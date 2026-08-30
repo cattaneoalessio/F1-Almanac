@@ -22,9 +22,19 @@ letti a occhio):
   info di base, elenco gare storiche disputate lì (con vincitore) e
   "albo d'oro" (i piloti più vincenti su quel tracciato), usata dalla
   pagina `/circuiti/:slug` del frontend.
+- `GET /scuderie` — indice di tutte le scuderie nel database.
+- `GET /scuderie/{slug}` (es. `/scuderie/alfa-romeo`) — scheda di una
+  scuderia: gare disputate (con il miglior risultato ottenuto in
+  ognuna, dato che una scuderia può schierare più piloti nella stessa
+  gara) e i piloti che ci hanno corso, coi loro totali **solo per il
+  periodo passato in quella scuderia** (non di carriera — uno stesso
+  pilota può comparire in più schede scuderia con numeri diversi).
+  Usata dalla pagina `/scuderie/:slug` del frontend. Se la scuderia
+  esiste ma non ha ancora risultati importati, risponde con liste
+  vuote invece di un 404 (la scuderia c'è davvero, solo senza dati).
 
-Tutti rispondono `404` con un messaggio chiaro se anno/circuito/pilota
-non esistono nel database (verificato: vedi sotto).
+Tutti rispondono `404` con un messaggio chiaro se anno/circuito/pilota/
+scuderia non esistono nel database (verificato: vedi sotto).
 
 ## Come avviarla
 
@@ -58,11 +68,22 @@ in modo affidabile). Se vuoi aggiungerlo, il posto giusto è la query in
 `main.py`: un `CASE WHEN r.giro_veloce AND sp.punto_giro_veloce THEN 1
 ELSE 0 END` da sommare ai punti.
 
+## Nazionalità delle scuderie
+
+Lo script di import di Fase B non valorizzava `costruttori.nazione_id`
+(non serviva finché non è arrivata la Sezione Scuderie). È stata
+aggiunta una patch una tantum, `db/patch_nazionalita_costruttori.sql`,
+che la popola con dati storici noti per le scuderie del 1950 — vedi le
+istruzioni nel file stesso. **Se importi nuove stagioni con scuderie
+non coperte da quella patch**, le loro schede scuderia mostreranno
+comunque tutto correttamente, solo senza bandierina finché non estendi
+la patch (o imposti `nazione_id` direttamente nell'import).
+
 ## CORS
 
-`CORSMiddleware` in `main.py` è già ristretto al dominio reale del
-frontend pubblicato (`https://f1-almanac.netlify.app`), non più aperto a
-tutte le origini. Se lavori in locale e il frontend gira su
-`http://127.0.0.1:5173` (l'indirizzo di default di Vite), aggiungilo
-temporaneamente all'elenco `allow_origins` in `main.py`, altrimenti le
-richieste dal frontend locale verranno bloccate dal browser.
+`CORSMiddleware` in `main.py` è ristretto al dominio reale del frontend
+pubblicato (`https://f1-almanac.netlify.app`) più gli indirizzi locali
+di sviluppo di Vite (`127.0.0.1`/`localhost` sulle porte 5173 e 4173,
+usate rispettivamente da `npm run dev` e `npm run preview`): non è più
+aperto a tutte le origini. Se in futuro pubblichi il frontend anche su
+un dominio proprio (es. dopo aver comprato un dominio), aggiungilo qui.

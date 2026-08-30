@@ -21,6 +21,7 @@ Avvio in locale:
 Poi apri http://127.0.0.1:8000/docs per la documentazione interattiva
 generata automaticamente da FastAPI.
 """
+from datetime import date
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
@@ -29,16 +30,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from db import get_connection
 from schemas import (
     GaraCircuito,
+    GaraScuderia,
     GaraStagione,
     RisultatiGara,
     RisultatoPilota,
     RisultatoStoricoPilota,
     SchedaCircuito,
     SchedaPilota,
+    SchedaScuderia,
     VoceAlboOro,
     VoceCircuito,
     VoceClassificaPiloti,
     VoceIndicePiloti,
+    VocePilotaScuderia,
+    VoceScuderia,
 )
 
 app = FastAPI(
@@ -47,12 +52,20 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# CORS aperto a tutte le origini: va bene per sviluppo locale. Prima di
-# andare online, restringilo al dominio reale del frontend (una riga
-# sola da cambiare qui sotto).
+# CORS ristretto al dominio reale del frontend pubblicato, più gli
+# indirizzi locali di sviluppo (Vite): senza questi ultimi, il frontend
+# avviato in locale con `npm run dev`/`npm run preview` verrebbe
+# bloccato dal browser (il backend risponderebbe comunque, ma il
+# browser scarterebbe la risposta perché l'origine non è in lista).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://f1-almanac.netlify.app"],
+    allow_origins=[
+        "https://f1-almanac.netlify.app",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:4173",
+        "http://localhost:4173",
+    ],
     allow_methods=["GET"],
     allow_headers=["*"],
 )
@@ -394,4 +407,163 @@ def scheda_circuito(slug: str):
         lunghezza_km=circuito["lunghezza_km"],
         gare=[GaraCircuito(**g) for g in gare],
         albo_oro=[VoceAlboOro(**v) for v in albo_oro],
+    )
+
+
+@app.get("/scuderie", response_model=list[VoceScuderia])
+def elenco_scuderie():
+    """Indice di tutte le scuderie presenti nel database, per la pagina
+    /scuderie del frontend."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT c.nome, c.codice_riferimento AS slug,
+                       n.codice_iso2 AS nazione_codice
+                FROM costruttori c
+                LEFT JOIN nazioni n ON n.id = c.nazione_id
+                ORDER BY c.nome ASC
+                """
+            )
+            righe = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [VoceScuderia(**riga) for riga in righe]
+
+
+@app.get("/scuderie/{slug}", response_model=SchedaScuderia)
+def scheda_scuderia(slug: str):
+    """Scheda di una scuderia: info di base, storico gare disputate (con
+    il miglior risultato ottenuto in ognuna, dato che una scuderia può
+    schierare più piloti nella stessa gara) e i piloti che ci hanno
+    corso, coi loro totali SOLO per il periodo passato in questa
+    scuderia (non di carriera). Usata dalla pagina /scuderie/:slug."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT c.id, c.nome, c.codice_riferimento AS slug,
+                       n.codice_iso2 AS nazione_codice
+                FROM costruttori c
+                LEFT JOIN nazioni n ON n.id = c.nazione_id
+                WHERE c.codice_riferimento = %(slug)s
+                """,
+                {"slug": slug},
+            )
+            scuderia = cur.fetchone()
+            if scuderia is None:
+                raise HTTPException(status_code=404, detail=f"Nessuna scuderia trovata con slug '{slug}'.")
+
+            cur.execute(
+                """
+                SELECT
+                    gp.id AS gran_premio_id,
+                    s.anno,
+                    gp.nome_gp,
+                    ci.codice_riferimento AS circuito,
+                    gp.data_gara,
+                    p.id AS pilota_id,
+                    p.nome || ' ' || p.cognome AS pilota,
+                    p.codice_riferimento AS pilota_slug,
+                    n.codice_iso2 AS pilota_nazione_codice,
+                    r.posizione_finale AS posizione,
+                    r.posizione_finale_testo AS posizione_testo,
+                    COALESCE(pp.punti, 0) AS punti
+                FROM risultati_gara r
+                JOIN gran_premi gp ON gp.id = r.gran_premio_id
+                JOIN stagioni s ON s.id = gp.stagione_id
+                JOIN circuiti ci ON ci.id = gp.circuito_id
+                JOIN piloti p ON p.id = r.pilota_id
+                LEFT JOIN nazioni n ON n.id = p.nazione_id
+                LEFT JOIN punti_per_posizione pp
+                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
+                    AND pp.posizione = r.posizione_finale
+                WHERE r.costruttore_id = %(costruttore_id)s
+                ORDER BY s.anno ASC, gp.data_gara ASC NULLS LAST
+                """,
+                {"costruttore_id": scuderia["id"]},
+            )
+            risultati = cur.fetchall()
+    finally:
+        conn.close()
+
+    if not risultati:
+        # La scuderia esiste ma non ha (ancora) risultati importati: si
+        # restituisce comunque la scheda, con liste vuote, invece di un
+        # 404 che sarebbe fuorviante (la scuderia c'è davvero).
+        return SchedaScuderia(
+            nome=scuderia["nome"],
+            slug=scuderia["slug"],
+            nazione_codice=scuderia["nazione_codice"],
+            punti_totali=0,
+            vittorie_totali=0,
+            gare_totali=0,
+            gare=[],
+            piloti=[],
+        )
+
+    punti_totali = sum(r["punti"] for r in risultati)
+    vittorie_totali = sum(1 for r in risultati if r["posizione"] == 1)
+
+    # Una riga "gara" per ogni gran premio disputato: si tiene il
+    # migliore dei risultati di quella gara (posizione più bassa vince;
+    # i ritiri/non classificati, posizione nulla, vanno dopo).
+    def chiave_migliore(riga):
+        return (riga["posizione"] is None, riga["posizione"] or 0)
+
+    gare_per_id = {}
+    for r in risultati:
+        gp_id = r["gran_premio_id"]
+        if gp_id not in gare_per_id or chiave_migliore(r) < chiave_migliore(gare_per_id[gp_id]):
+            gare_per_id[gp_id] = r
+
+    gare = [
+        GaraScuderia(
+            anno=r["anno"],
+            nome_gp=r["nome_gp"],
+            circuito=r["circuito"],
+            data_gara=r["data_gara"],
+            miglior_pilota=r["pilota"],
+            miglior_pilota_slug=r["pilota_slug"],
+            miglior_posizione=r["posizione"],
+            miglior_posizione_testo=r["posizione_testo"],
+        )
+        for r in sorted(gare_per_id.values(), key=lambda r: (r["anno"], r["data_gara"] or date.min))
+    ]
+
+    # Un pilota per riga: i totali contano SOLO i risultati ottenuti con
+    # QUESTA scuderia, non l'intera carriera del pilota (che può aver
+    # corso anche per altre scuderie, con numeri diversi).
+    piloti_map = {}
+    for r in risultati:
+        pid = r["pilota_id"]
+        voce = piloti_map.setdefault(
+            pid,
+            {
+                "pilota": r["pilota"],
+                "pilota_slug": r["pilota_slug"],
+                "nazione_codice": r["pilota_nazione_codice"],
+                "gare": 0,
+                "vittorie": 0,
+                "punti": 0.0,
+            },
+        )
+        voce["gare"] += 1
+        voce["vittorie"] += 1 if r["posizione"] == 1 else 0
+        voce["punti"] += float(r["punti"])
+
+    piloti = sorted(piloti_map.values(), key=lambda v: (-v["punti"], -v["vittorie"], v["pilota"]))
+
+    return SchedaScuderia(
+        nome=scuderia["nome"],
+        slug=scuderia["slug"],
+        nazione_codice=scuderia["nazione_codice"],
+        punti_totali=punti_totali,
+        vittorie_totali=vittorie_totali,
+        gare_totali=len(gare_per_id),
+        gare=gare,
+        piloti=[VocePilotaScuderia(**v) for v in piloti],
     )

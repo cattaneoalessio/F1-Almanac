@@ -109,3 +109,45 @@ class VoceIndicePiloti(BaseModel):
     punti_totali_carriera: float
     vittorie_totali: int
     gare_totali: int
+
+
+class VoceScuderia(BaseModel):
+    """Riga dell'indice /scuderie (elenco, non il dettaglio)."""
+    nome: str
+    slug: str
+    nazione_codice: Optional[str] = None
+
+
+class GaraScuderia(BaseModel):
+    """Una gara disputata da una scuderia, con il suo miglior risultato
+    in quella gara (può avere più piloti: si mostra il migliore)."""
+    anno: int
+    nome_gp: str
+    circuito: str  # codice_riferimento, per linkare alla pagina della gara
+    data_gara: Optional[date] = None
+    miglior_pilota: Optional[str] = None
+    miglior_pilota_slug: Optional[str] = None
+    miglior_posizione: Optional[int] = None
+    miglior_posizione_testo: Optional[str] = None
+
+
+class VocePilotaScuderia(BaseModel):
+    """Un pilota che ha corso per questa scuderia, con i suoi totali
+    (solo per il periodo passato in questa scuderia, non di carriera)."""
+    pilota: str
+    pilota_slug: str
+    nazione_codice: Optional[str] = None
+    gare: int
+    vittorie: int
+    punti: float
+
+
+class SchedaScuderia(BaseModel):
+    nome: str
+    slug: str
+    nazione_codice: Optional[str] = None
+    punti_totali: float
+    vittorie_totali: int
+    gare_totali: int
+    gare: list[GaraScuderia]
+    piloti: list[VocePilotaScuderia]
