@@ -51,7 +51,7 @@ app = FastAPI(
 # sola da cambiare qui sotto).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["f1-almanac.netlify.app"],
+    allow_origins=["https://f1-almanac.netlify.app"],
     allow_methods=["GET"],
     allow_headers=["*"],
 )
