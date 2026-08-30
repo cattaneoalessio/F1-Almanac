@@ -1,0 +1,21 @@
+.site-footer {
+  margin-top: 2.5rem;
+  padding: 1.1rem 1.5rem;
+  border-top: 1px solid var(--line);
+  background: var(--bg-main);
+}
+
+.site-footer__disclaimer {
+  max-width: 960px;
+  margin: 0 auto;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--text-gray);
+  text-align: center;
+}
+
+.site-footer__disclaimer strong {
+  color: var(--text-gray);
+  font-weight: 700;
+}

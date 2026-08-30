@@ -1,0 +1,51 @@
+/**
+ * .social-embed-container — contenitore responsive per iframe/embed di
+ * terzi (Instagram, X/Twitter, YouTube) nelle sezioni News/Live/GP.
+ *
+ * Perché serve: incorporare (embed) invece di scaricare i contenuti
+ * multimediali altrui sul nostro server evita del tutto i problemi di
+ * copyright sui video/post originali — il contenuto resta ospitato e
+ * sotto controllo della piattaforma di origine, noi mostriamo solo la
+ * "finestra" ufficiale che quella piattaforma fornisce per l'embed.
+ *
+ * Uso base (via <SocialEmbed>, sotto) o direttamente in HTML:
+ *   <div class="social-embed-container social-embed-container--video">
+ *     <iframe src="https://www.youtube.com/embed/XXXX" ...></iframe>
+ *   </div>
+ *
+ * Il modificatore --video forza un aspect-ratio 16:9 per i player
+ * (YouTube, X video): senza, l'iframe di Instagram/X per i post attorno
+ * ai testi gestisce già la propria altezza e basta il solo max-width.
+ */
+.social-embed-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 1rem auto;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.social-embed-container--video {
+  aspect-ratio: 16 / 9;
+}
+
+.social-embed-container--video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Instagram/X: l'iframe ufficiale gestisce da solo la propria altezza
+   (cambia in base al contenuto del post), quindi qui basta impedirgli
+   di sforare la larghezza del contenitore su mobile. */
+.social-embed-container:not(.social-embed-container--video) iframe,
+.social-embed-container:not(.social-embed-container--video) blockquote {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+}

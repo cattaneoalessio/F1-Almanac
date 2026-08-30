@@ -1,0 +1,32 @@
+.credited-figure {
+  margin: 0 0 1.2rem;
+}
+
+.credited-figure__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.credited-figure__caption {
+  margin-top: 0.4rem;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-gray);
+}
+
+.credited-figure__testo {
+  color: var(--text-muted);
+}
+
+.credited-figure__caption a {
+  color: var(--text-gray);
+  text-decoration: underline;
+}
+
+.credited-figure__caption a:hover {
+  color: var(--accent-gold);
+}

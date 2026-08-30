@@ -9,6 +9,7 @@ import CircuitsIndexView from './views/CircuitsIndexView.jsx';
 import CircuitView from './views/CircuitView.jsx';
 import ScuderiesIndexView from './views/ScuderiesIndexView.jsx';
 import ScuderiaView from './views/ScuderiaView.jsx';
+import SiteFooter from './components/SiteFooter.jsx';
 
 const TABS = [
   { pattern: '/archivio', to: `/archivio/${ANNO_DI_DEFAULT}`, label: 'Archivio storico' },
@@ -69,6 +70,8 @@ export default function App() {
           }
         />
       </Routes>
+
+      <SiteFooter />
     </div>
   );
 }

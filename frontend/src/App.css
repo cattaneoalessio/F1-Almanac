@@ -1,5 +1,17 @@
 .app-shell {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Il contenuto (nav + rotte) occupa lo spazio disponibile, così il
+   footer con il disclaimer resta ancorato in fondo alla viewport anche
+   nelle pagine con poco contenuto, invece di finire a metà schermo. */
+.app-shell > *:not(.site-footer) {
+  flex: 0 0 auto;
+}
+.app-shell > .main {
+  flex: 1 0 auto;
 }
 
 /* Barra di navigazione tra "Live Timing" e "Archivio storico" (Fase D).
