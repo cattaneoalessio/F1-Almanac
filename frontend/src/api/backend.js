@@ -55,6 +55,11 @@ export function getSchedaPilota(slug) {
   return fetchBackend(`/piloti/${encodeURIComponent(slug)}`);
 }
 
+/** Indice di tutti i piloti nel database, con i totali di carriera. */
+export function getElencoPiloti() {
+  return fetchBackend('/piloti');
+}
+
 /** Indice di tutti i circuiti nel database. */
 export function getElencoCircuiti() {
   return fetchBackend('/circuiti');

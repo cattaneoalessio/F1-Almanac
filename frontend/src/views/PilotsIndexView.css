@@ -1,0 +1,56 @@
+.pilots-index__ricerca {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 0 1.4rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+}
+.pilots-index__ricerca::placeholder {
+  color: var(--text-gray);
+}
+.pilots-index__ricerca:focus {
+  outline: 2px solid var(--accent-yellow);
+  outline-offset: 1px;
+}
+
+.pilots-index__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.pilots-index__card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.pilots-index__card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  transition: transform 0.15s ease;
+}
+.pilots-index__card-link:hover .pilots-index__card {
+  transform: translateY(-2px);
+  color: var(--accent-gold);
+}
+
+.pilots-index__nome {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.pilots-index__stats {
+  font-size: 0.78rem;
+  color: var(--text-gray);
+  margin-top: 0.2rem;
+}

@@ -3,7 +3,7 @@
 Struttura React reale, verificata (build, lint e screenshot Playwright
 passati), con **routing vero** (React Router: ogni stagione/gara/pilota/
 circuito ha un proprio URL, condivisibile e più indicizzabile di una
-singola pagina) e **tre sezioni** raggiungibili dalla barra in alto:
+singola pagina) e **quattro sezioni** raggiungibili dalla barra in alto:
 
 - **Archivio storico** (`/archivio/:anno`) — collegato **per davvero** al
   backend FastAPI del progetto (Fase C): selezioni una stagione
@@ -14,6 +14,10 @@ singola pagina) e **tre sezioni** raggiungibili dalla barra in alto:
   scheda di carriera (`/piloti/:slug`). Se la stagione non ha ancora
   dati nel database, lo dice chiaramente invece di mostrare una tabella
   vuota o rompersi.
+- **Piloti** (`/piloti`) — indice di tutti i piloti nel database, con
+  totali di carriera (gare/vittorie/punti) e un campo di ricerca per
+  nome (filtrato lato client: se l'elenco crescesse molto, andrà
+  spostato lato server). Ogni scheda rimanda a `/piloti/:slug`.
 - **Circuiti** (`/circuiti`) — indice di tutti i tracciati, ognuno con la
   propria scheda (`/circuiti/:slug`): gare storiche disputate lì e
   "albo d'oro" dei piloti più vincenti su quel circuito.
@@ -71,6 +75,7 @@ frontend/
 │   │   ├── HistoricalView.jsx           <- vista stagione, rotta /archivio/:anno
 │   │   ├── RaceDetailView.jsx/.css      <- vista gara, rotta /archivio/:anno/:circuito
 │   │   ├── DriverView.jsx/.css          <- scheda pilota, rotta /piloti/:slug
+│   │   ├── PilotsIndexView.jsx/.css     <- indice piloti (con ricerca), rotta /piloti
 │   │   ├── CircuitsIndexView.jsx/.css   <- indice circuiti, rotta /circuiti
 │   │   └── CircuitView.jsx/.css         <- scheda circuito, rotta /circuiti/:slug
 │   ├── styles/
