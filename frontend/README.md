@@ -3,7 +3,7 @@
 Struttura React reale, verificata (build, lint e screenshot Playwright
 passati), con **routing vero** (React Router: ogni stagione/gara/pilota/
 circuito ha un proprio URL, condivisibile e più indicizzabile di una
-singola pagina) e **quattro sezioni** raggiungibili dalla barra in alto:
+singola pagina) e **cinque sezioni** raggiungibili dalla barra in alto:
 
 - **Archivio storico** (`/archivio/:anno`) — collegato **per davvero** al
   backend FastAPI del progetto (Fase C): selezioni una stagione
@@ -18,6 +18,10 @@ singola pagina) e **quattro sezioni** raggiungibili dalla barra in alto:
   totali di carriera (gare/vittorie/punti) e un campo di ricerca per
   nome (filtrato lato client: se l'elenco crescesse molto, andrà
   spostato lato server). Ogni scheda rimanda a `/piloti/:slug`.
+- **Scuderie** (`/scuderie`) — indice di tutte le scuderie, ognuna con la
+  propria scheda (`/scuderie/:slug`): gare disputate (col miglior
+  risultato ottenuto in ognuna) e piloti che ci hanno corso, con i loro
+  totali relativi al solo periodo passato in quella scuderia.
 - **Circuiti** (`/circuiti`) — indice di tutti i tracciati, ognuno con la
   propria scheda (`/circuiti/:slug`): gare storiche disputate lì e
   "albo d'oro" dei piloti più vincenti su quel circuito.
@@ -77,7 +81,9 @@ frontend/
 │   │   ├── DriverView.jsx/.css          <- scheda pilota, rotta /piloti/:slug
 │   │   ├── PilotsIndexView.jsx/.css     <- indice piloti (con ricerca), rotta /piloti
 │   │   ├── CircuitsIndexView.jsx/.css   <- indice circuiti, rotta /circuiti
-│   │   └── CircuitView.jsx/.css         <- scheda circuito, rotta /circuiti/:slug
+│   │   ├── CircuitView.jsx/.css         <- scheda circuito, rotta /circuiti/:slug
+│   │   ├── ScuderiesIndexView.jsx/.css  <- indice scuderie, rotta /scuderie
+│   │   └── ScuderiaView.jsx             <- scheda scuderia, rotta /scuderie/:slug (riusa CircuitView.css)
 │   ├── styles/
 │   │   └── theme.css         <- IL design system: colori, font, badge, pannelli "vetro"
 │   ├── data/

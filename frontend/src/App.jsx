@@ -7,10 +7,13 @@ import DriverView from './views/DriverView.jsx';
 import PilotsIndexView from './views/PilotsIndexView.jsx';
 import CircuitsIndexView from './views/CircuitsIndexView.jsx';
 import CircuitView from './views/CircuitView.jsx';
+import ScuderiesIndexView from './views/ScuderiesIndexView.jsx';
+import ScuderiaView from './views/ScuderiaView.jsx';
 
 const TABS = [
   { pattern: '/archivio', to: `/archivio/${ANNO_DI_DEFAULT}`, label: 'Archivio storico' },
   { pattern: '/piloti', to: '/piloti', label: 'Piloti' },
+  { pattern: '/scuderie', to: '/scuderie', label: 'Scuderie' },
   { pattern: '/circuiti', to: '/circuiti', label: 'Circuiti' },
   { pattern: '/live', to: '/live', label: 'Live Timing' },
 ];
@@ -52,6 +55,8 @@ export default function App() {
         <Route path="/piloti/:slug" element={<DriverView />} />
         <Route path="/circuiti" element={<CircuitsIndexView />} />
         <Route path="/circuiti/:slug" element={<CircuitView />} />
+        <Route path="/scuderie" element={<ScuderiesIndexView />} />
+        <Route path="/scuderie/:slug" element={<ScuderiaView />} />
         <Route path="/live" element={<LiveTimingView />} />
         <Route
           path="*"

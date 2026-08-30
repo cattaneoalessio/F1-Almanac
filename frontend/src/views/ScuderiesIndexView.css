@@ -1,0 +1,32 @@
+.scuderie-index__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.scuderie-index__card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.scuderie-index__card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  transition: transform 0.15s ease;
+}
+.scuderie-index__card-link:hover .scuderie-index__card {
+  transform: translateY(-2px);
+  color: var(--accent-gold);
+}
+
+.scuderie-index__nome {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.scuderie-index__nazione {
+  display: flex;
+  align-items: center;
+  margin-top: 0.25rem;
+}

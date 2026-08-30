@@ -69,3 +69,13 @@ export function getElencoCircuiti() {
 export function getSchedaCircuito(slug) {
   return fetchBackend(`/circuiti/${encodeURIComponent(slug)}`);
 }
+
+/** Indice di tutte le scuderie nel database. */
+export function getElencoScuderie() {
+  return fetchBackend('/scuderie');
+}
+
+/** Scheda di una scuderia (gare disputate, piloti). `null` se lo slug non esiste. */
+export function getSchedaScuderia(slug) {
+  return fetchBackend(`/scuderie/${encodeURIComponent(slug)}`);
+}

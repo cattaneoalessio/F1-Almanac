@@ -15,7 +15,7 @@ import { colorForTeam, codeForTeam } from '../data/teamColors.js';
 export default function TeamBadge({ team, size = 'md' }) {
   return (
     <span
-      className={`team-badge ${size === 'sm' ? 'team-badge--sm' : ''}`}
+      className={`team-badge ${size === 'sm' ? 'team-badge--sm' : ''} ${size === 'lg' ? 'team-badge--lg' : ''}`}
       style={{ '--team-color': colorForTeam(team) }}
       title={team}
     >

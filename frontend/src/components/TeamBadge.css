@@ -19,3 +19,10 @@
   font-size: 0.42rem;
   border-radius: 4px;
 }
+.team-badge--lg {
+  width: 56px;
+  height: 56px;
+  font-size: 0.95rem;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
