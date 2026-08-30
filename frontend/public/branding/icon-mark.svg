@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect x="0" y="0" width="512" height="512" rx="115" ry="115" fill="#0b0c10"/>
+  <g transform="translate(372.00,300.00) rotate(-26.00) translate(-300.00,0)"><path d="M 0 0 Q 90.00 -12.65 180.00 -23.00 Q 255.00 -24.15 300.00 0 Q 255.00 24.15 180.00 23.00 Q 90.00 12.65 0 0 Z" fill="#e10600" opacity="1.0"/></g><g transform="translate(372.00,248.00) rotate(-26.00) translate(-250.00,0)"><path d="M 0 0 Q 75.00 -10.45 150.00 -19.00 Q 212.50 -19.95 250.00 0 Q 212.50 19.95 150.00 19.00 Q 75.00 10.45 0 0 Z" fill="#c5a059" opacity="1.0"/></g><g transform="translate(372.00,200.00) rotate(-26.00) translate(-195.00,0)"><path d="M 0 0 Q 58.50 -8.25 117.00 -15.00 Q 165.75 -15.75 195.00 0 Q 165.75 15.75 117.00 15.00 Q 58.50 8.25 0 0 Z" fill="#fff200" opacity="1.0"/></g>
+</svg>
