@@ -65,6 +65,46 @@ export default function CircuitView() {
             </div>
           </div>
 
+          {(scheda.indirizzo || scheda.capienza || scheda.google_maps_url) && (
+            <GlassPanel style={{ marginBottom: '1.2rem' }}>
+              <h2 className="section-title" style={{ marginTop: 0 }}>
+                Informazioni
+              </h2>
+              <ul className="circuit-view__info-list">
+                {scheda.indirizzo && (
+                  <li>
+                    <strong>Indirizzo:</strong> {scheda.indirizzo}
+                    {scheda.google_maps_url && (
+                      <>
+                        {' '}
+                        (<a href={scheda.google_maps_url} target="_blank" rel="noreferrer">apri su Google Maps ↗</a>)
+                      </>
+                    )}
+                  </li>
+                )}
+                {scheda.capienza && (
+                  <li>
+                    <strong>Capienza:</strong> circa {scheda.capienza.toLocaleString('it-IT')} spettatori
+                  </li>
+                )}
+                {scheda.lunghezza_km && (
+                  <li>
+                    <strong>Lunghezza:</strong> {scheda.lunghezza_km} km
+                  </li>
+                )}
+              </ul>
+            </GlassPanel>
+          )}
+
+          {scheda.storia && (
+            <GlassPanel style={{ marginBottom: '1.2rem' }}>
+              <h2 className="section-title" style={{ marginTop: 0 }}>
+                Storia
+              </h2>
+              <p className="circuit-view__testo">{scheda.storia}</p>
+            </GlassPanel>
+          )}
+
           <div className="circuit-view__grid">
             <GlassPanel>
               <h2 className="section-title" style={{ marginTop: 0 }}>
@@ -133,6 +173,71 @@ export default function CircuitView() {
               )}
             </GlassPanel>
           </div>
+
+          {scheda.curve.length > 0 && (
+            <GlassPanel style={{ marginTop: '1.2rem' }}>
+              <h2 className="section-title" style={{ marginTop: 0 }}>
+                Curve e rettilinei
+              </h2>
+              <div className="historical-standings__table-wrap">
+                <table className="historical-standings__table">
+                  <thead>
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">Nome</th>
+                      <th scope="col">Nome nel 1950</th>
+                      <th scope="col">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scheda.curve.map((curva) => (
+                      <tr key={curva.ordine}>
+                        <td className="tab-num">{curva.ordine}</td>
+                        <td>
+                          {curva.nome_moderno ?? <em>non più esistente</em>}
+                          {curva.anno_intitolazione && (
+                            <span className="circuit-view__nota-inline"> (dal {curva.anno_intitolazione})</span>
+                          )}
+                        </td>
+                        <td>{curva.nome_1950 ?? (curva.nome_moderno ? '—' : '')}</td>
+                        <td className="circuit-view__nota">{curva.nota ?? ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </GlassPanel>
+          )}
+
+          {scheda.configurazioni.length > 0 && (
+            <GlassPanel style={{ marginTop: '1.2rem' }}>
+              <h2 className="section-title" style={{ marginTop: 0 }}>
+                Configurazioni nel tempo
+              </h2>
+              <div className="historical-standings__table-wrap">
+                <table className="historical-standings__table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Periodo</th>
+                      <th scope="col">Lunghezza</th>
+                      <th scope="col">Descrizione</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scheda.configurazioni.map((conf) => (
+                      <tr key={conf.anno_da}>
+                        <td className="tab-num">
+                          {conf.anno_da}–{conf.anno_a ?? 'oggi'}
+                        </td>
+                        <td className="tab-num">{conf.lunghezza_km ? `${conf.lunghezza_km} km` : '—'}</td>
+                        <td className="circuit-view__nota">{conf.descrizione}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </GlassPanel>
+          )}
         </>
       )}
     </main>

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './HistoricalStandings.css';
 import GlassPanel from './GlassPanel.jsx';
-import { getClassificaPiloti, getGareStagione } from '../api/backend.js';
+import TeamBadge from './TeamBadge.jsx';
+import { getClassificaPiloti, getClassificaScuderie, getGareStagione } from '../api/backend.js';
 import { FlagIcon } from '../utils/flags.jsx';
 
 // Anno minimo/massimo selezionabili: coprono l'intera storia del
@@ -33,11 +34,14 @@ const ANNI_DISPONIBILI = generaElencoAnni();
 export default function HistoricalStandings({ anno, onAnnoChange }) {
   const [righeClassifica, setRigheClassifica] = useState([]);
   const [statoClassifica, setStatoClassifica] = useState('caricamento'); // caricamento | pronto | vuoto | errore
+  const [righeScuderie, setRigheScuderie] = useState([]);
+  const [statoScuderie, setStatoScuderie] = useState('caricamento'); // caricamento | pronto | vuoto | errore
   const [gare, setGare] = useState([]);
 
   useEffect(() => {
     let annullato = false;
     setStatoClassifica('caricamento');
+    setStatoScuderie('caricamento');
 
     getClassificaPiloti(anno)
       .then((dati) => {
@@ -55,6 +59,24 @@ export default function HistoricalStandings({ anno, onAnnoChange }) {
         console.error('Errore nel caricare la classifica storica:', errore);
         setRigheClassifica([]);
         setStatoClassifica('errore');
+      });
+
+    getClassificaScuderie(anno)
+      .then((dati) => {
+        if (annullato) return;
+        if (dati === null || dati.length === 0) {
+          setRigheScuderie([]);
+          setStatoScuderie('vuoto');
+          return;
+        }
+        setRigheScuderie(dati);
+        setStatoScuderie('pronto');
+      })
+      .catch((errore) => {
+        if (annullato) return;
+        console.error('Errore nel caricare la classifica scuderie:', errore);
+        setRigheScuderie([]);
+        setStatoScuderie('errore');
       });
 
     getGareStagione(anno)
@@ -136,6 +158,66 @@ export default function HistoricalStandings({ anno, onAnnoChange }) {
                       <Link to={`/piloti/${riga.pilota_slug}`} className="historical-standings__pilota">
                         <FlagIcon codiceIso2={riga.nazione_codice} />
                         {riga.pilota}
+                      </Link>
+                    </td>
+                    <td className="tab-num">{riga.punti_totali}</td>
+                    <td className="tab-num">{riga.vittorie}</td>
+                    <td className="tab-num">{riga.gare_disputate}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </GlassPanel>
+
+      <GlassPanel style={{ marginTop: '1.2rem' }}>
+        <h2 className="section-title" style={{ marginTop: 0 }}>
+          Classifica scuderie storica
+        </h2>
+        <p className="historical-standings__nota">
+          Nota: prima del 1958 non esisteva un Mondiale Costruttori ufficiale. Questa classifica è un
+          criterio nostro (somma i punti di tutti i piloti schierati da ogni scuderia in stagione), non un
+          titolo storico realmente assegnato all'epoca.
+        </p>
+
+        {statoScuderie === 'caricamento' && (
+          <p className="historical-standings__stato">Carico la classifica scuderie del {anno}…</p>
+        )}
+
+        {statoScuderie === 'errore' && (
+          <p className="historical-standings__stato historical-standings__stato--errore">
+            Non riesco a contattare il backend. Verifica che l'API sia avviata e riprova.
+          </p>
+        )}
+
+        {statoScuderie === 'vuoto' && (
+          <p className="historical-standings__stato">
+            Nessun dato per la stagione {anno} nel database (l'MVP contiene solo alcune gare di test).
+          </p>
+        )}
+
+        {statoScuderie === 'pronto' && (
+          <div className="historical-standings__table-wrap">
+            <table className="historical-standings__table">
+              <thead>
+                <tr>
+                  <th scope="col">Pos.</th>
+                  <th scope="col">Scuderia</th>
+                  <th scope="col">Punti</th>
+                  <th scope="col">Vittorie</th>
+                  <th scope="col">Gare</th>
+                </tr>
+              </thead>
+              <tbody>
+                {righeScuderie.map((riga, indice) => (
+                  <tr key={riga.scuderia_slug}>
+                    <td className="tab-num">{indice + 1}</td>
+                    <td>
+                      <Link to={`/scuderie/${riga.scuderia_slug}`} className="historical-standings__pilota">
+                        <TeamBadge team={riga.scuderia} size="sm" />
+                        <FlagIcon codiceIso2={riga.nazione_codice} />
+                        {riga.scuderia}
                       </Link>
                     </td>
                     <td className="tab-num">{riga.punti_totali}</td>

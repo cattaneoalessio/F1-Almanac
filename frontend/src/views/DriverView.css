@@ -17,3 +17,26 @@
   font-size: 0.82rem;
   color: var(--text-gray);
 }
+
+.driver-view__anni {
+  margin-left: 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-gray);
+}
+
+.driver-view__testo {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.driver-view__wiki {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+}
+
+.driver-view__wiki a {
+  color: var(--accent-gold);
+}

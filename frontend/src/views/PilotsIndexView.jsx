@@ -83,7 +83,7 @@ export default function PilotsIndexView() {
           {pilotiFiltrati.map((p) => (
             <Link key={p.slug} to={`/piloti/${p.slug}`} className="pilots-index__card-link">
               <GlassPanel className="pilots-index__card">
-                <DriverAvatar size={40} />
+                <DriverAvatar size={40} team={p.ultima_scuderia} />
                 <div>
                   <div className="pilots-index__nome">
                     <FlagIcon codiceIso2={p.nazione_codice} /> {p.pilota}

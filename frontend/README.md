@@ -8,23 +8,38 @@ singola pagina) e **cinque sezioni** raggiungibili dalla barra in alto:
 - **Archivio storico** (`/archivio/:anno`) — collegato **per davvero** al
   backend FastAPI del progetto (Fase C): selezioni una stagione
   (1950-2026), vedi l'elenco delle gare (cliccabili, `/archivio/:anno/
-  :circuito`) e la classifica piloti reale letta dal database
+  :circuito`), la classifica piloti reale letta dal database
   PostgreSQL, con bandiera del pilota (icona SVG, non emoji: le emoji
-  bandiera non si vedono su Windows). Ogni pilota rimanda alla sua
-  scheda di carriera (`/piloti/:slug`). Se la stagione non ha ancora
-  dati nel database, lo dice chiaramente invece di mostrare una tabella
-  vuota o rompersi.
+  bandiera non si vedono su Windows), e — sotto — la classifica
+  scuderie della stessa stagione (stesso criterio "a somma" dei punti,
+  non una classifica storica realmente esistita: il Mondiale Costruttori
+  è nato solo nel 1958). Ogni pilota/scuderia rimanda alla propria
+  scheda (`/piloti/:slug`, `/scuderie/:slug`). Se la stagione non ha
+  ancora dati nel database, lo dice chiaramente invece di mostrare una
+  tabella vuota o rompersi.
 - **Piloti** (`/piloti`) — indice di tutti i piloti nel database, con
   totali di carriera (gare/vittorie/punti) e un campo di ricerca per
   nome (filtrato lato client: se l'elenco crescesse molto, andrà
-  spostato lato server). Ogni scheda rimanda a `/piloti/:slug`.
+  spostato lato server). Ogni scheda rimanda a `/piloti/:slug`, che ora
+  mostra anche: avatar-casco stilizzato con i colori dell'ULTIMA
+  scuderia del pilota (non più grigio fisso), anni di nascita/morte,
+  link a Wikipedia quando disponibile, e quattro pannelli — Biografia,
+  Curiosità, Vittorie (solo le gare vinte) e Piazzamenti (tutte le
+  gare). Biografia/Curiosità mostrano un messaggio invece di restare
+  vuoti quando le fonti pubbliche disponibili non sono sufficienti
+  (succede per un certo numero di comprimari dell'epoca).
 - **Scuderie** (`/scuderie`) — indice di tutte le scuderie, ognuna con la
   propria scheda (`/scuderie/:slug`): gare disputate (col miglior
   risultato ottenuto in ognuna) e piloti che ci hanno corso, con i loro
   totali relativi al solo periodo passato in quella scuderia.
 - **Circuiti** (`/circuiti`) — indice di tutti i tracciati, ognuno con la
   propria scheda (`/circuiti/:slug`): gare storiche disputate lì e
-  "albo d'oro" dei piloti più vincenti su quel circuito.
+  "albo d'oro" dei piloti più vincenti su quel circuito, più — quando
+  disponibili — indirizzo/capienza/link a Google Maps, un pannello
+  "Storia" in prosa originale, e due tabelle: "Curve e rettilinei" (nome
+  moderno vs nome nel 1950, con l'anno di intitolazione quando una curva
+  ha preso il nome attuale dopo il 1950) e "Configurazioni nel tempo"
+  (le diverse planimetrie/lunghezze avute dal circuito nei decenni).
 - **Live Timing** (`/live`) — il mockup grafico originale (dati di
   esempio + tentativo di lettura da OpenF1 per le gomme).
 
@@ -87,7 +102,7 @@ frontend/
 │   ├── styles/
 │   │   └── theme.css         <- IL design system: colori, font, badge, pannelli "vetro"
 │   ├── data/
-│   │   └── teamColors.js     <- colori ufficiali scuderie + mescole gomme, in un unico posto
+│   │   └── teamColors.js     <- colori scuderie (moderne + storiche 1950) + mescole gomme, in un unico posto
 │   ├── utils/
 │   │   └── flags.jsx         <- <FlagIcon codiceIso2="IT" />, SVG locale (non emoji: illeggibili su Windows)
 │   ├── components/
@@ -126,6 +141,30 @@ prima di fare affidamento sui dati reali, apri quella pagina e controlla
 che i nomi dei campi restituiti coincidano con quelli usati nella
 funzione `normalizeStint()` dello script. Se sono cambiati, va
 aggiornata solo quella funzione.
+
+## Nota importante: il file `.env` va creato PRIMA di `npm run build`
+
+Vite legge `VITE_API_BASE_URL` una volta sola, nel momento in cui lanci
+`npm run build`, e lo "cuoce" dentro i file in `dist/`: se cambi o crei
+il file `.env` DOPO aver già fatto la build, non succede nulla finché
+non rilanci `npm run build` da capo. Se dopo aver pubblicato il sito le
+pagine restano bloccate su "Non riesco a contattare il backend", il
+primo sospetto è proprio questo: verifica che `.env` esista con
+l'indirizzo giusto e poi rilancia la build.
+
+## Colori delle scuderie storiche (1950)
+
+Nel 1950 le vetture correvano nei colori nazionali del proprio paese
+(rosso Italia, blu Francia, verde Gran Bretagna), non con livree
+sponsorizzate come oggi: `src/data/teamColors.js` assegna quindi un
+colore di stile — non una riproduzione fedele di una livrea reale — a
+ogni scuderia della stagione 1950 presente nel database (Alfa Romeo,
+Maserati, Talbot-Lago, Simca, ERA, Alta, Cooper, Kurtis Kraft). Le
+scuderie minori non elencate lì (per lo più singoli telai artigianali
+di Indianapolis, con una o due presenze ciascuno) restano nel grigio di
+fallback: se in futuro vuoi assegnargli un colore specifico, quello è
+l'unico file da toccare — sia l'avatar pilota (`DriverAvatar`) sia il
+badge scuderia (`TeamBadge`) lo leggono da lì automaticamente.
 
 ## Nota sul brand "Sky Sport"
 

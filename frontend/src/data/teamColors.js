@@ -20,6 +20,21 @@ export const TEAM_COLORS = {
   VCARB: '#6692FF',
   Sauber: '#52E252',
   Haas: '#B6BABD',
+
+  // Scuderie storiche (Campionato 1950 e dintorni). Nel 1950 le vetture
+  // non avevano ancora livree sponsorizzate: correvano nei "colori
+  // nazionali" di corsa del proprio paese (rosso Italia, blu Francia,
+  // verde Gran Bretagna...). Qui li usiamo solo come stile distintivo
+  // nell'app — non riproducono foto/livree reali, quindi restano
+  // coerenti con l'approccio "illustrazione originale" del resto del sito.
+  'Alfa Romeo': '#A6051A', // rosso corsa italiano (tono più scuro di Ferrari)
+  Maserati: '#C1121F', // rosso corsa italiano (tono più acceso)
+  'Talbot-Lago': '#0033A0', // bleu de France
+  Simca: '#0033A0', // Simca-Gordini, stessa livrea nazionale francese
+  ERA: '#00693E', // British Racing Green
+  Alta: '#00693E', // British Racing Green
+  Cooper: '#00693E', // British Racing Green
+  'Kurtis Kraft': '#4B6584', // telaio USA più diffuso a Indianapolis nel 1950
 };
 
 export function colorForTeam(teamName) {

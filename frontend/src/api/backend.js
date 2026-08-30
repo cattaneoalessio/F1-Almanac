@@ -40,6 +40,11 @@ export function getClassificaPiloti(anno) {
   return fetchBackend('/classifica/piloti', { anno });
 }
 
+/** Classifica scuderie di una stagione (punteggio "a somma"). `null` se l'anno non esiste. */
+export function getClassificaScuderie(anno) {
+  return fetchBackend('/classifica/scuderie', { anno });
+}
+
 /** Ordine di arrivo completo di una gara. Restituisce `null` se non trovata. */
 export function getRisultatiGara(anno, circuito) {
   return fetchBackend('/gare/risultati', { anno, circuito });
