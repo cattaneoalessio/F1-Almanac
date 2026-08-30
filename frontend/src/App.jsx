@@ -9,6 +9,7 @@ import CircuitsIndexView from './views/CircuitsIndexView.jsx';
 import CircuitView from './views/CircuitView.jsx';
 import ScuderiesIndexView from './views/ScuderiesIndexView.jsx';
 import ScuderiaView from './views/ScuderiaView.jsx';
+import NewsView from './views/NewsView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { pattern: '/piloti', to: '/piloti', label: 'Piloti' },
   { pattern: '/scuderie', to: '/scuderie', label: 'Scuderie' },
   { pattern: '/circuiti', to: '/circuiti', label: 'Circuiti' },
+  { pattern: '/news', to: '/news', label: 'News' },
   { pattern: '/live', to: '/live', label: 'Live Timing' },
 ];
 
@@ -58,6 +60,7 @@ export default function App() {
         <Route path="/circuiti/:slug" element={<CircuitView />} />
         <Route path="/scuderie" element={<ScuderiesIndexView />} />
         <Route path="/scuderie/:slug" element={<ScuderiaView />} />
+        <Route path="/news" element={<NewsView />} />
         <Route path="/live" element={<LiveTimingView />} />
         <Route
           path="*"
