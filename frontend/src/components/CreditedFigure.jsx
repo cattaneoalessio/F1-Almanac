@@ -28,6 +28,7 @@ export default function CreditedFigure({
   src,
   alt,
   autore,
+  autoreUrl,
   fonteUrl,
   fonteLabel = 'Fonte',
   licenzaUrl,
@@ -39,7 +40,19 @@ export default function CreditedFigure({
       <img className="credited-figure__img" src={src} alt={alt} loading="lazy" />
       <figcaption className="credited-figure__caption">
         {didascalia && <span className="credited-figure__testo">{didascalia} — </span>}
-        {autore && <span>Autore: {autore}. </span>}
+        {autore && (
+          <span>
+            Autore:{' '}
+            {autoreUrl ? (
+              <a href={autoreUrl} target="_blank" rel="noreferrer noopener">
+                {autore}
+              </a>
+            ) : (
+              autore
+            )}
+            .{' '}
+          </span>
+        )}
         {fonteUrl && (
           <span>
             Fonte:{' '}

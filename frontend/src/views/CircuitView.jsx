@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
+import CreditedFigure from '../components/CreditedFigure.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getSchedaCircuito } from '../api/backend.js';
+import { CIRCUIT_PHOTOS } from '../data/circuitPhotos.js';
 import '../components/HistoricalStandings.css';
 import './CircuitView.css';
 
@@ -101,6 +103,9 @@ export default function CircuitView() {
               <h2 className="section-title" style={{ marginTop: 0 }}>
                 Storia
               </h2>
+              {(CIRCUIT_PHOTOS[slug] || []).map((foto) => (
+                <CreditedFigure key={foto.src} {...foto} />
+              ))}
               <p className="circuit-view__testo">{scheda.storia}</p>
             </GlassPanel>
           )}
