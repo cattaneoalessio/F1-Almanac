@@ -38,6 +38,7 @@ from schemas import (
     VoceAlboOro,
     VoceCircuito,
     VoceClassificaPiloti,
+    VoceIndicePiloti,
 )
 
 app = FastAPI(
@@ -193,6 +194,43 @@ def gare_stagione(anno: int = Query(..., description="Anno della stagione, es. 1
         raise HTTPException(status_code=404, detail=f"Nessuna gara trovata per la stagione {anno}.")
 
     return [GaraStagione(**riga) for riga in righe]
+
+
+@app.get("/piloti", response_model=list[VoceIndicePiloti])
+def elenco_piloti():
+    """Indice di tutti i piloti presenti nel database, con i totali di
+    carriera (punti, vittorie, gare), per la pagina /piloti del frontend.
+    Ordinato per cognome: è un roster, non una classifica, quindi non ha
+    senso ordinarlo per punti come /classifica/piloti."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    p.nome || ' ' || p.cognome AS pilota,
+                    p.codice_riferimento AS slug,
+                    n.codice_iso2 AS nazione_codice,
+                    COALESCE(SUM(pp.punti), 0) AS punti_totali_carriera,
+                    COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie_totali,
+                    COUNT(*) AS gare_totali
+                FROM piloti p
+                JOIN risultati_gara r ON r.pilota_id = p.id
+                JOIN gran_premi gp ON gp.id = r.gran_premio_id
+                JOIN stagioni s ON s.id = gp.stagione_id
+                LEFT JOIN nazioni n ON n.id = p.nazione_id
+                LEFT JOIN punti_per_posizione pp
+                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
+                    AND pp.posizione = r.posizione_finale
+                GROUP BY p.id, p.nome, p.cognome, p.codice_riferimento, n.codice_iso2
+                ORDER BY p.cognome ASC, p.nome ASC
+                """
+            )
+            righe = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [VoceIndicePiloti(**riga) for riga in righe]
 
 
 @app.get("/piloti/{slug}", response_model=SchedaPilota)

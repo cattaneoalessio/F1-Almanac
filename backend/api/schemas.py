@@ -98,3 +98,14 @@ class SchedaCircuito(BaseModel):
     lunghezza_km: Optional[float] = None
     gare: list[GaraCircuito]
     albo_oro: list[VoceAlboOro]
+
+
+class VoceIndicePiloti(BaseModel):
+    """Riga dell'indice /piloti (elenco di tutti i piloti presenti nel
+    database, con i totali di carriera, non il dettaglio della scheda)."""
+    pilota: str
+    slug: str
+    nazione_codice: Optional[str] = None
+    punti_totali_carriera: float
+    vittorie_totali: int
+    gare_totali: int

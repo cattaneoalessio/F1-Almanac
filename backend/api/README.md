@@ -10,6 +10,10 @@ letti a occhio):
   cliccabili nella pagina della classifica).
 - `GET /classifica/piloti?anno=1950` — classifica piloti della stagione,
   con `nazione_codice` (ISO2) per la bandierina nel frontend.
+- `GET /piloti` — indice di tutti i piloti nel database con i totali di
+  carriera (punti/vittorie/gare), usato dalla pagina `/piloti` del
+  frontend. È un roster (ordinato per cognome), non una classifica: per
+  questo l'ordinamento è alfabetico e non per punti.
 - `GET /piloti/{slug}` (es. `/piloti/nino-farina`) — scheda di carriera
   di un pilota: totali (punti/vittorie/gare) e risultati gara per gara,
   usata dalla pagina `/piloti/:slug` del frontend (Fase D).
@@ -54,9 +58,11 @@ in modo affidabile). Se vuoi aggiungerlo, il posto giusto è la query in
 `main.py`: un `CASE WHEN r.giro_veloce AND sp.punto_giro_veloce THEN 1
 ELSE 0 END` da sommare ai punti.
 
-## Prima di andare online
+## CORS
 
-`CORSMiddleware` in `main.py` è aperto a tutte le origini
-(`allow_origins=["*"]`), comodo per sviluppo locale ma da restringere al
-dominio reale del frontend prima della pubblicazione — è una riga sola
-da cambiare.
+`CORSMiddleware` in `main.py` è già ristretto al dominio reale del
+frontend pubblicato (`https://f1-almanac.netlify.app`), non più aperto a
+tutte le origini. Se lavori in locale e il frontend gira su
+`http://127.0.0.1:5173` (l'indirizzo di default di Vite), aggiungilo
+temporaneamente all'elenco `allow_origins` in `main.py`, altrimenti le
+richieste dal frontend locale verranno bloccate dal browser.
