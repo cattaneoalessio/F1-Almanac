@@ -41,6 +41,23 @@ class VoceClassificaPiloti(BaseModel):
     gare_disputate: int
 
 
+class VoceClassificaScuderie(BaseModel):
+    """Riga della classifica scuderie di una stagione (/classifica/scuderie).
+
+    Punteggio "a somma": si sommano i punti di TUTTI i piloti schierati
+    dalla scuderia in ogni gara, non solo il migliore. Nel 1950 non
+    esisteva ancora un Mondiale Costruttori ufficiale (introdotto nel
+    1958): questo è quindi un criterio nostro, scelto per coerenza con
+    lo stesso criterio "a somma" già usato in /classifica/piloti, non
+    una classifica storica realmente esistita."""
+    scuderia: str
+    scuderia_slug: str
+    nazione_codice: Optional[str] = None
+    punti_totali: float
+    vittorie: int
+    gare_disputate: int
+
+
 class RisultatoStoricoPilota(BaseModel):
     anno: int
     nome_gp: str
@@ -61,6 +78,13 @@ class SchedaPilota(BaseModel):
     pilota: str
     pilota_slug: str
     nazione_codice: Optional[str] = None
+    data_nascita: Optional[date] = None
+    data_morte: Optional[date] = None
+    url_wikipedia: Optional[str] = None
+    biografia: Optional[str] = None
+    curiosita: Optional[str] = None
+    fonti_sufficienti: bool = False
+    ultima_scuderia: Optional[str] = None  # per colorare l'avatar/casco con l'ultima scuderia
     punti_totali_carriera: float
     vittorie_totali: int
     gare_totali: int
@@ -73,6 +97,28 @@ class VoceCircuito(BaseModel):
     slug: str
     nazione_codice: Optional[str] = None
     localita: Optional[str] = None
+
+
+class CurvaCircuito(BaseModel):
+    """Una curva o un rettilineo del tracciato, in ordine. nome_moderno
+    può essere nullo se il tratto esisteva SOLO nella configurazione
+    storica ed è stato eliminato dal tracciato attuale; nome_1950 è
+    valorizzato solo se il nome nel 1950 era diverso (o assente) rispetto
+    a quello moderno."""
+    ordine: int
+    tipo: str  # 'curva' | 'rettilineo'
+    nome_moderno: Optional[str] = None
+    nome_1950: Optional[str] = None
+    anno_intitolazione: Optional[int] = None  # anno del nome moderno, se assegnato dopo il 1950
+    nota: Optional[str] = None
+
+
+class ConfigurazioneCircuito(BaseModel):
+    """Una versione del tracciato nel tempo (lunghezza/layout cambiati)."""
+    anno_da: int
+    anno_a: Optional[int] = None  # None = tuttora in uso (o ultima nota)
+    lunghezza_km: Optional[float] = None
+    descrizione: str
 
 
 class GaraCircuito(BaseModel):
@@ -96,6 +142,12 @@ class SchedaCircuito(BaseModel):
     localita: Optional[str] = None
     nazione_codice: Optional[str] = None
     lunghezza_km: Optional[float] = None
+    indirizzo: Optional[str] = None
+    capienza: Optional[int] = None
+    google_maps_url: Optional[str] = None
+    storia: Optional[str] = None
+    curve: list[CurvaCircuito] = []
+    configurazioni: list[ConfigurazioneCircuito] = []
     gare: list[GaraCircuito]
     albo_oro: list[VoceAlboOro]
 
@@ -106,6 +158,7 @@ class VoceIndicePiloti(BaseModel):
     pilota: str
     slug: str
     nazione_codice: Optional[str] = None
+    ultima_scuderia: Optional[str] = None  # per colorare l'avatar/casco con l'ultima scuderia
     punti_totali_carriera: float
     vittorie_totali: int
     gare_totali: int

@@ -29,6 +29,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from db import get_connection
 from schemas import (
+    ConfigurazioneCircuito,
+    CurvaCircuito,
     GaraCircuito,
     GaraScuderia,
     GaraStagione,
@@ -41,6 +43,7 @@ from schemas import (
     VoceAlboOro,
     VoceCircuito,
     VoceClassificaPiloti,
+    VoceClassificaScuderie,
     VoceIndicePiloti,
     VocePilotaScuderia,
     VoceScuderia,
@@ -181,6 +184,50 @@ def classifica_piloti(anno: int = Query(..., description="Anno della stagione, e
     return [VoceClassificaPiloti(**riga) for riga in righe]
 
 
+@app.get("/classifica/scuderie", response_model=list[VoceClassificaScuderie])
+def classifica_scuderie(anno: int = Query(..., description="Anno della stagione, es. 1950")):
+    """Classifica scuderie della stagione, stesso criterio "a somma" già
+    usato in /classifica/piloti (si sommano i punti di TUTTI i piloti
+    schierati dalla scuderia, non solo il migliore): nel 1950 non
+    esisteva un Mondiale Costruttori ufficiale (arrivato solo nel 1958),
+    quindi qui applichiamo per coerenza lo stesso criterio già scelto
+    per i piloti, non una regola storica realmente esistita all'epoca."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    c.nome AS scuderia,
+                    c.codice_riferimento AS scuderia_slug,
+                    n.codice_iso2 AS nazione_codice,
+                    COALESCE(SUM(pp.punti), 0) AS punti_totali,
+                    COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie,
+                    COUNT(DISTINCT r.gran_premio_id) AS gare_disputate
+                FROM risultati_gara r
+                JOIN gran_premi gp ON gp.id = r.gran_premio_id
+                JOIN stagioni s ON s.id = gp.stagione_id
+                JOIN costruttori c ON c.id = r.costruttore_id
+                LEFT JOIN nazioni n ON n.id = c.nazione_id
+                LEFT JOIN punti_per_posizione pp
+                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
+                    AND pp.posizione = r.posizione_finale
+                WHERE s.anno = %(anno)s
+                GROUP BY c.id, c.nome, c.codice_riferimento, n.codice_iso2
+                ORDER BY punti_totali DESC, vittorie DESC, scuderia ASC
+                """,
+                {"anno": anno},
+            )
+            righe = cur.fetchall()
+    finally:
+        conn.close()
+
+    if not righe:
+        raise HTTPException(status_code=404, detail=f"Nessun dato trovato per la stagione {anno}.")
+
+    return [VoceClassificaScuderie(**riga) for riga in righe]
+
+
 @app.get("/gare", response_model=list[GaraStagione])
 def gare_stagione(anno: int = Query(..., description="Anno della stagione, es. 1950")):
     """Elenco delle gare di una stagione, usato per generare i link
@@ -226,7 +273,15 @@ def elenco_piloti():
                     n.codice_iso2 AS nazione_codice,
                     COALESCE(SUM(pp.punti), 0) AS punti_totali_carriera,
                     COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie_totali,
-                    COUNT(*) AS gare_totali
+                    COUNT(*) AS gare_totali,
+                    (
+                        SELECT c2.nome FROM risultati_gara r2
+                        JOIN gran_premi gp2 ON gp2.id = r2.gran_premio_id
+                        JOIN costruttori c2 ON c2.id = r2.costruttore_id
+                        WHERE r2.pilota_id = p.id
+                        ORDER BY gp2.data_gara DESC NULLS LAST
+                        LIMIT 1
+                    ) AS ultima_scuderia
                 FROM piloti p
                 JOIN risultati_gara r ON r.pilota_id = p.id
                 JOIN gran_premi gp ON gp.id = r.gran_premio_id
@@ -259,7 +314,21 @@ def scheda_pilota(slug: str):
                     p.id,
                     p.nome || ' ' || p.cognome AS pilota,
                     p.codice_riferimento AS pilota_slug,
-                    n.codice_iso2 AS nazione_codice
+                    n.codice_iso2 AS nazione_codice,
+                    p.data_nascita,
+                    p.data_morte,
+                    p.url_wikipedia,
+                    p.biografia,
+                    p.curiosita,
+                    p.fonti_sufficienti,
+                    (
+                        SELECT c2.nome FROM risultati_gara r2
+                        JOIN gran_premi gp2 ON gp2.id = r2.gran_premio_id
+                        JOIN costruttori c2 ON c2.id = r2.costruttore_id
+                        WHERE r2.pilota_id = p.id
+                        ORDER BY gp2.data_gara DESC NULLS LAST
+                        LIMIT 1
+                    ) AS ultima_scuderia
                 FROM piloti p
                 LEFT JOIN nazioni n ON n.id = p.nazione_id
                 WHERE p.codice_riferimento = %(slug)s
@@ -304,6 +373,13 @@ def scheda_pilota(slug: str):
         pilota=pilota["pilota"],
         pilota_slug=pilota["pilota_slug"],
         nazione_codice=pilota["nazione_codice"],
+        data_nascita=pilota["data_nascita"],
+        data_morte=pilota["data_morte"],
+        url_wikipedia=pilota["url_wikipedia"],
+        biografia=pilota["biografia"],
+        curiosita=pilota["curiosita"],
+        fonti_sufficienti=pilota["fonti_sufficienti"],
+        ultima_scuderia=pilota["ultima_scuderia"],
         punti_totali_carriera=punti_totali_carriera,
         vittorie_totali=vittorie_totali,
         gare_totali=len(risultati),
@@ -344,8 +420,9 @@ def scheda_circuito(slug: str):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT ci.nome, ci.codice_riferimento AS slug, ci.localita,
-                       n.codice_iso2 AS nazione_codice, ci.lunghezza_km
+                SELECT ci.id, ci.nome, ci.codice_riferimento AS slug, ci.localita,
+                       n.codice_iso2 AS nazione_codice, ci.lunghezza_km,
+                       ci.indirizzo, ci.capienza, ci.google_maps_url, ci.storia
                 FROM circuiti ci
                 LEFT JOIN nazioni n ON n.id = ci.nazione_id
                 WHERE ci.codice_riferimento = %(slug)s
@@ -355,6 +432,28 @@ def scheda_circuito(slug: str):
             circuito = cur.fetchone()
             if circuito is None:
                 raise HTTPException(status_code=404, detail=f"Nessun circuito trovato con slug '{slug}'.")
+
+            cur.execute(
+                """
+                SELECT ordine, tipo, nome_moderno, nome_1950, anno_intitolazione, nota
+                FROM circuiti_curve
+                WHERE circuito_id = %(circuito_id)s
+                ORDER BY ordine ASC
+                """,
+                {"circuito_id": circuito["id"]},
+            )
+            curve = cur.fetchall()
+
+            cur.execute(
+                """
+                SELECT anno_da, anno_a, lunghezza_km, descrizione
+                FROM circuiti_configurazioni
+                WHERE circuito_id = %(circuito_id)s
+                ORDER BY anno_da ASC
+                """,
+                {"circuito_id": circuito["id"]},
+            )
+            configurazioni = cur.fetchall()
 
             cur.execute(
                 """
@@ -405,6 +504,12 @@ def scheda_circuito(slug: str):
         localita=circuito["localita"],
         nazione_codice=circuito["nazione_codice"],
         lunghezza_km=circuito["lunghezza_km"],
+        indirizzo=circuito["indirizzo"],
+        capienza=circuito["capienza"],
+        google_maps_url=circuito["google_maps_url"],
+        storia=circuito["storia"],
+        curve=[CurvaCircuito(**c) for c in curve],
+        configurazioni=[ConfigurazioneCircuito(**c) for c in configurazioni],
         gare=[GaraCircuito(**g) for g in gare],
         albo_oro=[VoceAlboOro(**v) for v in albo_oro],
     )
