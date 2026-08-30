@@ -1,0 +1,9 @@
+.race-detail__table {
+  min-width: 560px;
+}
+
+.race-detail__motivo {
+  font-size: 0.72rem;
+  color: var(--text-gray);
+  font-style: italic;
+}

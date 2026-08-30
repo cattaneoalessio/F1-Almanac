@@ -1,0 +1,30 @@
+.circuit-view__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+}
+
+.circuit-view__nome {
+  font-size: 1.3rem;
+}
+
+.circuit-view__sottotitolo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-gray);
+}
+
+.circuit-view__grid {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 800px) {
+  .circuit-view__grid {
+    grid-template-columns: 1.2fr 1fr;
+    align-items: start;
+  }
+}

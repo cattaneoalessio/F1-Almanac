@@ -1,0 +1,127 @@
+.historical-standings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.historical-standings__year-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.historical-standings__year-picker select {
+  background: var(--bg-card-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.historical-standings__stato {
+  margin: 0;
+  padding: 1.2rem 0.2rem;
+  text-align: center;
+}
+
+.historical-standings__stato--errore {
+  color: var(--accent-red);
+}
+
+/* Su schermi stretti la tabella scorre in orizzontale invece di
+   rompere il layout: fondamentale, dato che il sito è mobile-first. */
+.historical-standings__table-wrap {
+  overflow-x: auto;
+}
+
+.historical-standings__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 420px;
+}
+
+.historical-standings__table th,
+.historical-standings__table td {
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.historical-standings__table th {
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--text-gray);
+  text-transform: uppercase;
+}
+
+.historical-standings__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.historical-standings__table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.historical-standings__pilota {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+.historical-standings__pilota:hover {
+  color: var(--accent-gold);
+}
+
+.flag-icon {
+  flex-shrink: 0;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--line);
+  object-fit: cover;
+  vertical-align: middle;
+}
+.flag-icon-placeholder {
+  display: inline-block;
+  width: 20px;
+  height: 15px;
+}
+
+.historical-standings__races {
+  margin-bottom: 1rem;
+}
+.historical-standings__races-title {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 0.7rem;
+  color: var(--text-muted);
+}
+.historical-standings__races-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+.historical-standings__races-list a {
+  text-decoration: none;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  border-bottom: 1px dashed var(--line);
+}
+.historical-standings__races-list a:hover {
+  color: var(--accent-gold);
+  border-bottom-color: var(--accent-gold);
+}

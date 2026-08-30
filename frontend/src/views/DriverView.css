@@ -1,0 +1,19 @@
+.driver-view__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.4rem;
+}
+
+.driver-view__nome {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.3rem;
+}
+
+.driver-view__sottotitolo {
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-gray);
+}

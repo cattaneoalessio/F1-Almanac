@@ -1,0 +1,35 @@
+.circuits-index__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.circuits-index__card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.circuits-index__card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  transition: transform 0.15s ease;
+}
+.circuits-index__card-link:hover .circuits-index__card {
+  transform: translateY(-2px);
+  color: var(--accent-gold);
+}
+
+.circuits-index__nome {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.circuits-index__localita {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-gray);
+  margin-top: 0.2rem;
+}

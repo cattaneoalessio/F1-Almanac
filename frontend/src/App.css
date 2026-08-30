@@ -1,0 +1,249 @@
+.app-shell {
+  min-height: 100vh;
+}
+
+/* Barra di navigazione tra "Live Timing" e "Archivio storico" (Fase D).
+   Sticky in alto: su mobile è la prima cosa che l'utente tocca per
+   orientarsi, senza dover scorrere il resto della pagina. */
+.app-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.7rem 1.1rem;
+  background: rgba(11, 12, 16, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  /* Su schermi stretti le voci scorrono in orizzontale invece di andare
+     a capo: con 3+ voci (Archivio storico, Circuiti, Live Timing, e
+     altre che verranno) andare a capo romperebbe il layout "mobile
+     first" richiesto fin dall'inizio del progetto. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.app-tabs::-webkit-scrollbar {
+  display: none;
+}
+.app-tabs__item {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-gray);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  display: inline-block;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.app-tabs__item:hover {
+  color: var(--text-primary);
+}
+.app-tabs__item--attiva {
+  color: var(--text-primary);
+  background: var(--bg-card-raised);
+  border-color: var(--line);
+}
+
+.page {
+  min-height: 100vh;
+}
+
+/* Vista storica: niente sidebar di timing live, layout centrato e più
+   largo per leggere bene una tabella su schermi grandi e piccoli. */
+.main--historical {
+  max-width: 900px;
+  margin: 0 auto;
+}
+@media (min-width: 900px) {
+  .page {
+    display: grid;
+    grid-template-columns: var(--sidebar-w) 1fr;
+  }
+}
+
+.main {
+  padding: 1.25rem 1.1rem 4rem;
+  max-width: 1100px;
+}
+@media (min-width: 700px) {
+  .main {
+    padding: 2rem 2.4rem 5rem;
+  }
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+  flex-wrap: wrap;
+}
+.topbar__meta {
+  font-size: 0.78rem;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.topbar__meta strong {
+  color: var(--accent-gold);
+}
+.topbar__title {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.hero {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+}
+@media (min-width: 800px) {
+  .hero {
+    grid-template-columns: 1.3fr 1fr;
+    align-items: stretch;
+  }
+}
+
+.spotlight {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  justify-content: space-between;
+}
+.spotlight__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.spotlight__name {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.spotlight__team {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.spotlight__stat-row {
+  display: flex;
+  gap: 1.6rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 0.9rem;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.stat__label {
+  font-size: 0.64rem;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.stat__value {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+.stat__value--accent {
+  color: var(--accent-yellow);
+}
+
+.section-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-gray);
+  margin: 2rem 0 0.9rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+.standings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.standing-row {
+  display: grid;
+  grid-template-columns: 1.8rem 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.standing-row:last-child {
+  border-bottom: none;
+}
+.standing-row__pos {
+  font-family: var(--font-display);
+  color: var(--text-gray);
+}
+.standing-row__name {
+  font-weight: 600;
+}
+.standing-row__team {
+  font-size: 0.7rem;
+  color: var(--text-gray);
+}
+.standing-row__pts {
+  font-family: var(--font-display);
+  color: var(--accent-gold);
+}
+
+.grid-cards {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+.card h4 {
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+.card p {
+  font-size: 0.85rem;
+  margin: 0;
+}
+.card:hover {
+  transform: translateY(-2px);
+  transition: transform 0.2s ease;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.1rem;
+  margin-top: 2.2rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line);
+}
+.legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text-gray);
+}
+.legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

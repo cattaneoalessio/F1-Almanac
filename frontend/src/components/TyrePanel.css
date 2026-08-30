@@ -1,0 +1,32 @@
+.tyre-panel h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-gray);
+  font-family: var(--font-body);
+  font-weight: 700;
+  margin-bottom: 0.9rem;
+}
+.tyre-stints {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.tyre-stint {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.82rem;
+}
+.tyre-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+}
+.tyre-stint__laps {
+  margin-left: auto;
+  color: var(--text-gray);
+  font-family: var(--font-mono);
+}

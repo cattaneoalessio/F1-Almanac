@@ -1,0 +1,122 @@
+/* Stile del "rail" di live timing — mobile first:
+   striscia orizzontale scorrevole in cima; da 900px in su diventa la
+   colonna fissa larga 320px tipica dei grafismi da diretta TV. */
+
+.rail {
+  background: linear-gradient(180deg, #14171d 0%, #0f1116 100%);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  display: flex;
+  gap: 0;
+}
+.rail__header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+}
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+}
+.wordmark span {
+  color: var(--accent-red);
+}
+
+.row-list {
+  display: flex;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  border-left: 3px solid var(--team-color, var(--text-gray));
+  min-width: 168px;
+  opacity: 0;
+  animation: rowRise 0.5s ease forwards;
+  animation-delay: calc(var(--i) * 45ms);
+}
+@keyframes rowRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.row__pos {
+  font-family: var(--font-display);
+  background: #2a2e35;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.row__driver {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.row__code {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 0.92rem;
+}
+.row__team {
+  font-size: 0.68rem;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.row__gap {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent-yellow);
+  white-space: nowrap;
+}
+.row__gap--fixed {
+  color: var(--text-gray);
+}
+
+@media (min-width: 900px) {
+  .rail {
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: var(--sidebar-w);
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-bottom: none;
+    border-right: 1px solid var(--line);
+  }
+  .rail__header {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding: 1.1rem 1.2rem;
+  }
+  .row-list {
+    flex-direction: column;
+  }
+  .row {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+    padding: 0.65rem 1.1rem;
+  }
+}

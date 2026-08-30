@@ -1,0 +1,152 @@
+/*
+ * theme.css — Design system del progetto (deriva dal mockup validato).
+ * Ogni pagina/componente futuro deve partire da queste variabili invece
+ * di definire colori "a mano": così lo stile resta coerente ovunque.
+ */
+
+:root {
+  --bg-main: #0b0c10;
+  --bg-card: #1f2833;
+  --bg-card-raised: #262f3b;
+  --line: rgba(255, 255, 255, 0.08);
+
+  --accent-red: #e10600;
+  --accent-gold: #c5a059;
+  --accent-yellow: #fff200;
+
+  --text-primary: #ffffff;
+  --text-muted: #c5a059;
+  --text-gray: #8d8d8d;
+
+  --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+
+  --font-display: 'Orbitron', 'Share Tech Mono', monospace;
+  --font-body: 'Titillium Web', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Share Tech Mono', 'Orbitron', monospace;
+
+  --sidebar-w: 320px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+  margin: 0;
+}
+
+p {
+  line-height: 1.6;
+  color: var(--text-gray);
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: var(--accent-red);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-yellow);
+  outline-offset: 2px;
+}
+
+.tab-num {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Pannello "vetro" da studio — usato da <GlassPanel /> */
+.sky-panel {
+  background: rgba(31, 40, 51, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  padding: 1.4rem;
+}
+
+/* Badge di stato sessione — usato da <StatusBadge /> */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.3rem 0.55rem;
+  border-radius: 3px;
+}
+.badge--live {
+  background: var(--accent-red);
+  color: #fff;
+}
+.badge--live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.5);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0);
+  }
+}
+.badge--finished {
+  background: #2a2e35;
+  color: var(--text-gray);
+}
+
+/* Illustrazione circuito — vedi components/CircuitArt.jsx */
+.circuit-art {
+  color: var(--accent-gold);
+  flex-shrink: 0;
+}
+.circuit-art--watermark {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  width: 140px;
+  height: 140px;
+  opacity: 0.16;
+  pointer-events: none;
+}
