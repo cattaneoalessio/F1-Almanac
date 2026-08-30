@@ -1,1 +1,57 @@
+name: Aggiorna news Pirelli
+
+# Si attiva da sola ogni notte, ma puoi anche lanciarla a mano da
+# GitHub: Actions -> "Aggiorna news Pirelli" -> "Run workflow".
+on:
+  schedule:
+    # 01:00 UTC = le 02:00 in Italia in inverno (CET, UTC+1) e le 03:00
+    # in estate (CEST, UTC+2): la sintassi cron di GitHub Actions non
+    # segue il cambio ora legale, quindi non esiste un orario fisso che
+    # sia "le 2 di notte in Italia" tutto l'anno. Se preferisci restare
+    # sempre vicino alle 2 di notte anche d'estate, cambia in "0 0 * * *".
+    - cron: '0 1 * * *'
+  workflow_dispatch: {}
+
+# Necessario perché il job faccia "git push" con il token integrato:
+# senza questo permesso il push viene rifiutato (repo di default con
+# permessi in sola lettura per le Actions).
+permissions:
+  contents: write
+
+jobs:
+  aggiorna-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repository
+        uses: actions/checkout@v4
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Nessun "npm install" necessario: lo script usa solo funzioni
+      # native di Node 18+ (fetch, fs/promises), senza dipendenze
+      # esterne come rss-parser.
+      - name: Esegui lo script di aggiornamento
+        working-directory: frontend
+        run: node scripts/fetch-pirelli.js
+
+      - name: Verifica se ci sono cambiamenti
+        id: verifica
+        run: |
+          if git diff --quiet -- frontend/src/data/pirelli-news.json; then
+            echo "cambiato=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "cambiato=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit e push (solo se ci sono novità)
+        if: steps.verifica.outputs.cambiato == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/data/pirelli-news.json
+          git commit -m "Aggiorna news Pirelli (automatico)"
+          git push
 
