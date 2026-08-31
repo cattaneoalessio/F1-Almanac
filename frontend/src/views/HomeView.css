@@ -1,0 +1,286 @@
+/* HomeView — home dinamica (Fase E). Più "da rivista sportiva" del resto
+   del sito (che resta tabellare, pensato per l'archivio consultabile):
+   hero a piena larghezza, card grandi, meno tabelle. Palette invariata
+   (var(--bg-*), var(--accent-*)) per restare coerente col resto. */
+
+.home-view {
+  max-width: 1200px;
+}
+
+/* ---------- HERO ---------- */
+.home-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  padding: 3.2rem 1.6rem;
+  margin-bottom: 2.4rem;
+  background: radial-gradient(120% 140% at 15% 20%, #2a1416 0%, var(--bg-main) 55%),
+    linear-gradient(135deg, var(--bg-card) 0%, var(--bg-main) 100%);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+@media (min-width: 700px) {
+  .home-hero {
+    padding: 4.5rem 3rem;
+  }
+}
+.home-hero__art {
+  position: absolute;
+  top: 50%;
+  right: -60px;
+  transform: translateY(-50%);
+  color: var(--accent-red);
+  opacity: 0.12;
+  pointer-events: none;
+}
+.home-hero__content {
+  position: relative;
+  max-width: 640px;
+}
+.home-hero__kicker {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin: 0 0 0.9rem;
+}
+.home-hero__titolo {
+  font-size: 2rem;
+  line-height: 1.15;
+  margin-bottom: 1rem;
+}
+@media (min-width: 700px) {
+  .home-hero__titolo {
+    font-size: 2.9rem;
+  }
+}
+.home-hero__sottotitolo {
+  font-size: 1rem;
+  max-width: 52ch;
+  margin-bottom: 1.8rem;
+}
+.home-hero__azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.home-hero__cta {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 0.75rem 1.3rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  color: var(--text-primary);
+  background: var(--bg-card-raised);
+}
+.home-hero__cta--primaria {
+  background: var(--accent-red);
+  border-color: var(--accent-red);
+}
+.home-hero__cta:hover {
+  filter: brightness(1.12);
+}
+
+/* ---------- SEZIONI ---------- */
+.home-section {
+  margin-bottom: 2.6rem;
+}
+.home-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+/* ---------- CLASSIFICHE ---------- */
+.home-classifiche {
+  display: grid;
+  gap: 1.2rem;
+}
+@media (min-width: 700px) {
+  .home-classifiche {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.home-classifiche__titolo {
+  font-size: 0.95rem;
+  margin-bottom: 0.9rem;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.home-classifiche__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.home-classifiche__lista li {
+  display: grid;
+  grid-template-columns: 1.4rem auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--line);
+}
+.home-classifiche__lista li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.home-classifiche__pos {
+  color: var(--text-gray);
+}
+.home-classifiche__nome {
+  font-size: 0.9rem;
+}
+.home-classifiche__punti {
+  font-weight: 700;
+  color: var(--accent-gold);
+}
+
+/* ---------- FOCUS ON ---------- */
+.home-focus {
+  display: grid;
+  gap: 1.4rem;
+  padding: 0;
+  overflow: hidden;
+}
+@media (min-width: 700px) {
+  .home-focus {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+}
+/* Stessa logica di .credited-figure__img (vedi CreditedFigure.css): le
+   mappe circuito sono SVG con proporzioni molto diverse tra loro, quindi
+   si lascia che sia l'immagine a decidere l'altezza (height:auto) invece
+   di forzarla in un riquadro fisso — un riquadro fisso con object-fit
+   lascia troppo spazio vuoto attorno a un tracciato sottile (verificato
+   via screenshot: object-fit:contain in un box da 220px creava un grande
+   vuoto nero attorno alla mappa). */
+.home-focus__foto {
+  display: block;
+  width: 100%;
+  height: auto;
+  align-self: center;
+  padding: 1.2rem;
+  background: #05060a;
+}
+.home-focus__corpo {
+  padding: 1.4rem 1.6rem 1.6rem;
+}
+.home-focus__data {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 0.4rem;
+}
+.home-focus__titolo {
+  font-size: 1.5rem;
+  margin-bottom: 0.3rem;
+}
+.home-focus__localita {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+.home-focus__dati {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  font-size: 0.85rem;
+  color: var(--text-gray);
+}
+.home-focus__curiosita {
+  font-style: italic;
+  font-size: 0.88rem;
+}
+.home-focus__link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--accent-yellow);
+}
+
+/* ---------- CALENDARIO ---------- */
+.home-calendario {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.home-calendario__riga {
+  display: grid;
+  grid-template-columns: 2rem auto 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+.home-calendario__riga:last-child {
+  border-bottom: none;
+}
+.home-calendario__round {
+  color: var(--text-gray);
+}
+.home-calendario__data {
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+.home-calendario__nome {
+  text-decoration: none;
+  color: var(--text-primary);
+}
+.home-calendario__nome:hover {
+  color: var(--accent-yellow);
+}
+.home-calendario__riga--disputato .home-calendario__nome {
+  color: var(--text-gray);
+}
+
+/* ---------- NEWS ---------- */
+.home-news__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  margin-bottom: 1rem;
+}
+.home-news__titolo {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+.home-news__estratto {
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+}
+.home-news__fonte {
+  font-size: 0.72rem;
+  color: var(--text-gray);
+  margin: 0;
+}
+.home-news__vai-a-news {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--accent-yellow);
+}

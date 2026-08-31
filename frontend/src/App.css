@@ -12,6 +12,16 @@
 }
 .app-shell > .main {
   flex: 1 0 auto;
+  /* Bug reale trovato in verifica: da quando .app-shell è diventato un
+     flex container (per ancorare il footer in fondo), .main perdeva la
+     larghezza piena e si restringeva al minimo indispensabile per il
+     suo contenuto — che per una griglia "grid-template-columns:
+     repeat(auto-fill, minmax(...))" corrisponde a una sola colonna,
+     rompendo il layout a più colonne di Piloti/Scuderie/Circuiti.
+     width:100% forza la larghezza piena invece di lasciarla calcolare
+     dal contenuto. */
+  width: 100%;
+  min-width: 0;
 }
 
 /* Barra di navigazione tra "Live Timing" e "Archivio storico" (Fase D).

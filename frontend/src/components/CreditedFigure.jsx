@@ -34,10 +34,16 @@ export default function CreditedFigure({
   licenzaUrl,
   licenzaLabel,
   didascalia,
+  // true quando l'immagine è già mostrata da un altro elemento intorno
+  // (es. la lightbox di CircuitPhotoGallery, che ha un proprio <img>
+  // grande): evita di duplicarla, mostrando solo la didascalia.
+  nascondiImmagine = false,
 }) {
   return (
     <figure className="credited-figure">
-      <img className="credited-figure__img" src={src} alt={alt} loading="lazy" />
+      {!nascondiImmagine && (
+        <img className="credited-figure__img" src={src} alt={alt} loading="lazy" />
+      )}
       <figcaption className="credited-figure__caption">
         {didascalia && <span className="credited-figure__testo">{didascalia} — </span>}
         {autore && (

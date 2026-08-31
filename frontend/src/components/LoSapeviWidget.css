@@ -1,0 +1,42 @@
+.lo-sapevi {
+  border-left: 3px solid var(--accent-gold);
+}
+.lo-sapevi__etichetta {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin: 0 0 0.6rem;
+}
+.lo-sapevi__testo {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 0 0 1rem;
+}
+.lo-sapevi__azioni {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.2rem;
+}
+.lo-sapevi__link {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--accent-yellow);
+}
+.lo-sapevi__altro {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--text-gray);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.lo-sapevi__altro:hover {
+  color: var(--text-primary);
+}

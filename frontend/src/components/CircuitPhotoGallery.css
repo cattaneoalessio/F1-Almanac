@@ -1,0 +1,103 @@
+.circuit-gallery {
+  margin-bottom: 1.1rem;
+}
+
+.circuit-gallery__principale {
+  margin: 0;
+}
+
+.circuit-gallery__apri-principale {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
+.circuit-gallery__apri-principale img {
+  display: block;
+}
+
+.circuit-gallery__miniature {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.circuit-gallery__miniatura {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--bg-card);
+  width: 92px;
+  height: 62px;
+  flex-shrink: 0;
+}
+.circuit-gallery__miniatura img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.circuit-gallery__miniatura:hover {
+  border-color: var(--accent-yellow);
+}
+
+.circuit-gallery__lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  /* Il tema del sito è già quasi nero (--bg-main): uno sfondo altrettanto
+     scuro qui sotto sarebbe invisibile come "oscuramento". La sfocatura
+     (backdrop-filter) rende comunque evidente che si è aperto un livello
+     sopra la pagina, indipendentemente dal contrasto di colore. */
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.2rem;
+  cursor: zoom-out;
+}
+.circuit-gallery__lightbox-contenuto {
+  max-width: min(1000px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  cursor: auto;
+  padding: 0.9rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+.circuit-gallery__lightbox-contenuto img {
+  display: block;
+  max-width: 100%;
+  max-height: 74vh;
+  margin: 0 auto;
+  border-radius: 4px;
+}
+.circuit-gallery__lightbox-contenuto .credited-figure__caption {
+  text-align: center;
+  margin-top: 0.6rem;
+}
+.circuit-gallery__chiudi {
+  position: fixed;
+  top: 1.1rem;
+  right: 1.2rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg-card-raised);
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  z-index: 101;
+}
+.circuit-gallery__chiudi:hover {
+  border-color: var(--accent-yellow);
+}

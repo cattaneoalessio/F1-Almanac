@@ -1,5 +1,6 @@
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import './App.css';
+import HomeView from './views/HomeView.jsx';
 import LiveTimingView from './views/LiveTimingView.jsx';
 import HistoricalView, { ANNO_DI_DEFAULT } from './views/HistoricalView.jsx';
 import RaceDetailView from './views/RaceDetailView.jsx';
@@ -13,6 +14,10 @@ import NewsView from './views/NewsView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
 
 const TABS = [
+  // "/" è un caso speciale: con startsWith() combacerebbe con QUALSIASI
+  // percorso (tutti iniziano per "/"), marcando la Home come attiva anche
+  // altrove. Per questa voce sola serve un confronto esatto (vedi sotto).
+  { pattern: '/', to: '/', label: 'Home', esatto: true },
   { pattern: '/archivio', to: `/archivio/${ANNO_DI_DEFAULT}`, label: 'Archivio storico' },
   { pattern: '/piloti', to: '/piloti', label: 'Piloti' },
   { pattern: '/scuderie', to: '/scuderie', label: 'Scuderie' },
@@ -26,7 +31,9 @@ function BarraNavigazione() {
   return (
     <nav className="app-tabs" aria-label="Sezioni del sito">
       {TABS.map((tab) => {
-        const attiva = location.pathname.startsWith(tab.pattern);
+        const attiva = tab.esatto
+          ? location.pathname === tab.pattern
+          : location.pathname.startsWith(tab.pattern);
         return (
           <Link
             key={tab.pattern}
@@ -48,10 +55,11 @@ export default function App() {
       <BarraNavigazione />
 
       <Routes>
-        {/* La home rimanda alla stagione più significativa dell'archivio
-            storico (il contenuto reale, indicizzabile) invece di essere
-            una pagina a parte con lo stesso contenuto duplicato. */}
-        <Route path="/" element={<Navigate to={`/archivio/${ANNO_DI_DEFAULT}`} replace />} />
+        {/* Fase E: la home è ora una pagina dinamica a sé (hero, classifica
+            stagione in corso, calendario, focus on prossima gara, news),
+            non più un redirect verso l'archivio storico — che resta
+            comunque raggiungibile dal tab "Archivio storico". */}
+        <Route path="/" element={<HomeView />} />
         <Route path="/archivio/:anno" element={<HistoricalView />} />
         <Route path="/archivio/:anno/:circuito" element={<RaceDetailView />} />
         <Route path="/piloti" element={<PilotsIndexView />} />
