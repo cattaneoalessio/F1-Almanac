@@ -6,14 +6,19 @@ Due endpoint, come richiesto:
   GET /classifica/piloti?anno=          -> classifica piloti di una stagione (bonus,
                                             utile al frontend storico/fase D)
 
-Nota sui punti: sia qui che nella classifica i punti NON vengono letti
-dalla colonna risultati_gara.punti (che l'import di Fase B lascia a 0),
-ma calcolati al volo unendo la posizione di ogni pilota alla tabella
-punti_per_posizione del sistema di punteggio della sua stagione. Così
-lo schema disegnato in Fase A (pensato apposta per gestire punteggi
-storici diversi da quelli moderni) viene davvero usato, invece di
-restare solo teoria. Il punto bonus per il giro più veloce NON è
-incluso: l'import di Fase B non popola ancora il campo giro_veloce.
+Nota sui punti (AGGIORNATA in fase di import stagioni 1951-1970): le
+classifiche calcolate qui sommano DIRETTAMENTE risultati_gara.punti,
+la colonna che lo schema descrive come "fonte di verità" per i punti.
+Non è sempre stato così: l'import CSV del 1950 (Fase B) lasciava questa
+colonna a 0 e le classifiche la calcolavano al volo unendo
+punti_per_posizione — un meccanismo diverso da quanto lo schema stesso
+dichiarava. db/patch_backfill_punti_risultati.sql ha corretto la
+colonna anche per il 1950 (stessi numeri di prima, verificato), così
+oggi un solo meccanismo (SUM(risultati_gara.punti)) vale per tutte le
+stagioni, vecchie e nuove: le stagioni importate da Jolpica scrivono i
+punti reali (già corretti per l'epoca, arrivi a pari merito compresi,
+bonus giro veloce già incluso nel totale) direttamente in questa
+colonna, senza bisogno di un'altra tabella di supporto.
 
 Avvio in locale:
     pip install fastapi uvicorn[standard] psycopg2-binary python-dotenv --break-system-packages
@@ -157,7 +162,7 @@ def classifica_piloti(anno: int = Query(..., description="Anno della stagione, e
                     p.nome || ' ' || p.cognome AS pilota,
                     p.codice_riferimento AS pilota_slug,
                     n.codice_iso2 AS nazione_codice,
-                    COALESCE(SUM(pp.punti), 0) AS punti_totali,
+                    COALESCE(SUM(r.punti), 0) AS punti_totali,
                     COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie,
                     COUNT(*) AS gare_disputate
                 FROM risultati_gara r
@@ -165,9 +170,6 @@ def classifica_piloti(anno: int = Query(..., description="Anno della stagione, e
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN piloti p ON p.id = r.pilota_id
                 LEFT JOIN nazioni n ON n.id = p.nazione_id
-                LEFT JOIN punti_per_posizione pp
-                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
-                    AND pp.posizione = r.posizione_finale
                 WHERE s.anno = %(anno)s
                 GROUP BY p.id, p.nome, p.cognome, p.codice_riferimento, n.codice_iso2
                 ORDER BY punti_totali DESC, vittorie DESC, pilota ASC
@@ -191,7 +193,12 @@ def classifica_scuderie(anno: int = Query(..., description="Anno della stagione,
     schierati dalla scuderia, non solo il migliore): nel 1950 non
     esisteva un Mondiale Costruttori ufficiale (arrivato solo nel 1958),
     quindi qui applichiamo per coerenza lo stesso criterio già scelto
-    per i piloti, non una regola storica realmente esistita all'epoca."""
+    per i piloti, non una regola storica realmente esistita all'epoca.
+
+    I punti si sommano DIRETTAMENTE da risultati_gara.punti (vedi nota
+    in cima al file e db/patch_backfill_punti_risultati.sql): stesso
+    meccanismo unico usato da /classifica/piloti, valido sia per il 1950
+    (backfillato) sia per le stagioni importate da Jolpica."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -201,7 +208,7 @@ def classifica_scuderie(anno: int = Query(..., description="Anno della stagione,
                     c.nome AS scuderia,
                     c.codice_riferimento AS scuderia_slug,
                     n.codice_iso2 AS nazione_codice,
-                    COALESCE(SUM(pp.punti), 0) AS punti_totali,
+                    COALESCE(SUM(r.punti), 0) AS punti_totali,
                     COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie,
                     COUNT(DISTINCT r.gran_premio_id) AS gare_disputate
                 FROM risultati_gara r
@@ -209,9 +216,6 @@ def classifica_scuderie(anno: int = Query(..., description="Anno della stagione,
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN costruttori c ON c.id = r.costruttore_id
                 LEFT JOIN nazioni n ON n.id = c.nazione_id
-                LEFT JOIN punti_per_posizione pp
-                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
-                    AND pp.posizione = r.posizione_finale
                 WHERE s.anno = %(anno)s
                 GROUP BY c.id, c.nome, c.codice_riferimento, n.codice_iso2
                 ORDER BY punti_totali DESC, vittorie DESC, scuderia ASC
