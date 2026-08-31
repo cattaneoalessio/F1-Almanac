@@ -28,7 +28,12 @@ CREATE TABLE IF NOT EXISTS classifica_ufficiale_piloti (
     id              SERIAL PRIMARY KEY,
     stagione_id     INTEGER NOT NULL REFERENCES stagioni(id) ON DELETE CASCADE,
     pilota_id       INTEGER NOT NULL REFERENCES piloti(id),
-    posizione       SMALLINT NOT NULL,
+    -- NULLABLE, non NOT NULL: per un pilota/costruttore con zero punti in
+    -- stagione, Jolpica non assegna alcuna posizione (la chiave "position"
+    -- è letteralmente assente dal JSON sorgente, non "0") — vedi
+    -- db/patch_nullable_posizione_ufficiale.sql per il bug reale scoperto
+    -- al primo import vero e la spiegazione completa.
+    posizione       SMALLINT,
     punti           NUMERIC(6,2) NOT NULL,
     vittorie        SMALLINT NOT NULL DEFAULT 0,
     UNIQUE (stagione_id, pilota_id)
@@ -40,7 +45,12 @@ CREATE TABLE IF NOT EXISTS classifica_ufficiale_costruttori (
     id              SERIAL PRIMARY KEY,
     stagione_id     INTEGER NOT NULL REFERENCES stagioni(id) ON DELETE CASCADE,
     costruttore_id  INTEGER NOT NULL REFERENCES costruttori(id),
-    posizione       SMALLINT NOT NULL,
+    -- NULLABLE, non NOT NULL: per un pilota/costruttore con zero punti in
+    -- stagione, Jolpica non assegna alcuna posizione (la chiave "position"
+    -- è letteralmente assente dal JSON sorgente, non "0") — vedi
+    -- db/patch_nullable_posizione_ufficiale.sql per il bug reale scoperto
+    -- al primo import vero e la spiegazione completa.
+    posizione       SMALLINT,
     punti           NUMERIC(6,2) NOT NULL,
     vittorie        SMALLINT NOT NULL DEFAULT 0,
     UNIQUE (stagione_id, costruttore_id)
