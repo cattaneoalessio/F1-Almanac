@@ -122,6 +122,18 @@ async function scaricaFeed({ lingua, url }) {
   const blocchiItem = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
   console.log(`  trovati ${blocchiItem.length} articoli nel feed ${lingua}`);
 
+  // Diagnostica: se il feed risponde 200 OK ma non c'è nessun <item>,
+  // quasi certamente il corpo della risposta non è l'RSS che ci
+  // aspettiamo (una pagina di login, un "verifica che non sei un
+  // robot", una pagina di errore mascherata da 200...). Stampare
+  // content-type e le prime righe del corpo permette di capire cosa
+  // sta arrivando davvero invece di continuare a indovinare alla cieca.
+  if (blocchiItem.length === 0) {
+    console.log(`  [diagnostica ${lingua}] content-type ricevuto: ${risposta.headers.get('content-type')}`);
+    console.log(`  [diagnostica ${lingua}] prime righe del corpo della risposta:`);
+    console.log(xml.slice(0, 500).split('\n').map((riga) => `    ${riga}`).join('\n'));
+  }
+
   return blocchiItem.map((blocco) => {
     const titoloGrezzo = estraiCampo(blocco, 'title');
     const link = estraiCampo(blocco, 'link');
