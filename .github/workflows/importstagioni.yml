@@ -47,7 +47,22 @@ jobs:
 
       - name: Installa le dipendenze
         working-directory: backend
-        run: pip install requests psycopg2-binary python-dotenv
+        # pandas serve perché import_stagioni_jolpica.py riusa 4 funzioni
+        # di supporto da import_risultati_gp.py (slugify, ricerca/
+        # creazione pilota/costruttore/nazione) per riconoscere come "la
+        # stessa persona" un pilota già presente dal 1950 — ma quel primo
+        # script importa da pandas in cima al file per la sua parte di
+        # lettura CSV, che import_stagioni_jolpica.py non usa affatto.
+        # BUG REALE trovato al primo lancio reale di questa Action (dry
+        # run): "ModuleNotFoundError: No module named 'pandas'" — il
+        # semplice import del modulo fallisce comunque, anche se la parte
+        # che userebbe pandas non viene mai chiamata. Nota per una pulizia
+        # futura: le funzioni di supporto condivise andrebbero estratte in
+        # un modulo senza dipendenze pesanti, invece di trascinarsi dietro
+        # pandas anche qui — per ora, il modo più sicuro e veloce di
+        # sbloccare l'import è installarlo, senza toccare
+        # import_risultati_gp.py (usato in produzione per il 1950).
+        run: pip install requests psycopg2-binary python-dotenv pandas
 
       - name: Esegui l'import (dry-run)
         if: inputs.dry_run == 'true'
