@@ -1,0 +1,66 @@
+name: Importa stagioni storiche F1 (Jolpica)
+
+# A differenza di "Aggiorna news Pirelli", questa NON è una routine
+# automatica: importa dati storici una tantum (o su richiesta puntuale),
+# quindi si lancia SOLO a mano da GitHub: Actions -> "Importa stagioni
+# storiche F1 (Jolpica)" -> "Run workflow". Nessuno "schedule" qui di
+# proposito.
+#
+# PERCHÉ QUESTO WORKFLOW ESISTE: import_stagioni_jolpica.py deve parlare
+# con l'API pubblica Jolpica (api.jolpi.ca) usando una connessione di
+# rete vera, che l'ambiente di sviluppo/agente usato per scrivere questo
+# script non ha (richieste dirette bloccate da policy di rete). GitHub
+# Actions ha accesso a Internet completo, esattamente come già succede
+# per scripts/fetch-pirelli.js — stesso schema, stesso motivo.
+on:
+  workflow_dispatch:
+    inputs:
+      anni:
+        description: >-
+          Anni da importare. Es. "1951-1970" per l'intervallo completo,
+          "1955" per una sola stagione, "1955,1960-1962" per più pezzi.
+        required: true
+        default: '1951-1970'
+      dry_run:
+        description: >-
+          Se "true", mostra solo cosa farebbe (nessuna scrittura sul
+          database): utile per un primo controllo prima di lanciare
+          l'import vero.
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  importa-stagioni:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repository
+        uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installa le dipendenze
+        working-directory: backend
+        run: pip install requests psycopg2-binary python-dotenv
+
+      - name: Esegui l'import (dry-run)
+        if: inputs.dry_run == 'true'
+        working-directory: backend
+        run: python import_stagioni_jolpica.py --anni "${{ inputs.anni }}" --dry-run
+
+      - name: Esegui l'import vero (scrive sul database di produzione)
+        if: inputs.dry_run == 'false'
+        working-directory: backend
+        env:
+          # Secret da creare su GitHub: Settings -> Secrets and variables
+          # -> Actions -> "New repository secret", nome DATABASE_URL,
+          # valore la connection string di Neon (la stessa usata da Render
+          # per il backend in produzione).
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python import_stagioni_jolpica.py --anni "${{ inputs.anni }}"
