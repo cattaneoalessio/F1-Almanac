@@ -684,14 +684,21 @@ export const CIRCUIT_PHOTOS = {
     },
   ],
   "pescara": [
+    // BUG REALE trovato dall'utente il 2026-09-20: il file precedente
+    // "Pescara_Circuit.svg" (autore attribuito "Will Pittenger") non
+    // esiste affatto su Wikimedia Commons con quel nome — un'immagine
+    // "inventata" durante il lotto originale delle 78 foto, mai
+    // verificata singolarmente come fatto invece per Le Mans/Losail.
+    // Sostituito con dati reali forniti dall'utente dopo aver
+    // controllato direttamente su Commons.
     {
-      src: "https://commons.wikimedia.org/wiki/Special:Redirect/file/Pescara_Circuit.svg",
+      src: "https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuito_di_Pescara.png",
       alt: "Mappa del tracciato: Circuito di Pescara",
-      autore: "Will Pittenger",
-      fonteUrl: "https://commons.wikimedia.org/wiki/File:Pescara_Circuit.svg",
+      autore: "Sayatek",
+      fonteUrl: "https://commons.wikimedia.org/wiki/File:Circuito_di_Pescara.png",
       fonteLabel: "Wikimedia Commons",
-      licenzaUrl: "https://creativecommons.org/licenses/by-sa/3.0/deed.it",
-      licenzaLabel: "CC BY-SA 3.0",
+      licenzaUrl: "https://creativecommons.org/licenses/by-sa/4.0/deed.it",
+      licenzaLabel: "CC BY-SA 4.0",
     },
   ],
   "phoenix": [

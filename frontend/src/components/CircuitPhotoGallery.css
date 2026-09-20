@@ -9,13 +9,20 @@
 .circuit-gallery__apri-principale {
   display: block;
   width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
+  /* Le mappe dei tracciati storici (SVG/PNG da Wikimedia Commons) hanno
+     quasi sempre sfondo trasparente con linee e scritte nere: sul tema
+     scuro del sito (--bg-main) risultavano illeggibili. Sfondo bianco +
+     un po' di respiro intorno, come una "scheda tecnica" stampata. */
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-sizing: border-box;
   cursor: zoom-in;
 }
 .circuit-gallery__apri-principale img {
   display: block;
+  border: none; /* il bordo lo dà già il contenitore bianco sopra */
 }
 
 .circuit-gallery__miniature {
@@ -30,7 +37,9 @@
   border-radius: 4px;
   overflow: hidden;
   cursor: zoom-in;
-  background: var(--bg-card);
+  /* sfondo bianco per lo stesso motivo della foto principale: le mappe
+     hanno spesso sfondo trasparente e testo/linee nere */
+  background: #fff;
   width: 92px;
   height: 62px;
   flex-shrink: 0;
@@ -79,6 +88,11 @@
   max-height: 74vh;
   margin: 0 auto;
   border-radius: 4px;
+  /* stesso motivo delle miniature/foto principale: sfondo bianco perché
+     le mappe hanno spesso sfondo trasparente e testo/linee nere */
+  background: #fff;
+  padding: 0.7rem;
+  box-sizing: border-box;
 }
 .circuit-gallery__lightbox-contenuto .credited-figure__caption {
   text-align: center;
