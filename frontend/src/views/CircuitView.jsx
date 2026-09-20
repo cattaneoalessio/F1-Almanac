@@ -98,13 +98,26 @@ export default function CircuitView() {
             </GlassPanel>
           )}
 
-          {scheda.storia && (
+          {/* BUG REALE trovato dall'utente dopo l'import 1951-1970 del
+              2026-09-20: questo pannello era condizionato SOLO a
+              scheda.storia (il testo di storia scritto a mano, presente
+              solo per i 7 circuiti del 1950 arricchiti manualmente) —
+              quindi la mappa/foto del circuito (CIRCUIT_PHOTOS[slug],
+              già pronta per tutti i 78 circuiti reali) non veniva mai
+              mostrata per nessuno dei circuiti creati dall'import, pur
+              avendo una foto disponibile. Non era un problema di slug:
+              i dati c'erano, il pannello semplicemente non si apriva.
+              Corretto condizionando il pannello alla presenza di UNA
+              QUALSIASI delle due cose (foto O testo storico), e
+              rendendo il testo storico stesso facoltativo al suo
+              interno. */}
+          {(scheda.storia || CIRCUIT_PHOTOS[slug]) && (
             <GlassPanel style={{ marginBottom: '1.2rem' }}>
               <h2 className="section-title" style={{ marginTop: 0 }}>
-                Storia
+                {scheda.storia ? 'Storia' : 'Mappa del tracciato'}
               </h2>
               <CircuitPhotoGallery foto={CIRCUIT_PHOTOS[slug]} />
-              <p className="circuit-view__testo">{scheda.storia}</p>
+              {scheda.storia && <p className="circuit-view__testo">{scheda.storia}</p>}
             </GlassPanel>
           )}
 
