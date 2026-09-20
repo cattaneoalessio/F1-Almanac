@@ -26,10 +26,15 @@
 }
 
 .driver-view__testo {
-  margin: 0;
-  font-size: 0.88rem;
+  /* +30% rispetto allo 0.88rem originale, su richiesta esplicita */
+  margin: 0 0 0.85em;
+  font-size: 1.14rem;
   line-height: 1.55;
   color: var(--text-primary);
+}
+
+.driver-view__testo:last-child {
+  margin-bottom: 0;
 }
 
 .driver-view__wiki {

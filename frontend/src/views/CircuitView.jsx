@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import CircuitPhotoGallery from '../components/CircuitPhotoGallery.jsx';
+import Pagination from '../components/Pagination.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getSchedaCircuito } from '../api/backend.js';
 import { CIRCUIT_PHOTOS } from '../data/circuitPhotos.js';
+import { ordinaDescPerDataOAnno } from '../utils/sortByDate.js';
+import usePagination from '../hooks/usePagination.js';
 import '../components/HistoricalStandings.css';
+import '../components/Pagination.css';
 import './CircuitView.css';
 
 /** Scheda di un circuito: /circuiti/:slug */
@@ -39,6 +43,16 @@ export default function CircuitView() {
       annullato = true;
     };
   }, [slug]);
+
+  // Gare in ordine decrescente (la più recente in cima), paginate a
+  // 10 righe come richiesto. scheda è null finché non è "pronto", ma
+  // useMemo va chiamato sempre nello stesso ordine ad ogni render:
+  // per questo gira su un array vuoto invece di essere condizionato.
+  const gareOrdinate = useMemo(
+    () => (scheda ? ordinaDescPerDataOAnno(scheda.gare) : []),
+    [scheda]
+  );
+  const paginazioneGare = usePagination(gareOrdinate, 10);
 
   return (
     <main className="main main--historical">
@@ -136,7 +150,7 @@ export default function CircuitView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {scheda.gare.map((gara) => (
+                    {paginazioneGare.righePagina.map((gara) => (
                       <tr key={`${gara.anno}-${gara.nome_gp}`}>
                         <td className="tab-num">{gara.anno}</td>
                         <td>
@@ -153,6 +167,11 @@ export default function CircuitView() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination
+                  pagina={paginazioneGare.pagina}
+                  totalePagine={paginazioneGare.totalePagine}
+                  onCambiaPagina={paginazioneGare.setPagina}
+                />
               </div>
             </GlassPanel>
 

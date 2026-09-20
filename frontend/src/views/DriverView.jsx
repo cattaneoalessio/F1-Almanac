@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import GlassPanel from '../components/GlassPanel.jsx';
 import DriverAvatar from '../components/DriverAvatar.jsx';
+import Pagination from '../components/Pagination.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getSchedaPilota } from '../api/backend.js';
+import { ordinaDescPerAnno } from '../utils/sortByDate.js';
+import { paragrafareBiografia } from '../utils/paragrafare.js';
+import usePagination from '../hooks/usePagination.js';
 import '../components/HistoricalStandings.css';
+import '../components/Pagination.css';
 import './CircuitView.css';
 import './DriverView.css';
 
@@ -50,8 +55,22 @@ export default function DriverView() {
     };
   }, [slug]);
 
+  // Entrambe le tabelle vanno mostrate in ordine decrescente per anno
+  // (la gara più recente in cima), poi paginate a 10 righe per pagina.
+  const risultatiOrdinati = useMemo(
+    () => (scheda ? ordinaDescPerAnno(scheda.risultati) : []),
+    [scheda]
+  );
   const vittorie = useMemo(
-    () => (scheda ? scheda.risultati.filter((r) => r.posizione === 1) : []),
+    () => ordinaDescPerAnno(risultatiOrdinati.filter((r) => r.posizione === 1)),
+    [risultatiOrdinati]
+  );
+
+  const paginazionePiazzamenti = usePagination(risultatiOrdinati, 10);
+  const paginazioneVittorie = usePagination(vittorie, 10);
+
+  const paragrafiBiografia = useMemo(
+    () => (scheda ? paragrafareBiografia(scheda.biografia) : []),
     [scheda]
   );
 
@@ -101,7 +120,11 @@ export default function DriverView() {
                 Biografia
               </h2>
               {scheda.biografia ? (
-                <p className="driver-view__testo">{scheda.biografia}</p>
+                paragrafiBiografia.map((paragrafo, indice) => (
+                  <p className="driver-view__testo" key={`bio-par-${indice}`}>
+                    {paragrafo}
+                  </p>
+                ))
               ) : (
                 <p className="historical-standings__stato">
                   Non abbiamo ancora abbastanza fonti pubbliche affidabili per una biografia di questo pilota:
@@ -139,7 +162,7 @@ export default function DriverView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {vittorie.map((riga, indice) => (
+                    {paginazioneVittorie.righePagina.map((riga, indice) => (
                       <tr key={`vittoria-${riga.anno}-${riga.circuito}-${indice}`}>
                         <td className="tab-num">{riga.anno}</td>
                         <td>
@@ -150,6 +173,11 @@ export default function DriverView() {
                     ))}
                   </tbody>
                 </table>
+                <Pagination
+                  pagina={paginazioneVittorie.pagina}
+                  totalePagine={paginazioneVittorie.totalePagine}
+                  onCambiaPagina={paginazioneVittorie.setPagina}
+                />
               </div>
             )}
           </GlassPanel>
@@ -170,7 +198,7 @@ export default function DriverView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {scheda.risultati.map((riga, indice) => (
+                  {paginazionePiazzamenti.righePagina.map((riga, indice) => (
                     <tr key={`${riga.anno}-${riga.circuito}-${indice}`}>
                       <td className="tab-num">{riga.anno}</td>
                       <td>
@@ -183,6 +211,11 @@ export default function DriverView() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                pagina={paginazionePiazzamenti.pagina}
+                totalePagine={paginazionePiazzamenti.totalePagine}
+                onCambiaPagina={paginazionePiazzamenti.setPagina}
+              />
             </div>
           </GlassPanel>
         </>
