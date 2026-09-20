@@ -172,6 +172,47 @@ MAPPA_NAZIONALITA_ISO2 = {
     "East German": "DE",
 }
 
+# BUG REALE trovato dopo il lancio vero del 2026-09-20 (segnalato
+# dall'utente controllando il sito, non dal log — l'import non dà
+# nessun errore in questo caso, crea semplicemente un secondo pilota):
+# pilota_id_da_jolpica() riconosce un pilota già in database confrontando
+# lo slug calcolato da "{givenName} {familyName}" (dati Jolpica) con
+# piloti.codice_riferimento — ma per alcuni piloti già presenti dal 1950
+# (inserito a mano) il nome completo non coincide alla lettera con
+# quello che restituisce Jolpica. Caso reale: Fangio nel 1950 è salvato
+# come nome="Juan", cognome="Manuel Fangio" (slug "juan-manuel-fangio"),
+# mentre Jolpica lo restituisce come givenName="Juan",
+# familyName="Fangio" (senza "Manuel" nel mezzo) -> slug "juan-fangio":
+# due slug diversi, quindi due righe diverse in piloti, con la sua
+# carriera 1950 e 1951+ spezzata in due schede.
+#
+# Questa mappa forza, per lo specifico Jolpica driverId indicato, il
+# riuso del pilota già esistente con quel codice_riferimento (invece di
+# calcolare lo slug dal nome Jolpica) — bypassa il confronto per nome,
+# non lo corregge: se in futuro emerge un altro pilota "sdoppiato" tra
+# 1950 e le stagioni successive, va aggiunta qui una riga
+# "driverId_jolpica": "codice-riferimento-esistente" (il driverId si
+# legge nel JSON di Jolpica, es. https://api.jolpi.ca/ergast/f1/1951/drivers.json).
+#
+# NOTA: questa mappa NON sistema da sola i piloti già duplicati
+# dall'import del 2026-09-20 — per quelli serve un merge manuale via SQL
+# (vedi db/patch_merge_piloti_duplicati.sql per Fangio).
+MAPPA_PILOTI_DRIVERID_CODICE = {
+    "fangio": "juan-manuel-fangio",
+}
+
+
+def trova_pilota_per_codice(cur, codice_riferimento: str) -> Optional[int]:
+    """Cerca un pilota per codice_riferimento esatto (usato da
+    MAPPA_PILOTI_DRIVERID_CODICE per riagganciare un pilota Jolpica al
+    suo record già esistente in database, quando il nome non combacia
+    lettera per lettera). None se non lo trova — in quel caso il
+    chiamante ricade sul percorso normale (cerca/crea per slug del
+    nome)."""
+    cur.execute("SELECT id FROM piloti WHERE codice_riferimento = %s", (codice_riferimento,))
+    riga = cur.fetchone()
+    return riga[0] if riga else None
+
 
 def get_json(percorso: str, parametri: Optional[dict] = None) -> dict:
     """GET verso l'API Jolpica con una pausa di cortesia e un errore
@@ -264,6 +305,22 @@ def trova_o_crea_gran_premio(cur, stagione_id: int, circuito_id: int, gara_jolpi
 
 
 def pilota_id_da_jolpica(cur, driver: dict) -> int:
+    # Prima controlla la mappa manuale (vedi MAPPA_PILOTI_DRIVERID_CODICE
+    # più sopra): per i pochi piloti noti "sdoppiati" tra 1950 e le
+    # stagioni successive, riaggancia direttamente il record esistente
+    # invece di ricalcolare lo slug dal nome Jolpica.
+    codice_forzato = MAPPA_PILOTI_DRIVERID_CODICE.get(driver.get("driverId", ""))
+    if codice_forzato:
+        pilota_id = trova_pilota_per_codice(cur, codice_forzato)
+        if pilota_id:
+            return pilota_id
+        log.warning(
+            "MAPPA_PILOTI_DRIVERID_CODICE indica codice_riferimento=%r per "
+            "driverId=%r ma non esiste in tabella piloti: ricado sul "
+            "percorso normale (cerca/crea per nome).",
+            codice_forzato, driver.get("driverId"),
+        )
+
     nome_completo = f"{driver['givenName']} {driver['familyName']}".strip()
     iso2 = iso2_da_nazionalita(driver.get("nationality", ""))
     return trova_o_crea_pilota(cur, nome_completo, iso2)
