@@ -160,6 +160,16 @@ MAPPA_NAZIONALITA_ISO2 = {
     "Mexican": "MX", "Canadian": "CA", "Japanese": "JP",
     "Liechtensteiner": "LI", "Hong Konger": "HK", "Danish": "DK",
     "Polish": "PL",
+    # Jolpica usa "East German" per i piloti della Germania Ovest/Est di
+    # inizio anni '50 indistintamente da "German" per motivi di comodo
+    # storico nella loro fonte: nei primi anni '50 (i GP di Germania del
+    # 1952-1953 dove è comparsa) la DDR non era ancora trattata come
+    # nazione sportivamente distinta neppure dalla FIA. La mappiamo su
+    # 'DE' come "German", non su una nazione a parte: vedi
+    # db/patch_nazionalita_est_tedeschi.sql per il backfill dei piloti
+    # già importati prima di questa correzione (1951-1970, lanciato il
+    # 2026-09-20) che erano rimasti con nazione_id NULL.
+    "East German": "DE",
 }
 
 
