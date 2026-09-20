@@ -193,7 +193,26 @@ INSERT INTO nazioni (codice_iso2, nome, nome_gentilizio) VALUES
     ('SE', 'Svezia', 'Svedese'),
     ('DK', 'Danimarca', 'Danese'),
     ('PL', 'Polonia', 'Polacco'),
-    ('IE', 'Irlanda', 'Irlandese')
+    ('IE', 'Irlanda', 'Irlandese'),
+    -- Nazioni ospitanti dei circuiti più recenti (aggiunte il 2026-09-20
+    -- insieme al backfill di circuiti.nazione_id, vedi
+    -- db/patch_backfill_nazioni_circuiti.sql e MAPPA_PAESE_CIRCUITO_ISO2
+    -- in backend/import_stagioni_jolpica.py per il perché mancavano):
+    ('PT', 'Portogallo', 'Portoghese'),
+    ('MA', 'Marocco', 'Marocchino'),
+    ('BH', 'Bahrein', 'Bahreinita'),
+    ('AZ', 'Azerbaigian', 'Azero'),
+    ('IN', 'India', 'Indiano'),
+    ('TR', 'Turchia', 'Turco'),
+    ('SA', 'Arabia Saudita', 'Saudita'),
+    ('QA', 'Qatar', 'Qatariota'),
+    ('SG', 'Singapore', 'Singaporiano'),
+    ('HU', 'Ungheria', 'Ungherese'),
+    ('MY', 'Malesia', 'Malese'),
+    ('CN', 'Cina', 'Cinese'),
+    ('RU', 'Russia', 'Russo'),
+    ('KR', 'Corea del Sud', 'Sudcoreano'),
+    ('AE', 'Emirati Arabi Uniti', 'Emiratino')
 ON CONFLICT (codice_iso2) DO NOTHING;
 
 INSERT INTO stati_risultato (codice, descrizione) VALUES
