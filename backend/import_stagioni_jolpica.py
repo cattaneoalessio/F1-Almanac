@@ -172,6 +172,43 @@ MAPPA_NAZIONALITA_ISO2 = {
     "East German": "DE",
 }
 
+# Nomi paese in inglese (come li restituisce Jolpica in
+# Circuit.Location.country, es. "Italy", "UK", "USA") -> codice ISO2.
+# È una mappa DIVERSA da MAPPA_NAZIONALITA_ISO2 qui sopra: quella copre
+# i gentilizi dei piloti/costruttori ("Italian"), questa i nomi di
+# paese dei circuiti ("Italy") — stringhe diverse per lo stesso paese,
+# Jolpica non è coerente tra i due endpoint. Verificata sui 78 circuiti
+# realmente presenti in https://api.jolpi.ca/ergast/f1/circuits.json
+# il 2026-09-20 (vedi elenco completo nel commit che ha introdotto
+# questa mappa): se in futuro comparisse un paese non elencato qui,
+# trova_o_crea_circuito lo segnala con un avviso invece di lasciare
+# nazione_id silenziosamente NULL, così il buco si vede subito.
+MAPPA_PAESE_CIRCUITO_ISO2 = {
+    "Italy": "IT", "UK": "GB", "Germany": "DE", "France": "FR",
+    "Spain": "ES", "Netherlands": "NL", "Belgium": "BE",
+    "Switzerland": "CH", "Austria": "AT", "Monaco": "MC",
+    "Argentina": "AR", "Brazil": "BR", "USA": "US", "Mexico": "MX",
+    "Canada": "CA", "Australia": "AU", "New Zealand": "NZ",
+    "Japan": "JP", "Thailand": "TH", "South Africa": "ZA",
+    "Sweden": "SE", "Portugal": "PT", "Morocco": "MA",
+    "Bahrain": "BH", "Azerbaijan": "AZ", "India": "IN",
+    "Turkey": "TR", "Saudi Arabia": "SA", "Qatar": "QA",
+    "Singapore": "SG", "Hungary": "HU", "Malaysia": "MY",
+    "China": "CN", "Russia": "RU", "Korea": "KR", "UAE": "AE",
+}
+
+
+def iso2_da_paese_circuito(paese_inglese: str) -> Optional[str]:
+    trovato = MAPPA_PAESE_CIRCUITO_ISO2.get(paese_inglese)
+    if not trovato:
+        log.warning(
+            "Paese circuito %r non nella mappa MAPPA_PAESE_CIRCUITO_ISO2: "
+            "nazione_id resterà NULL per questo circuito, aggiungi la "
+            "mappatura e correggi a mano con un UPDATE.",
+            paese_inglese,
+        )
+    return trovato
+
 # BUG REALE trovato dopo il lancio vero del 2026-09-20 (segnalato
 # dall'utente controllando il sito, non dal log — l'import non dà
 # nessun errore in questo caso, crea semplicemente un secondo pilota):
@@ -253,12 +290,16 @@ def trova_o_crea_circuito(cur, circuito_jolpica: dict) -> int:
     localita = ", ".join(p for p in [loc.get("locality"), loc.get("country")] if p) or None
     nazione_id = None
     if loc.get("country"):
-        # Jolpica dà il nome del paese in inglese (es. "Italy"), non un
-        # ISO2: qui usiamo solo la località testuale, la nazione_id la
-        # lasciamo NULL piuttosto che indovinare un codice sbagliato — è
-        # un dato secondario per la scheda circuito (già presente per i
-        # 7 del 1950, inseriti a mano), non blocca l'import delle gare.
-        pass
+        # Corretto il 2026-09-20 dopo la segnalazione dell'utente che la
+        # bandiera non compariva mai per i circuiti importati (era
+        # NULL di proposito, vedi MAPPA_PAESE_CIRCUITO_ISO2 qui sopra
+        # per il perché di prima): ora mappiamo il nome paese inglese
+        # di Jolpica sull'ISO2 e, se lo conosciamo, agganciamo/creiamo
+        # la riga in nazioni con trova_o_crea_nazione (stessa funzione
+        # già usata per piloti/costruttori).
+        codice_iso2 = iso2_da_paese_circuito(loc["country"])
+        if codice_iso2:
+            nazione_id = trova_o_crea_nazione(cur, codice_iso2)
 
     log.info("Circuito nuovo: %s (slug=%s)", circuito_jolpica["circuitName"], slug)
     cur.execute(
