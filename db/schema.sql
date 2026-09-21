@@ -182,9 +182,12 @@ CREATE TABLE risultati_gara (
     punti                   NUMERIC(6,2) NOT NULL DEFAULT 0,
     giro_veloce             BOOLEAN NOT NULL DEFAULT FALSE,
     tempo_giro_veloce       INTERVAL,
+    tipo_sessione           VARCHAR(10) NOT NULL DEFAULT 'gara',  -- 'gara' | 'sprint' (aggiunto 2026-09-21,
+                                                              -- vedi nota sui punti Sprint mancanti più sotto)
     creato_il               TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_risultato_gara_pilota UNIQUE (gran_premio_id, pilota_id),
-    CONSTRAINT chk_punti_non_negativi CHECK (punti >= 0)
+    CONSTRAINT uq_risultato_gara_pilota UNIQUE (gran_premio_id, pilota_id, tipo_sessione),
+    CONSTRAINT chk_punti_non_negativi CHECK (punti >= 0),
+    CONSTRAINT chk_tipo_sessione CHECK (tipo_sessione IN ('gara', 'sprint'))
 );
 CREATE INDEX idx_risultati_gp ON risultati_gara (gran_premio_id);
 CREATE INDEX idx_risultati_pilota ON risultati_gara (pilota_id);
