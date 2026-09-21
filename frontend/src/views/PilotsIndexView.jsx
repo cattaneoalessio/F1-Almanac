@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import DriverAvatar from '../components/DriverAvatar.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
+import PhotoBand from '../components/PhotoBand.jsx';
+import AdSlot from '../components/AdSlot.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getElencoPiloti } from '../api/backend.js';
+import fotoTopband from '../assets/topbands/piloti.jpg';
 import '../components/HistoricalStandings.css';
 import './PilotsIndexView.css';
 
@@ -48,12 +51,18 @@ export default function PilotsIndexView() {
 
   return (
     <main className="main main--historical">
-      <div className="topbar">
-        <div className="topbar__title">
-          <DriverAvatar size={34} />
-          <h1 style={{ fontSize: '1.4rem' }}>Piloti</h1>
+      <PhotoBand src={fotoTopband} objectPosition="right center">
+        <div className="topbar">
+          <div className="topbar__title">
+            <DriverAvatar size={34} />
+            <h1 style={{ fontSize: '1.4rem' }}>Piloti</h1>
+          </div>
+          <div className="topbar__meta">{piloti.length} piloti nell'archivio</div>
         </div>
-        <div className="topbar__meta">{piloti.length} piloti nell'archivio</div>
+      </PhotoBand>
+
+      <div className="main--historical__ad">
+        <AdSlot width={300} height={250} />
       </div>
 
       {stato === 'pronto' && (

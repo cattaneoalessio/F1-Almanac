@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
 import CircuitIcon from '../components/CircuitIcon.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
+import PhotoBand from '../components/PhotoBand.jsx';
+import AdSlot from '../components/AdSlot.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getElencoCircuiti } from '../api/backend.js';
+import fotoTopband from '../assets/topbands/circuiti.jpg';
 import '../components/HistoricalStandings.css';
 import './CircuitsIndexView.css';
 
@@ -55,12 +58,18 @@ export default function CircuitsIndexView() {
 
   return (
     <main className="main main--historical">
-      <div className="topbar">
-        <div className="topbar__title">
-          <CircuitArt size={34} />
-          <h1 style={{ fontSize: '1.4rem' }}>Circuiti</h1>
+      <PhotoBand src={fotoTopband} objectPosition="left 30%">
+        <div className="topbar">
+          <div className="topbar__title">
+            <CircuitArt size={34} />
+            <h1 style={{ fontSize: '1.4rem' }}>Circuiti</h1>
+          </div>
+          <div className="topbar__meta">Tutti i tracciati presenti nell'archivio</div>
         </div>
-        <div className="topbar__meta">Tutti i tracciati presenti nell'archivio</div>
+      </PhotoBand>
+
+      <div className="main--historical__ad">
+        <AdSlot width={300} height={250} />
       </div>
 
       {stato === 'pronto' && (

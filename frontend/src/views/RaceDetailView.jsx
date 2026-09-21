@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
+import PhotoBand from '../components/PhotoBand.jsx';
+import AdSlot from '../components/AdSlot.jsx';
 import { getRisultatiGara } from '../api/backend.js';
 import { statoGara, formattaDataGara } from '../utils/statoGara.js';
+import fotoTopband from '../assets/topbands/gara.jpg';
 import '../components/HistoricalStandings.css';
 import './RaceDetailView.css';
 
@@ -41,16 +44,22 @@ export default function RaceDetailView() {
 
   return (
     <main className="main main--historical">
-      <div className="topbar">
-        <div className="topbar__title">
-          <CircuitArt size={34} />
-          <h1 style={{ fontSize: '1.4rem' }}>{gara ? gara.nome_gp : 'Gara'}</h1>
+      <PhotoBand src={fotoTopband} objectPosition="center 42%">
+        <div className="topbar">
+          <div className="topbar__title">
+            <CircuitArt size={34} />
+            <h1 style={{ fontSize: '1.4rem' }}>{gara ? gara.nome_gp : 'Gara'}</h1>
+          </div>
+          <div className="topbar__meta">
+            <Link to={`/archivio/${anno}`}>&larr; Torna alla stagione {anno}</Link>
+            {' · '}
+            <Link to={`/circuiti/${circuito}`}>Scheda circuito</Link>
+          </div>
         </div>
-        <div className="topbar__meta">
-          <Link to={`/archivio/${anno}`}>&larr; Torna alla stagione {anno}</Link>
-          {' · '}
-          <Link to={`/circuiti/${circuito}`}>Scheda circuito</Link>
-        </div>
+      </PhotoBand>
+
+      <div className="main--historical__ad">
+        <AdSlot width={300} height={250} />
       </div>
 
       {gara && (() => {

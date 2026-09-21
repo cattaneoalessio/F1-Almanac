@@ -84,6 +84,11 @@
   max-width: 900px;
   margin: 0 auto;
 }
+.main--historical__ad {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.6rem;
+}
 @media (min-width: 900px) {
   .page {
     display: grid;

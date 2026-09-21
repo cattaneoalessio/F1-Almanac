@@ -1,6 +1,9 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
+import PhotoBand from '../components/PhotoBand.jsx';
+import AdSlot from '../components/AdSlot.jsx';
 import HistoricalStandings, { ANNO_MASSIMO } from '../components/HistoricalStandings.jsx';
+import fotoTopband from '../assets/topbands/archivio.jpg';
 
 // Di default si apre sull'ultima stagione disponibile (oggi il 2026),
 // non più sul 1950: quel valore risale all'MVP quando era l'unica
@@ -23,12 +26,18 @@ export default function HistoricalView() {
 
   return (
     <main className="main main--historical">
-      <div className="topbar">
-        <div className="topbar__title">
-          <CircuitArt size={34} />
-          <h1 style={{ fontSize: '1.4rem' }}>Archivio storico</h1>
+      <PhotoBand src={fotoTopband} objectPosition="right 35%">
+        <div className="topbar">
+          <div className="topbar__title">
+            <CircuitArt size={34} />
+            <h1 style={{ fontSize: '1.4rem' }}>Archivio storico</h1>
+          </div>
+          <div className="topbar__meta">Risultati e classifiche dal 1950 a oggi</div>
         </div>
-        <div className="topbar__meta">Risultati e classifiche dal 1950 a oggi</div>
+      </PhotoBand>
+
+      <div className="main--historical__ad">
+        <AdSlot width={728} height={90} />
       </div>
 
       <HistoricalStandings anno={anno} onAnnoChange={(nuovoAnno) => navigate(`/archivio/${nuovoAnno}`)} />
