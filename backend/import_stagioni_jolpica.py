@@ -395,7 +395,12 @@ def stato_id_da_status(cur, status_testo: str) -> Optional[int]:
     return riga[0] if riga else None
 
 
-def importa_risultati_gara(cur, gran_premio_id: int, risultati_jolpica: list[dict]) -> int:
+def importa_risultati_gara(cur, gran_premio_id: int, risultati_jolpica: list[dict], tipo_sessione: str = "gara") -> int:
+    """tipo_sessione: 'gara' (default, /results.json) o 'sprint'
+    (/sprint.json). Le due sessioni convivono come righe distinte per lo
+    stesso gran_premio_id + pilota_id grazie al vincolo unico allargato
+    in db/patch_migrazione_sprint.sql — senza quella migrazione lanciata
+    su Neon, l'INSERT per 'sprint' fallirebbe (colonna inesistente)."""
     inserite = 0
     for r in risultati_jolpica:
         pilota_id = pilota_id_da_jolpica(cur, r["Driver"])
@@ -419,9 +424,10 @@ def importa_risultati_gara(cur, gran_premio_id: int, risultati_jolpica: list[dic
             """INSERT INTO risultati_gara
                    (gran_premio_id, pilota_id, costruttore_id, numero_vettura,
                     posizione_griglia, posizione_finale, posizione_finale_testo,
-                    stato_id, motivo_ritiro, giri_completati, distacco_testo, punti)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-               ON CONFLICT (gran_premio_id, pilota_id) DO NOTHING""",
+                    stato_id, motivo_ritiro, giri_completati, distacco_testo, punti,
+                    tipo_sessione)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (gran_premio_id, pilota_id, tipo_sessione) DO NOTHING""",
             (
                 gran_premio_id,
                 pilota_id,
@@ -435,6 +441,7 @@ def importa_risultati_gara(cur, gran_premio_id: int, risultati_jolpica: list[dic
                 int(r["laps"]) if str(r.get("laps", "")).isdigit() else None,
                 tempo,
                 float(r.get("points") or 0),
+                tipo_sessione,
             ),
         )
         inserite += 1
@@ -497,6 +504,24 @@ def importa_stagione(cur, anno: int, dry_run: bool) -> None:
         risultati = gare_risultati[0]["Results"] if gare_risultati else []
         n = importa_risultati_gara(cur, gran_premio_id, risultati)
         log.info("  Round %s (%s): %d risultati importati.", g.get("round"), g["raceName"], n)
+
+        # Sprint Race (dal 2021): non tutti i round ne hanno una. Jolpica
+        # risponde con Races=[] (non un errore HTTP) per i round senza
+        # Sprint, quindi qui non serve un except dedicato — ma teniamo
+        # comunque un try/except largo per non far fallire l'intera
+        # stagione se un singolo round desse un problema di rete.
+        try:
+            dati_sprint = get_json(f"{anno}/{g['round']}/sprint.json", {"limit": 100})
+            gare_sprint = dati_sprint["MRData"]["RaceTable"]["Races"]
+            risultati_sprint = gare_sprint[0]["SprintResults"] if gare_sprint else []
+            if risultati_sprint:
+                n_sprint = importa_risultati_gara(cur, gran_premio_id, risultati_sprint, tipo_sessione="sprint")
+                log.info("  Round %s (%s): %d risultati Sprint importati.", g.get("round"), g["raceName"], n_sprint)
+        except Exception:
+            log.exception(
+                "  Round %s (%s): errore nel recuperare/importare la Sprint, proseguo con le altre gare.",
+                g.get("round"), g["raceName"],
+            )
 
     dati_piloti = get_json(f"{anno}/driverStandings.json")
     liste_piloti = dati_piloti["MRData"]["StandingsTable"]["StandingsLists"]
