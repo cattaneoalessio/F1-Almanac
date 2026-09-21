@@ -29,6 +29,7 @@ class RisultatiGara(BaseModel):
     circuito: str
     nome_gp: str
     data_gara: Optional[date] = None
+    commento: Optional[str] = None  # breve commento editoriale, None finché non scritto a mano
     risultati: list[RisultatoPilota]
     risultati_sprint: list[RisultatoPilota] = []  # vuoto per i GP senza Sprint Race (la maggioranza)
 
@@ -73,6 +74,7 @@ class GaraStagione(BaseModel):
     nome_gp: str
     circuito: str  # codice_riferimento, da usare nell'URL della pagina gara
     data_gara: Optional[date] = None
+    ha_sprint: bool = False  # True se questo weekend ha avuto/avrà anche una Sprint Race
 
 
 class SchedaPilota(BaseModel):

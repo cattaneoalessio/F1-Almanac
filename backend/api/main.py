@@ -103,7 +103,7 @@ def risultati_gara(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT gp.nome_gp, gp.data_gara
+                SELECT gp.nome_gp, gp.data_gara, gp.commento
                 FROM gran_premi gp
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN circuiti ci ON ci.id = gp.circuito_id
@@ -157,6 +157,7 @@ def risultati_gara(
         circuito=circuito,
         nome_gp=gp_meta["nome_gp"],
         data_gara=gp_meta["data_gara"],
+        commento=gp_meta["commento"],
         risultati=[RisultatoPilota(**riga) for riga in righe],
         risultati_sprint=[RisultatoPilota(**riga) for riga in righe_sprint],
     )
@@ -252,7 +253,11 @@ def gare_stagione(anno: int = Query(..., description="Anno della stagione, es. 1
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT gp.nome_gp, ci.codice_riferimento AS circuito, gp.data_gara
+                SELECT gp.nome_gp, ci.codice_riferimento AS circuito, gp.data_gara,
+                       EXISTS (
+                           SELECT 1 FROM risultati_gara r
+                           WHERE r.gran_premio_id = gp.id AND r.tipo_sessione = 'sprint'
+                       ) AS ha_sprint
                 FROM gran_premi gp
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN circuiti ci ON ci.id = gp.circuito_id
