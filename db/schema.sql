@@ -74,6 +74,10 @@ CREATE TABLE piloti (
     data_morte          DATE,
     nazione_id          SMALLINT REFERENCES nazioni(id),
     url_wikipedia       TEXT,
+    biografia           TEXT,                          -- breve biografia editoriale, opzionale (popolata via patch SQL dedicate)
+    curiosita           TEXT,                           -- un aneddoto/curiosità, opzionale
+    fonti_biografia      TEXT,                          -- URL delle fonti usate per biografia/curiosità (riferimento interno, non esposto dall'API)
+    fonti_sufficienti   BOOLEAN NOT NULL DEFAULT false, -- true solo se le fonti erano sufficienti per scrivere una biografia affidabile ("meglio vuoto che inventato")
     creato_il           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_piloti_cognome ON piloti (cognome);
