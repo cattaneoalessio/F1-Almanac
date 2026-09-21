@@ -5,6 +5,8 @@ import TeamBadge from '../components/TeamBadge.jsx';
 import PreviewBadge from '../components/PreviewBadge.jsx';
 import CircuitArt from '../components/CircuitArt.jsx';
 import LoSapeviWidget from '../components/LoSapeviWidget.jsx';
+import AdSlot from '../components/AdSlot.jsx';
+import heroFoto from '../assets/hero/home-hero.jpg';
 import { CIRCUIT_PHOTOS } from '../data/circuitPhotos.js';
 import {
   MOCK_CLASSIFICA_PILOTI,
@@ -62,7 +64,9 @@ export default function HomeView() {
     <main className="main home-view">
       {/* ---------- HERO ---------- */}
       <section className="home-hero">
-        <CircuitArt className="home-hero__art" size={340} />
+        <img className="home-hero__foto" src={heroFoto} alt="" aria-hidden="true" />
+        <div className="home-hero__scrim" />
+        <CircuitArt watermark className="home-hero__art" />
         <div className="home-hero__content">
           <p className="home-hero__kicker">GP Almanac — L'almanacco della Formula 1</p>
           <h1 className="home-hero__titolo">Ogni stagione. Ogni pilota. Ogni circuito.</h1>
@@ -79,6 +83,10 @@ export default function HomeView() {
             </Link>
           </div>
         </div>
+      </section>
+
+      <section className="home-section home-section--ad">
+        <AdSlot width={728} height={90} />
       </section>
 
       {/* ---------- LO SAPEVI CHE (contenuto reale, non mockup) ---------- */}
@@ -184,6 +192,10 @@ export default function HomeView() {
             ))}
           </ul>
         </GlassPanel>
+      </section>
+
+      <section className="home-section home-section--ad">
+        <AdSlot width={970} height={250} />
       </section>
 
       {/* ---------- NEWS ---------- */}

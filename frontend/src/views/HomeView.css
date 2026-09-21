@@ -14,10 +14,28 @@
   border-radius: 10px;
   padding: 3.2rem 1.6rem;
   margin-bottom: 2.4rem;
-  background: radial-gradient(120% 140% at 15% 20%, #2a1416 0%, var(--bg-main) 55%),
-    linear-gradient(135deg, var(--bg-card) 0%, var(--bg-main) 100%);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
+}
+.home-hero__foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  z-index: 0;
+}
+.home-hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    100deg,
+    rgba(11, 12, 16, 0.94) 0%,
+    rgba(11, 12, 16, 0.72) 42%,
+    rgba(11, 12, 16, 0.25) 75%
+  );
 }
 @media (min-width: 700px) {
   .home-hero {
@@ -25,16 +43,12 @@
   }
 }
 .home-hero__art {
-  position: absolute;
-  top: 50%;
-  right: -60px;
-  transform: translateY(-50%);
-  color: var(--accent-red);
-  opacity: 0.12;
-  pointer-events: none;
+  z-index: 1;
+  color: var(--accent-gold);
 }
 .home-hero__content {
   position: relative;
+  z-index: 2;
   max-width: 640px;
 }
 .home-hero__kicker {
@@ -96,6 +110,10 @@
   flex-wrap: wrap;
   gap: 0.6rem;
   margin-bottom: 1rem;
+}
+.home-section--ad {
+  display: flex;
+  justify-content: center;
 }
 
 /* ---------- CLASSIFICHE ---------- */

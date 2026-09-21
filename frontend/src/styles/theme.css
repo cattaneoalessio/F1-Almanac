@@ -10,9 +10,14 @@
   --bg-card-raised: #262f3b;
   --line: rgba(255, 255, 255, 0.08);
 
-  --accent-red: #e10600;
-  --accent-gold: #c5a059;
+  /* Palette aggiornata 2026-09-21 dal redesign fotografico (vedi canvas
+     Design). --accent-yellow invariato: resta usato da PreviewBadge,
+     CircuitPhotoGallery e dai focus state, fuori dallo scope di questo
+     giro (solo Home per ora). */
+  --accent-red: #e8432e;
+  --accent-gold: #d9a441;
   --accent-yellow: #fff200;
+  --accent-cyan: #3fd0ff;
 
   --text-primary: #ffffff;
   --text-muted: #c5a059;
@@ -20,8 +25,10 @@
 
   --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
 
-  --font-display: 'Orbitron', 'Share Tech Mono', monospace;
-  --font-body: 'Titillium Web', -apple-system, 'Segoe UI', sans-serif;
+  /* --font-mono invariato: usato per i tempi/numeri tabellari nel live
+     timing e nelle classifiche, non fa parte del redesign visivo. */
+  --font-display: 'Big Shoulders Display', 'Share Tech Mono', sans-serif;
+  --font-body: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Share Tech Mono', 'Orbitron', monospace;
 
   --sidebar-w: 320px;
