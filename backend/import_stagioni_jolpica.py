@@ -251,17 +251,38 @@ def trova_pilota_per_codice(cur, codice_riferimento: str) -> Optional[int]:
     return riga[0] if riga else None
 
 
-def get_json(percorso: str, parametri: Optional[dict] = None) -> dict:
-    """GET verso l'API Jolpica con una pausa di cortesia e un errore
-    parlante se qualcosa va storto (status diverso da 200, JSON non
-    valido): meglio fermarsi con un messaggio chiaro che proseguire con
-    dati a metà."""
+def get_json(percorso: str, parametri: Optional[dict] = None, tentativi: int = 3) -> dict:
+    """GET verso l'API Jolpica con una pausa di cortesia, qualche tentativo
+    automatico in caso di errore di rete transitorio (timeout, connessione
+    caduta) e un errore parlante se anche dopo i tentativi qualcosa va
+    storto (status diverso da 200, JSON non valido).
+
+    2026-09-21: aggiunto il retry dopo che un singolo timeout momentaneo
+    verso api.jolpi.ca ha fatto fallire un intero import multi-stagione
+    (2021-2026) a metà — l'API pubblica di Jolpica ogni tanto non risponde
+    in tempo sotto la raffica di richieste di un import così lungo, e prima
+    un solo timeout interrompeva tutto senza nessun tentativo di recupero."""
     url = f"{BASE_URL}/{percorso}"
-    risposta = requests.get(url, params=parametri, timeout=30)
-    time.sleep(PAUSA_TRA_RICHIESTE_SEC)
-    if risposta.status_code != 200:
-        raise RuntimeError(f"Jolpica ha risposto HTTP {risposta.status_code} per {url}")
-    return risposta.json()
+    ultimo_errore: Optional[Exception] = None
+    for tentativo in range(1, tentativi + 1):
+        try:
+            risposta = requests.get(url, params=parametri, timeout=30)
+        except requests.exceptions.RequestException as errore:
+            ultimo_errore = errore
+            if tentativo < tentativi:
+                attesa = 5 * tentativo  # backoff lineare: 5s, poi 10s
+                log.warning(
+                    "Richiesta a %s fallita (tentativo %d/%d: %s): riprovo tra %ds.",
+                    url, tentativo, tentativi, errore, attesa,
+                )
+                time.sleep(attesa)
+                continue
+            raise RuntimeError(f"Jolpica non ha risposto dopo {tentativi} tentativi per {url}") from errore
+        time.sleep(PAUSA_TRA_RICHIESTE_SEC)
+        if risposta.status_code != 200:
+            raise RuntimeError(f"Jolpica ha risposto HTTP {risposta.status_code} per {url}")
+        return risposta.json()
+    raise RuntimeError(f"Jolpica non ha risposto per {url}") from ultimo_errore  # pragma: no cover
 
 
 def slug_circuito(circuit_id: str) -> str:
@@ -499,11 +520,25 @@ def importa_stagione(cur, anno: int, dry_run: bool) -> None:
         circuito_id = trova_o_crea_circuito(cur, g["Circuit"])
         gran_premio_id = trova_o_crea_gran_premio(cur, stagione_id, circuito_id, g)
 
-        dati_risultati = get_json(f"{anno}/{g['round']}/results.json", {"limit": 100})
-        gare_risultati = dati_risultati["MRData"]["RaceTable"]["Races"]
-        risultati = gare_risultati[0]["Results"] if gare_risultati else []
-        n = importa_risultati_gara(cur, gran_premio_id, risultati)
-        log.info("  Round %s (%s): %d risultati importati.", g.get("round"), g["raceName"], n)
+        # try/except anche qui (non solo sulla Sprint sotto): get_json ora
+        # riprova già da sola sui timeout transitori, ma se anche i tentativi
+        # si esauriscono per un singolo round non deve far fallire l'intero
+        # import multi-stagione — si salta quel round (rilanciando l'import
+        # in un secondo momento lo recupera, grazie a ON CONFLICT DO NOTHING).
+        try:
+            dati_risultati = get_json(f"{anno}/{g['round']}/results.json", {"limit": 100})
+            gare_risultati = dati_risultati["MRData"]["RaceTable"]["Races"]
+            risultati = gare_risultati[0]["Results"] if gare_risultati else []
+            n = importa_risultati_gara(cur, gran_premio_id, risultati)
+            log.info("  Round %s (%s): %d risultati importati.", g.get("round"), g["raceName"], n)
+        except Exception:
+            log.exception(
+                "  Round %s (%s): errore nel recuperare/importare i risultati della gara, "
+                "salto questo round e proseguo con gli altri (rilancia l'import più tardi "
+                "per recuperarlo, è sicuro: le gare già importate vengono saltate).",
+                g.get("round"), g["raceName"],
+            )
+            continue
 
         # Sprint Race (dal 2021): non tutti i round ne hanno una. Jolpica
         # risponde con Races=[] (non un errore HTTP) per i round senza
