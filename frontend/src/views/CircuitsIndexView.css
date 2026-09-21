@@ -1,3 +1,35 @@
+.circuits-index__search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-card-raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.5rem 0.8rem;
+  margin-bottom: 1rem;
+  max-width: 360px;
+}
+
+.circuits-index__search-icon {
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.circuits-index__search input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.circuits-index__search input::placeholder {
+  color: var(--text-muted);
+}
+
 .circuits-index__grid {
   display: grid;
   gap: 1rem;

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
+import CircuitIcon from '../components/CircuitIcon.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getElencoCircuiti } from '../api/backend.js';
@@ -11,6 +12,7 @@ import './CircuitsIndexView.css';
 export default function CircuitsIndexView() {
   const [circuiti, setCircuiti] = useState([]);
   const [stato, setStato] = useState('caricamento'); // caricamento | pronto | errore
+  const [ricerca, setRicerca] = useState('');
 
   useEffect(() => {
     let annullato = false;
@@ -32,6 +34,25 @@ export default function CircuitsIndexView() {
     };
   }, []);
 
+  // Filtro live per nome circuito, nazione o città: confronto senza
+  // maiuscole/accenti così "citta" trova anche "Città" e "monaco" trova
+  // "Monaco". La lista è già tutta caricata in memoria (max ~80 righe),
+  // quindi filtrare lato client a ogni carattere digitato è immediato,
+  // niente richieste aggiuntive al backend.
+  const normalizza = (testo) =>
+    (testo || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase();
+
+  const circuitiFiltrati = useMemo(() => {
+    const query = normalizza(ricerca.trim());
+    if (!query) return circuiti;
+    return circuiti.filter((c) =>
+      [c.nome, c.nazione_nome, c.localita].some((campo) => normalizza(campo).includes(query))
+    );
+  }, [circuiti, ricerca]);
+
   return (
     <main className="main main--historical">
       <div className="topbar">
@@ -42,6 +63,19 @@ export default function CircuitsIndexView() {
         <div className="topbar__meta">Tutti i tracciati presenti nell'archivio</div>
       </div>
 
+      {stato === 'pronto' && (
+        <label className="circuits-index__search">
+          <span className="circuits-index__search-icon" aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            placeholder="Cerca per circuito, nazione o città…"
+            value={ricerca}
+            onChange={(evento) => setRicerca(evento.target.value)}
+            aria-label="Cerca circuito per nome, nazione o città"
+          />
+        </label>
+      )}
+
       {stato === 'caricamento' && <p className="historical-standings__stato">Carico l'elenco…</p>}
       {stato === 'errore' && (
         <p className="historical-standings__stato historical-standings__stato--errore">
@@ -49,12 +83,16 @@ export default function CircuitsIndexView() {
         </p>
       )}
 
-      {stato === 'pronto' && (
+      {stato === 'pronto' && circuitiFiltrati.length === 0 && (
+        <p className="historical-standings__stato">Nessun circuito trovato per "{ricerca}".</p>
+      )}
+
+      {stato === 'pronto' && circuitiFiltrati.length > 0 && (
         <div className="circuits-index__grid">
-          {circuiti.map((c) => (
+          {circuitiFiltrati.map((c) => (
             <Link key={c.slug} to={`/circuiti/${c.slug}`} className="circuits-index__card-link">
               <GlassPanel className="circuits-index__card">
-                <CircuitArt size={40} />
+                <CircuitIcon slug={c.slug} size={40} />
                 <div>
                   <div className="circuits-index__nome">{c.nome}</div>
                   <div className="circuits-index__localita">

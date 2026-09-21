@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import CircuitArt from '../components/CircuitArt.jsx';
+import CircuitIcon from '../components/CircuitIcon.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import CircuitPhotoGallery from '../components/CircuitPhotoGallery.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -71,7 +71,7 @@ export default function CircuitView() {
       {stato === 'pronto' && (
         <>
           <div className="circuit-view__header">
-            <CircuitArt size={64} />
+            <CircuitIcon slug={slug} size={64} />
             <div>
               <h1 className="circuit-view__nome">{scheda.nome}</h1>
               <p className="circuit-view__sottotitolo">
