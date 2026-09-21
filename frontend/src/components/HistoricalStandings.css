@@ -153,3 +153,18 @@
   color: var(--accent-gold);
   border-color: var(--accent-gold);
 }
+.historical-standings__races-sprint-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: default;
+}

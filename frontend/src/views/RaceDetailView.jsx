@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import { getRisultatiGara } from '../api/backend.js';
+import { statoGara, formattaDataGara } from '../utils/statoGara.js';
 import '../components/HistoricalStandings.css';
 import './RaceDetailView.css';
 
@@ -10,7 +11,7 @@ import './RaceDetailView.css';
 export default function RaceDetailView() {
   const { anno, circuito } = useParams();
   const [gara, setGara] = useState(null);
-  const [stato, setStato] = useState('caricamento'); // caricamento | pronto | vuoto | errore
+  const [stato, setStato] = useState('caricamento'); // caricamento | pronto | vuoto | errore (stato di CARICAMENTO della pagina)
 
   useEffect(() => {
     let annullato = false;
@@ -51,6 +52,22 @@ export default function RaceDetailView() {
           <Link to={`/circuiti/${circuito}`}>Scheda circuito</Link>
         </div>
       </div>
+
+      {gara && (() => {
+        // statoQuando: quando si è disputata (o si disputerà) la gara —
+        // riusa la stessa logica Disputata/Prossima già usata nell'elenco
+        // gare della stagione, per coerenza in tutto il sito.
+        const statoQuando = statoGara(gara.data_gara);
+        const dataFormattata = formattaDataGara(gara.data_gara);
+        if (!statoQuando || !dataFormattata) return null;
+        return (
+          <p className="race-detail__quando">
+            {statoQuando === 'Disputata' ? 'Disputata il' : 'Si disputerà il'} {dataFormattata}
+          </p>
+        );
+      })()}
+
+      {gara && gara.commento && <p className="race-detail__commento">{gara.commento}</p>}
 
       <GlassPanel>
         {stato === 'caricamento' && <p className="historical-standings__stato">Carico i risultati…</p>}

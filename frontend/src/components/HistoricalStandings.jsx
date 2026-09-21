@@ -5,6 +5,7 @@ import GlassPanel from './GlassPanel.jsx';
 import TeamBadge from './TeamBadge.jsx';
 import { getClassificaPiloti, getClassificaScuderie, getGareStagione } from '../api/backend.js';
 import { FlagIcon } from '../utils/flags.jsx';
+import { statoGara, formattaDataGara } from '../utils/statoGara.js';
 
 // Anno minimo/massimo selezionabili: coprono l'intera storia del
 // campionato mondiale di F1 (dal 1950 a oggi). Il database può contenere
@@ -23,19 +24,6 @@ function generaElencoAnni() {
 }
 
 const ANNI_DISPONIBILI = generaElencoAnni();
-
-/**
- * Una gara è "Disputata" se la sua data è passata (o è oggi), "Prossima"
- * se è futura. Se manca la data (raro, solo per gare storiche molto
- * vecchie) non mostriamo l'etichetta invece di indovinare.
- */
-function statoGara(dataGaraIso) {
-  if (!dataGaraIso) return null;
-  const oggi = new Date();
-  oggi.setHours(0, 0, 0, 0);
-  const dataGara = new Date(dataGaraIso);
-  return dataGara <= oggi ? 'Disputata' : 'Prossima';
-}
 
 /**
  * Contenuto della pagina "stagione": selettore anno + elenco gare +
@@ -127,14 +115,23 @@ export default function HistoricalStandings({ anno, onAnnoChange }) {
           <ul className="historical-standings__races-list">
             {gare.map((gara) => {
               const stato = statoGara(gara.data_gara);
+              const dataFormattata = formattaDataGara(gara.data_gara);
               return (
                 <li key={gara.circuito}>
                   <Link to={`/archivio/${anno}/${gara.circuito}`}>{gara.nome_gp}</Link>
+                  {gara.ha_sprint && (
+                    <span
+                      className="historical-standings__races-sprint-badge"
+                      title="Weekend con Sprint Race"
+                    >
+                      S
+                    </span>
+                  )}
                   {stato && (
                     <span
                       className={`historical-standings__races-stato historical-standings__races-stato--${stato === 'Disputata' ? 'disputata' : 'prossima'}`}
                     >
-                      {stato}
+                      {stato === 'Prossima' && dataFormattata ? `${stato} · ${dataFormattata}` : stato}
                     </span>
                   )}
                 </li>
