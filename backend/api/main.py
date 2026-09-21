@@ -616,6 +616,21 @@ def scheda_scuderia(slug: str):
                 {"costruttore_id": scuderia["id"]},
             )
             punti_totali = cur.fetchone()["totale"]
+
+            # Punti totali PER PILOTA con questa scuderia (gara + Sprint):
+            # serve per il campo "punti" di ogni voce in piloti qui sotto,
+            # che altrimenti (costruito solo dalle righe "gara" di risultati)
+            # non conterebbe i punti Sprint del singolo pilota.
+            cur.execute(
+                """
+                SELECT pilota_id, COALESCE(SUM(punti), 0) AS totale
+                FROM risultati_gara
+                WHERE costruttore_id = %(costruttore_id)s
+                GROUP BY pilota_id
+                """,
+                {"costruttore_id": scuderia["id"]},
+            )
+            punti_per_pilota = {r["pilota_id"]: float(r["totale"]) for r in cur.fetchall()}
     finally:
         conn.close()
 
@@ -681,7 +696,12 @@ def scheda_scuderia(slug: str):
         )
         voce["gare"] += 1
         voce["vittorie"] += 1 if r["posizione"] == 1 else 0
-        voce["punti"] += float(r["punti"])
+
+    # I punti si sovrascrivono qui (invece di sommarli riga per riga sopra)
+    # con il totale gara+Sprint calcolato nella query dedicata: "gare" e
+    # "vittorie" restano invece basati solo sulle righe "gara".
+    for pid, voce in piloti_map.items():
+        voce["punti"] = punti_per_pilota.get(pid, 0.0)
 
     piloti = sorted(piloti_map.values(), key=lambda v: (-v["punti"], -v["vittorie"], v["pilota"]))
 
