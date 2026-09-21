@@ -32,21 +32,47 @@
   top: 0;
   z-index: 10;
   display: flex;
-  gap: 0.4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.2rem;
   padding: 0.7rem 1.1rem;
   background: rgba(11, 12, 16, 0.9);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
+}
+.app-tabs__logo {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  color: var(--text-primary);
+}
+.app-tabs__logo-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  flex-shrink: 0;
+}
+.app-tabs__links {
+  display: flex;
+  gap: 0.4rem;
+  min-width: 0;
   /* Su schermi stretti le voci scorrono in orizzontale invece di andare
-     a capo: con 3+ voci (Archivio storico, Circuiti, Live Timing, e
-     altre che verranno) andare a capo romperebbe il layout "mobile
-     first" richiesto fin dall'inizio del progetto. */
+     a capo: con 7 voci (Home, Archivio storico, Piloti, Scuderie,
+     Circuiti, News, Live Timing) andare a capo romperebbe il layout
+     "mobile first" richiesto fin dall'inizio del progetto. */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
-.app-tabs::-webkit-scrollbar {
+.app-tabs__links::-webkit-scrollbar {
   display: none;
 }
 .app-tabs__item {
@@ -56,10 +82,8 @@
   text-transform: uppercase;
   text-decoration: none;
   color: var(--text-gray);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 0.5rem 0.9rem;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 0.6rem;
   cursor: pointer;
   display: inline-block;
   white-space: nowrap;
@@ -69,13 +93,37 @@
   color: var(--text-primary);
 }
 .app-tabs__item--attiva {
-  color: var(--text-primary);
-  background: var(--bg-card-raised);
-  border-color: var(--line);
+  color: var(--accent-red);
+  border-bottom-color: var(--accent-red);
 }
 
 .page {
   min-height: 100vh;
+}
+
+/* Colonne ADS fisse ai lati — dimensione minima "skyscraper" (160×600).
+   Ancorate al bordo della finestra, indipendenti dalla larghezza del
+   contenuto centrale: compaiono solo quando lo schermo è abbastanza
+   largo da ospitarle senza toccare la colonna di contenuto (che resta
+   centrata, vedi .main/.main--historical/.home-view). Sotto quella
+   soglia restano nascoste, coerente con l'impostazione mobile-first
+   del resto del sito. */
+.rail-ad {
+  display: none;
+}
+@media (min-width: 1600px) {
+  .rail-ad {
+    display: block;
+    position: fixed;
+    top: 6rem;
+    z-index: 5;
+  }
+  .rail-ad--left {
+    left: 24px;
+  }
+  .rail-ad--right {
+    right: 24px;
+  }
 }
 
 /* Vista storica: niente sidebar di timing live, layout centrato e più
@@ -99,6 +147,7 @@
 .main {
   padding: 1.25rem 1.1rem 4rem;
   max-width: 1100px;
+  margin: 0 auto;
 }
 @media (min-width: 700px) {
   .main {

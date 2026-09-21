@@ -12,6 +12,7 @@ import ScuderiesIndexView from './views/ScuderiesIndexView.jsx';
 import ScuderiaView from './views/ScuderiaView.jsx';
 import NewsView from './views/NewsView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
+import AdSlot from './components/AdSlot.jsx';
 
 const TABS = [
   // "/" è un caso speciale: con startsWith() combacerebbe con QUALSIASI
@@ -30,21 +31,27 @@ function BarraNavigazione() {
   const location = useLocation();
   return (
     <nav className="app-tabs" aria-label="Sezioni del sito">
-      {TABS.map((tab) => {
-        const attiva = tab.esatto
-          ? location.pathname === tab.pattern
-          : location.pathname.startsWith(tab.pattern);
-        return (
-          <Link
-            key={tab.pattern}
-            to={tab.to}
-            className={`app-tabs__item ${attiva ? 'app-tabs__item--attiva' : ''}`}
-            aria-current={attiva ? 'page' : undefined}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
+      <Link to="/" className="app-tabs__logo">
+        <span className="app-tabs__logo-dot" aria-hidden="true" />
+        GP Almanac
+      </Link>
+      <div className="app-tabs__links">
+        {TABS.map((tab) => {
+          const attiva = tab.esatto
+            ? location.pathname === tab.pattern
+            : location.pathname.startsWith(tab.pattern);
+          return (
+            <Link
+              key={tab.pattern}
+              to={tab.to}
+              className={`app-tabs__item ${attiva ? 'app-tabs__item--attiva' : ''}`}
+              aria-current={attiva ? 'page' : undefined}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }
@@ -53,6 +60,13 @@ export default function App() {
   return (
     <div className="app-shell">
       <BarraNavigazione />
+
+      <div className="rail-ad rail-ad--left" aria-hidden="true">
+        <AdSlot width={160} height={600} />
+      </div>
+      <div className="rail-ad rail-ad--right" aria-hidden="true">
+        <AdSlot width={160} height={600} />
+      </div>
 
       <Routes>
         {/* Fase E: la home è ora una pagina dinamica a sé (hero, classifica

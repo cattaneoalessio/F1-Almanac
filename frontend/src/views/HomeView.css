@@ -5,16 +5,28 @@
 
 .home-view {
   max-width: 1200px;
+  margin: 0 auto;
 }
 
 /* ---------- HERO ---------- */
 .home-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 10px;
-  padding: 3.2rem 1.6rem;
+  /* Full-bleed: esce dal contenitore centrato (.home-view/.main) e
+     copre l'intera larghezza della pagina, non solo la colonna di
+     contenuto — unica sezione della home a farlo, di proposito: dalla
+     sezione successiva in giù il contenuto torna centrato per lasciare
+     spazio alle colonne ADS ai lati (vedi .rail-ad in App.css). */
+  width: auto;
+  max-width: none;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  border-radius: 0;
+  padding: 3.2rem 0;
   margin-bottom: 2.4rem;
   border: 1px solid var(--line);
+  border-left: none;
+  border-right: none;
   box-shadow: var(--shadow);
 }
 .home-hero__foto {
@@ -39,7 +51,7 @@
 }
 @media (min-width: 700px) {
   .home-hero {
-    padding: 4.5rem 3rem;
+    padding: 4.5rem 0;
   }
 }
 .home-hero__art {
@@ -50,6 +62,16 @@
   position: relative;
   z-index: 2;
   max-width: 640px;
+  /* Allinea il testo (a bandiera sinistra, non centrato) più o meno
+     dove inizia la colonna di contenuto normale sotto l'hero, così il
+     titolo non parte incollato al bordo della finestra su schermi
+     larghi. Approssimato via padding, non serve essere pixel-perfect. */
+  padding-left: max(1.6rem, calc((100vw - 1100px) / 2 + 1.1rem));
+}
+@media (min-width: 700px) {
+  .home-hero__content {
+    padding-left: max(3rem, calc((100vw - 1100px) / 2 + 2.4rem));
+  }
 }
 .home-hero__kicker {
   font-family: var(--font-display);
