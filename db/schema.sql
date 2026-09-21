@@ -156,6 +156,7 @@ CREATE TABLE gran_premi (
     numero_giri         SMALLINT,
     distanza_km         NUMERIC(7,3),
     url_wikipedia       TEXT,
+    commento            TEXT,                           -- breve commento editoriale sulla gara, opzionale: NULL finché non scritto a mano (o da Claude Desktop), mai generato automaticamente
     UNIQUE (stagione_id, circuito_id, data_gara)
 );
 CREATE INDEX idx_gran_premi_stagione ON gran_premi (stagione_id);
