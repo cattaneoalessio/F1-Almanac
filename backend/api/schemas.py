@@ -30,6 +30,7 @@ class RisultatiGara(BaseModel):
     nome_gp: str
     data_gara: Optional[date] = None
     risultati: list[RisultatoPilota]
+    risultati_sprint: list[RisultatoPilota] = []  # vuoto per i GP senza Sprint Race (la maggioranza)
 
 
 class VoceClassificaPiloti(BaseModel):

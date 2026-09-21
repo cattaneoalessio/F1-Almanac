@@ -118,8 +118,7 @@ def risultati_gara(
                     detail=f"Nessun Gran Premio trovato per anno={anno} e circuito='{circuito}'.",
                 )
 
-            cur.execute(
-                """
+            query_risultati = """
                 SELECT
                     r.posizione_finale AS posizione,
                     r.posizione_finale_testo AS posizione_testo,
@@ -139,11 +138,17 @@ def risultati_gara(
                 JOIN costruttori c ON c.id = r.costruttore_id
                 LEFT JOIN stati_risultato sr ON sr.id = r.stato_id
                 WHERE s.anno = %(anno)s AND ci.codice_riferimento = %(circuito)s
+                    AND r.tipo_sessione = %(tipo_sessione)s
                 ORDER BY r.posizione_finale NULLS LAST, r.giri_completati DESC NULLS LAST
-                """,
-                {"anno": anno, "circuito": circuito},
-            )
+                """
+            cur.execute(query_risultati, {"anno": anno, "circuito": circuito, "tipo_sessione": "gara"})
             righe = cur.fetchall()
+
+            # Sprint Race dello stesso weekend, se c'è (dal 2021): righe
+            # vuote per la stragrande maggioranza dei GP, che non ne hanno
+            # una — il frontend nasconde il box quando la lista è vuota.
+            cur.execute(query_risultati, {"anno": anno, "circuito": circuito, "tipo_sessione": "sprint"})
+            righe_sprint = cur.fetchall()
     finally:
         conn.close()
 
@@ -153,6 +158,7 @@ def risultati_gara(
         nome_gp=gp_meta["nome_gp"],
         data_gara=gp_meta["data_gara"],
         risultati=[RisultatoPilota(**riga) for riga in righe],
+        risultati_sprint=[RisultatoPilota(**riga) for riga in righe_sprint],
     )
 
 
@@ -168,8 +174,8 @@ def classifica_piloti(anno: int = Query(..., description="Anno della stagione, e
                     p.codice_riferimento AS pilota_slug,
                     n.codice_iso2 AS nazione_codice,
                     COALESCE(SUM(r.punti), 0) AS punti_totali,
-                    COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie,
-                    COUNT(*) AS gare_disputate
+                    COUNT(*) FILTER (WHERE r.posizione_finale = 1 AND r.tipo_sessione = 'gara') AS vittorie,
+                    COUNT(DISTINCT r.gran_premio_id) AS gare_disputate
                 FROM risultati_gara r
                 JOIN gran_premi gp ON gp.id = r.gran_premio_id
                 JOIN stagioni s ON s.id = gp.stagione_id
@@ -214,7 +220,7 @@ def classifica_scuderie(anno: int = Query(..., description="Anno della stagione,
                     c.codice_riferimento AS scuderia_slug,
                     n.codice_iso2 AS nazione_codice,
                     COALESCE(SUM(r.punti), 0) AS punti_totali,
-                    COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie,
+                    COUNT(*) FILTER (WHERE r.posizione_finale = 1 AND r.tipo_sessione = 'gara') AS vittorie,
                     COUNT(DISTINCT r.gran_premio_id) AS gare_disputate
                 FROM risultati_gara r
                 JOIN gran_premi gp ON gp.id = r.gran_premio_id
@@ -281,8 +287,8 @@ def elenco_piloti():
                     p.codice_riferimento AS slug,
                     n.codice_iso2 AS nazione_codice,
                     COALESCE(SUM(r.punti), 0) AS punti_totali_carriera,
-                    COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie_totali,
-                    COUNT(*) AS gare_totali,
+                    COUNT(*) FILTER (WHERE r.posizione_finale = 1 AND r.tipo_sessione = 'gara') AS vittorie_totali,
+                    COUNT(DISTINCT r.gran_premio_id) AS gare_totali,
                     (
                         SELECT c2.nome FROM risultati_gara r2
                         JOIN gran_premi gp2 ON gp2.id = r2.gran_premio_id
@@ -359,16 +365,25 @@ def scheda_pilota(slug: str):
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN circuiti ci ON ci.id = gp.circuito_id
                 JOIN costruttori c ON c.id = r.costruttore_id
-                WHERE r.pilota_id = %(pilota_id)s
+                WHERE r.pilota_id = %(pilota_id)s AND r.tipo_sessione = 'gara'
                 ORDER BY s.anno ASC, gp.data_gara ASC
                 """,
                 {"pilota_id": pilota["id"]},
             )
             risultati = cur.fetchall()
+
+            # Il totale punti carriera include anche i punti Sprint (che
+            # contano per il mondiale), a differenza della tabella
+            # piazzamenti/vittorie qui sopra che mostra solo le gare della
+            # domenica: sommati con una query separata su TUTTE le righe.
+            cur.execute(
+                "SELECT COALESCE(SUM(punti), 0) AS totale FROM risultati_gara WHERE pilota_id = %(pilota_id)s",
+                {"pilota_id": pilota["id"]},
+            )
+            punti_totali_carriera = cur.fetchone()["totale"]
     finally:
         conn.close()
 
-    punti_totali_carriera = sum(r["punti"] for r in risultati)
     vittorie_totali = sum(1 for r in risultati if r["posizione"] == 1)
 
     return SchedaPilota(
@@ -469,7 +484,7 @@ def scheda_circuito(slug: str):
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN circuiti ci ON ci.id = gp.circuito_id
                 LEFT JOIN risultati_gara r
-                    ON r.gran_premio_id = gp.id AND r.posizione_finale = 1
+                    ON r.gran_premio_id = gp.id AND r.posizione_finale = 1 AND r.tipo_sessione = 'gara'
                 LEFT JOIN piloti vincitore ON vincitore.id = r.pilota_id
                 WHERE ci.codice_riferimento = %(slug)s
                 ORDER BY gp.data_gara ASC NULLS LAST, s.anno ASC
@@ -490,7 +505,7 @@ def scheda_circuito(slug: str):
                 JOIN circuiti ci ON ci.id = gp.circuito_id
                 JOIN piloti p ON p.id = r.pilota_id
                 LEFT JOIN nazioni n ON n.id = p.nazione_id
-                WHERE ci.codice_riferimento = %(slug)s AND r.posizione_finale = 1
+                WHERE ci.codice_riferimento = %(slug)s AND r.posizione_finale = 1 AND r.tipo_sessione = 'gara'
                 GROUP BY p.id, p.nome, p.cognome, p.codice_riferimento, n.codice_iso2
                 ORDER BY vittorie DESC, pilota ASC
                 """,
@@ -585,12 +600,22 @@ def scheda_scuderia(slug: str):
                 JOIN circuiti ci ON ci.id = gp.circuito_id
                 JOIN piloti p ON p.id = r.pilota_id
                 LEFT JOIN nazioni n ON n.id = p.nazione_id
-                WHERE r.costruttore_id = %(costruttore_id)s
+                WHERE r.costruttore_id = %(costruttore_id)s AND r.tipo_sessione = 'gara'
                 ORDER BY s.anno ASC, gp.data_gara ASC NULLS LAST
                 """,
                 {"costruttore_id": scuderia["id"]},
             )
             risultati = cur.fetchall()
+
+            # Punti totali di scuderia: includono anche i punti Sprint
+            # (contano per il mondiale costruttori), a differenza
+            # dell'elenco gare/piloti qui sopra che mostra solo le gare
+            # della domenica — vedi stessa scelta fatta per /piloti/{slug}.
+            cur.execute(
+                "SELECT COALESCE(SUM(punti), 0) AS totale FROM risultati_gara WHERE costruttore_id = %(costruttore_id)s",
+                {"costruttore_id": scuderia["id"]},
+            )
+            punti_totali = cur.fetchone()["totale"]
     finally:
         conn.close()
 
@@ -609,7 +634,6 @@ def scheda_scuderia(slug: str):
             piloti=[],
         )
 
-    punti_totali = sum(r["punti"] for r in risultati)
     vittorie_totali = sum(1 for r in risultati if r["posizione"] == 1)
 
     # Una riga "gara" per ogni gran premio disputato: si tiene il
