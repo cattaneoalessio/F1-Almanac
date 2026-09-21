@@ -25,6 +25,19 @@ function generaElencoAnni() {
 const ANNI_DISPONIBILI = generaElencoAnni();
 
 /**
+ * Una gara è "Disputata" se la sua data è passata (o è oggi), "Prossima"
+ * se è futura. Se manca la data (raro, solo per gare storiche molto
+ * vecchie) non mostriamo l'etichetta invece di indovinare.
+ */
+function statoGara(dataGaraIso) {
+  if (!dataGaraIso) return null;
+  const oggi = new Date();
+  oggi.setHours(0, 0, 0, 0);
+  const dataGara = new Date(dataGaraIso);
+  return dataGara <= oggi ? 'Disputata' : 'Prossima';
+}
+
+/**
  * Contenuto della pagina "stagione": selettore anno + elenco gare +
  * classifica piloti. L'anno è controllato dall'esterno (la vista che la
  * usa lo legge dall'URL, /archivio/:anno) così ogni stagione ha un
@@ -112,11 +125,21 @@ export default function HistoricalStandings({ anno, onAnnoChange }) {
         <GlassPanel className="historical-standings__races">
           <h3 className="historical-standings__races-title">Gare della stagione {anno}</h3>
           <ul className="historical-standings__races-list">
-            {gare.map((gara) => (
-              <li key={gara.circuito}>
-                <Link to={`/archivio/${anno}/${gara.circuito}`}>{gara.nome_gp}</Link>
-              </li>
-            ))}
+            {gare.map((gara) => {
+              const stato = statoGara(gara.data_gara);
+              return (
+                <li key={gara.circuito}>
+                  <Link to={`/archivio/${anno}/${gara.circuito}`}>{gara.nome_gp}</Link>
+                  {stato && (
+                    <span
+                      className={`historical-standings__races-stato historical-standings__races-stato--${stato === 'Disputata' ? 'disputata' : 'prossima'}`}
+                    >
+                      {stato}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </GlassPanel>
       )}
@@ -233,3 +256,5 @@ export default function HistoricalStandings({ anno, onAnnoChange }) {
     </div>
   );
 }
+
+export { ANNO_MASSIMO, ANNO_MINIMO };

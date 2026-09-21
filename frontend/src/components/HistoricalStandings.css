@@ -122,6 +122,11 @@
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
 }
+.historical-standings__races-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 .historical-standings__races-list a {
   text-decoration: none;
   color: var(--text-primary);
@@ -131,4 +136,20 @@
 .historical-standings__races-list a:hover {
   color: var(--accent-gold);
   border-bottom-color: var(--accent-gold);
+}
+.historical-standings__races-stato {
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+.historical-standings__races-stato--disputata {
+  color: var(--text-gray);
+}
+.historical-standings__races-stato--prossima {
+  color: var(--accent-gold);
+  border-color: var(--accent-gold);
 }

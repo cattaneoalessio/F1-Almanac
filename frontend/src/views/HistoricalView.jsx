@@ -1,8 +1,14 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
-import HistoricalStandings from '../components/HistoricalStandings.jsx';
+import HistoricalStandings, { ANNO_MASSIMO } from '../components/HistoricalStandings.jsx';
 
-const ANNO_DI_DEFAULT = 1950; // prima stagione del Mondiale F1, ed è l'unica con dati reali nell'MVP
+// Di default si apre sull'ultima stagione disponibile (oggi il 2026),
+// non più sul 1950: quel valore risale all'MVP quando era l'unica
+// stagione con dati reali. ANNO_MASSIMO vive in HistoricalStandings.jsx
+// (stesso file che genera il menu a tendina) così i due restano
+// sincronizzati: quando si importerà il 2027 basterà aggiornare un
+// solo punto invece di due.
+const ANNO_DI_DEFAULT = ANNO_MASSIMO;
 
 /**
  * Pagina "stagione" (Fase D), raggiungibile da /archivio/:anno. L'anno

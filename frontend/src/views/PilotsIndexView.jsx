@@ -90,11 +90,8 @@ export default function PilotsIndexView() {
                   </div>
                   <div className="pilots-index__stats">
                     {p.gare_totali} {p.gare_totali === 1 ? 'gara' : 'gare'}
-                    {p.vittorie_totali > 0 && (
-                      <> · {p.vittorie_totali} {p.vittorie_totali === 1 ? 'vittoria' : 'vittorie'}</>
-                    )}
                     {' · '}
-                    {p.punti_totali_carriera} pt
+                    {p.vittorie_totali} {p.vittorie_totali === 1 ? 'vittoria' : 'vittorie'}
                   </div>
                 </div>
               </GlassPanel>
