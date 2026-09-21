@@ -419,7 +419,8 @@ def elenco_circuiti():
             cur.execute(
                 """
                 SELECT ci.nome, ci.codice_riferimento AS slug,
-                       n.codice_iso2 AS nazione_codice, ci.localita
+                       n.codice_iso2 AS nazione_codice, n.nome AS nazione_nome,
+                       ci.localita
                 FROM circuiti ci
                 LEFT JOIN nazioni n ON n.id = ci.nazione_id
                 ORDER BY ci.nome ASC

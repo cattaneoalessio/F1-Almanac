@@ -99,6 +99,7 @@ class VoceCircuito(BaseModel):
     nome: str
     slug: str
     nazione_codice: Optional[str] = None
+    nazione_nome: Optional[str] = None  # nome esteso della nazione, per la ricerca lato frontend
     localita: Optional[str] = None
 
 
