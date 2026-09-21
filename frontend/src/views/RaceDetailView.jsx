@@ -103,6 +103,47 @@ export default function RaceDetailView() {
           </div>
         )}
       </GlassPanel>
+
+      {stato === 'pronto' && gara.risultati_sprint && gara.risultati_sprint.length > 0 && (
+        <GlassPanel style={{ marginTop: '1.2rem' }}>
+          <h2 className="section-title" style={{ marginTop: 0 }}>
+            Sprint Race
+          </h2>
+          <div className="historical-standings__table-wrap">
+            <table className="historical-standings__table race-detail__table">
+              <thead>
+                <tr>
+                  <th scope="col">Pos.</th>
+                  <th scope="col">Pilota</th>
+                  <th scope="col">Costruttore</th>
+                  <th scope="col">Giri</th>
+                  <th scope="col">Tempo/Distacco</th>
+                  <th scope="col">Punti</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gara.risultati_sprint.map((riga) => (
+                  <tr key={`sprint-${riga.pilota_slug}`}>
+                    <td className="tab-num">{riga.posizione ?? riga.posizione_testo ?? 'Rit.'}</td>
+                    <td>
+                      <Link to={`/piloti/${riga.pilota_slug}`} className="historical-standings__pilota">
+                        {riga.pilota}
+                      </Link>
+                      {riga.motivo_ritiro && (
+                        <div className="race-detail__motivo">{riga.motivo_ritiro}</div>
+                      )}
+                    </td>
+                    <td>{riga.costruttore}</td>
+                    <td className="tab-num">{riga.giri_completati ?? '—'}</td>
+                    <td className="tab-num">{riga.tempo ?? '—'}</td>
+                    <td className="tab-num">{riga.punti}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </GlassPanel>
+      )}
     </main>
   );
 }
