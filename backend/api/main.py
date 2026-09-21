@@ -20,6 +20,14 @@ punti reali (già corretti per l'epoca, arrivi a pari merito compresi,
 bonus giro veloce già incluso nel totale) direttamente in questa
 colonna, senza bisogno di un'altra tabella di supporto.
 
+2026-09-21: la nota sopra era vera solo per /classifica/piloti e
+/classifica/scuderie — /gare/risultati, /piloti, /piloti/{slug} e
+/scuderie/{slug} erano rimasti indietro e leggevano ancora
+punti_per_posizione (che non viene mai popolata per le stagioni
+importate da Jolpica, quindi restituivano sempre 0 su quelle gare).
+Allineati anche questi quattro a risultati_gara.punti: ora nessun
+endpoint dell'API dipende più da punti_per_posizione.
+
 Avvio in locale:
     pip install fastapi uvicorn[standard] psycopg2-binary python-dotenv --break-system-packages
     uvicorn main:app --reload
@@ -122,7 +130,7 @@ def risultati_gara(
                     COALESCE(r.tempo_totale::text, r.distacco_testo) AS tempo,
                     sr.codice AS stato,
                     r.motivo_ritiro,
-                    COALESCE(pp.punti, 0) AS punti
+                    COALESCE(r.punti, 0) AS punti
                 FROM gran_premi gp
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN circuiti ci ON ci.id = gp.circuito_id
@@ -130,9 +138,6 @@ def risultati_gara(
                 JOIN piloti p ON p.id = r.pilota_id
                 JOIN costruttori c ON c.id = r.costruttore_id
                 LEFT JOIN stati_risultato sr ON sr.id = r.stato_id
-                LEFT JOIN punti_per_posizione pp
-                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
-                    AND pp.posizione = r.posizione_finale
                 WHERE s.anno = %(anno)s AND ci.codice_riferimento = %(circuito)s
                 ORDER BY r.posizione_finale NULLS LAST, r.giri_completati DESC NULLS LAST
                 """,
@@ -275,7 +280,7 @@ def elenco_piloti():
                     p.nome || ' ' || p.cognome AS pilota,
                     p.codice_riferimento AS slug,
                     n.codice_iso2 AS nazione_codice,
-                    COALESCE(SUM(pp.punti), 0) AS punti_totali_carriera,
+                    COALESCE(SUM(r.punti), 0) AS punti_totali_carriera,
                     COUNT(*) FILTER (WHERE r.posizione_finale = 1) AS vittorie_totali,
                     COUNT(*) AS gare_totali,
                     (
@@ -289,11 +294,7 @@ def elenco_piloti():
                 FROM piloti p
                 JOIN risultati_gara r ON r.pilota_id = p.id
                 JOIN gran_premi gp ON gp.id = r.gran_premio_id
-                JOIN stagioni s ON s.id = gp.stagione_id
                 LEFT JOIN nazioni n ON n.id = p.nazione_id
-                LEFT JOIN punti_per_posizione pp
-                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
-                    AND pp.posizione = r.posizione_finale
                 GROUP BY p.id, p.nome, p.cognome, p.codice_riferimento, n.codice_iso2
                 ORDER BY p.cognome ASC, p.nome ASC
                 """
@@ -352,15 +353,12 @@ def scheda_pilota(slug: str):
                     c.nome AS costruttore,
                     r.posizione_finale AS posizione,
                     r.posizione_finale_testo AS posizione_testo,
-                    COALESCE(pp.punti, 0) AS punti
+                    COALESCE(r.punti, 0) AS punti
                 FROM risultati_gara r
                 JOIN gran_premi gp ON gp.id = r.gran_premio_id
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN circuiti ci ON ci.id = gp.circuito_id
                 JOIN costruttori c ON c.id = r.costruttore_id
-                LEFT JOIN punti_per_posizione pp
-                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
-                    AND pp.posizione = r.posizione_finale
                 WHERE r.pilota_id = %(pilota_id)s
                 ORDER BY s.anno ASC, gp.data_gara ASC
                 """,
@@ -580,16 +578,13 @@ def scheda_scuderia(slug: str):
                     n.codice_iso2 AS pilota_nazione_codice,
                     r.posizione_finale AS posizione,
                     r.posizione_finale_testo AS posizione_testo,
-                    COALESCE(pp.punti, 0) AS punti
+                    COALESCE(r.punti, 0) AS punti
                 FROM risultati_gara r
                 JOIN gran_premi gp ON gp.id = r.gran_premio_id
                 JOIN stagioni s ON s.id = gp.stagione_id
                 JOIN circuiti ci ON ci.id = gp.circuito_id
                 JOIN piloti p ON p.id = r.pilota_id
                 LEFT JOIN nazioni n ON n.id = p.nazione_id
-                LEFT JOIN punti_per_posizione pp
-                    ON pp.sistema_punteggio_id = s.sistema_punteggio_id
-                    AND pp.posizione = r.posizione_finale
                 WHERE r.costruttore_id = %(costruttore_id)s
                 ORDER BY s.anno ASC, gp.data_gara ASC NULLS LAST
                 """,
