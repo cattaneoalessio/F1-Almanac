@@ -99,10 +99,44 @@ CREATE TABLE circuiti (
     lunghezza_km        NUMERIC(6,3),
     latitudine          NUMERIC(9,6),
     longitudine         NUMERIC(9,6),
+    indirizzo           VARCHAR(200),
+    capienza            INTEGER,
+    google_maps_url     TEXT,
+    storia              TEXT,                          -- testo libero, oggi scritto a mano solo per i 7 circuiti del 1950
     url_wikipedia       TEXT,
     creato_il           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_circuiti_nome ON circuiti (nome);
+
+-- Curve e rettilinei di un circuito, in ordine di percorrenza: usati dal
+-- box "Curve e rettilinei" nella pagina /circuiti/:slug. nome_moderno
+-- nullo = tratto esistito solo nella configurazione storica, rimosso da
+-- quella attuale; nome_1950 valorizzato solo se diverso (o assente)
+-- rispetto al nome moderno.
+CREATE TABLE circuiti_curve (
+    id                  SERIAL PRIMARY KEY,
+    circuito_id         INTEGER NOT NULL REFERENCES circuiti(id) ON DELETE CASCADE,
+    ordine              SMALLINT NOT NULL,
+    tipo                VARCHAR(20) NOT NULL,           -- 'curva' | 'rettilineo'
+    nome_moderno        VARCHAR(150),
+    nome_1950           VARCHAR(150),
+    anno_intitolazione  SMALLINT,                       -- anno del nome moderno, se assegnato dopo il 1950
+    nota                TEXT,
+    UNIQUE (circuito_id, ordine)
+);
+
+-- Versioni del tracciato nel tempo (layout/lunghezza cambiati): usate dal
+-- box "Configurazioni nel tempo" nella pagina /circuiti/:slug.
+CREATE TABLE circuiti_configurazioni (
+    id                  SERIAL PRIMARY KEY,
+    circuito_id         INTEGER NOT NULL REFERENCES circuiti(id) ON DELETE CASCADE,
+    anno_da             SMALLINT NOT NULL,
+    anno_a              SMALLINT,                       -- NULL = tuttora in uso (o ultima nota)
+    lunghezza_km        NUMERIC(6,3),
+    descrizione         TEXT NOT NULL,
+    UNIQUE (circuito_id, anno_da)
+);
+CREATE INDEX idx_circuiti_configurazioni_circuito ON circuiti_configurazioni (circuito_id);
 
 CREATE TABLE stagioni (
     id                      SERIAL PRIMARY KEY,
