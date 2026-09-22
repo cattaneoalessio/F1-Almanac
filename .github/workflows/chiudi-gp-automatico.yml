@@ -23,12 +23,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Render (piano free) addormenta il servizio dopo 15 minuti senza
-      # richieste: la prima chiamata dopo una pausa lunga (come una
-      # schedulazione notturna) può impiegare fino a un minuto per
-      # svegliarlo. Una richiesta di riscaldamento separata, prima di
-      # quella vera, evita che la chiamata che conta vada in timeout.
-      - name: Sveglia il backend (Render si addormenta dopo inattività)
-        run: curl -sS --max-time 90 "${{ secrets.BACKEND_URL }}/" || true
+      # richieste: dopo una pausa lunga (come una schedulazione
+      # notturna) può impiegare anche più di 90 secondi per svegliarsi
+      # del tutto. Un singolo tentativo di risveglio ignorato in caso
+      # di fallimento (come nella prima versione di questo workflow)
+      # rischia di lasciare partire la chiamata vera contro un server
+      # ancora addormentato, che va in timeout — qui invece si riprova
+      # ogni 10s per fino a ~5 minuti, finché non risponde davvero.
+      - name: Sveglia il backend e aspetta che risponda
+        run: |
+          tentativi=0
+          massimo=30
+          fino_a_quando_pronto() {
+            codice=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "${{ secrets.BACKEND_URL }}/" 2>/dev/null || echo "000")
+            [ "$codice" = "200" ]
+          }
+          until fino_a_quando_pronto; do
+            tentativi=$((tentativi + 1))
+            if [ "$tentativi" -ge "$massimo" ]; then
+              echo "::warning::Il backend non ha risposto entro ~5 minuti, procedo comunque con il tentativo vero"
+              break
+            fi
+            echo "Backend non ancora pronto (tentativo $tentativi/$massimo), riprovo tra 10s..."
+            sleep 10
+          done
+          echo "Backend pronto (o tempo massimo di attesa raggiunto)."
 
       - name: Chiudi i GP pronti
         run: |
