@@ -16,6 +16,7 @@ import ArcadeView from './views/ArcadeView.jsx';
 import ChronoQuizView from './views/ChronoQuizView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
 import AdSlot from './components/AdSlot.jsx';
+import { AuthProvider, nomeUtente, useAuth } from './auth/AuthContext.jsx';
 
 const TABS = [
   // "/" è un caso speciale: con startsWith() combacerebbe con QUALSIASI
@@ -33,6 +34,7 @@ const TABS = [
 
 function BarraNavigazione() {
   const location = useLocation();
+  const { utente, apriLogin, logout } = useAuth();
   const [menuAperto, setMenuAperto] = useState(false);
   const barraRef = useRef(null);
 
@@ -92,6 +94,14 @@ function BarraNavigazione() {
             </Link>
           );
         })}
+        <button
+          type="button"
+          className="app-tabs__auth"
+          onClick={utente ? logout : apriLogin}
+          title={utente ? `Esci (${nomeUtente(utente)})` : 'Accedi per salvare i punteggi Arcade in classifica'}
+        >
+          {utente ? `Esci — ${nomeUtente(utente)}` : 'Accedi'}
+        </button>
       </div>
 
       {/* Hamburger, visibile solo sotto i 700px (vedi App.css): apre/chiude
@@ -127,6 +137,9 @@ function BarraNavigazione() {
             </Link>
           );
         })}
+        <button type="button" className="app-tabs__mobile-auth" onClick={utente ? logout : apriLogin}>
+          {utente ? `Esci — ${nomeUtente(utente)}` : 'Accedi'}
+        </button>
       </div>
     </nav>
   );
@@ -134,47 +147,49 @@ function BarraNavigazione() {
 
 export default function App() {
   return (
-    <div className="app-shell">
-      <BarraNavigazione />
+    <AuthProvider>
+      <div className="app-shell">
+        <BarraNavigazione />
 
-      <div className="rail-ad rail-ad--left" aria-hidden="true">
-        <AdSlot width={160} height={600} />
+        <div className="rail-ad rail-ad--left" aria-hidden="true">
+          <AdSlot width={160} height={600} />
+        </div>
+        <div className="rail-ad rail-ad--right" aria-hidden="true">
+          <AdSlot width={160} height={600} />
+        </div>
+
+        <Routes>
+          {/* Fase E: la home è ora una pagina dinamica a sé (hero, classifica
+              stagione in corso, calendario, focus on prossima gara, news),
+              non più un redirect verso l'archivio storico — che resta
+              comunque raggiungibile dal tab "Archivio storico". */}
+          <Route path="/" element={<HomeView />} />
+          <Route path="/archivio/:anno" element={<HistoricalView />} />
+          <Route path="/archivio/:anno/:circuito" element={<RaceDetailView />} />
+          <Route path="/piloti" element={<PilotsIndexView />} />
+          <Route path="/piloti/:slug" element={<DriverView />} />
+          <Route path="/circuiti" element={<CircuitsIndexView />} />
+          <Route path="/circuiti/:slug" element={<CircuitView />} />
+          <Route path="/scuderie" element={<ScuderiesIndexView />} />
+          <Route path="/scuderie/:slug" element={<ScuderiaView />} />
+          <Route path="/news" element={<NewsView />} />
+          <Route path="/live" element={<LiveTimingView />} />
+          <Route path="/arcade" element={<ArcadeView />} />
+          <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
+          <Route
+            path="*"
+            element={
+              <main className="main main--historical">
+                <p className="historical-standings__stato">
+                  Pagina non trovata. <Link to={`/archivio/${ANNO_DI_DEFAULT}`}>Torna all'archivio storico</Link>.
+                </p>
+              </main>
+            }
+          />
+        </Routes>
+
+        <SiteFooter />
       </div>
-      <div className="rail-ad rail-ad--right" aria-hidden="true">
-        <AdSlot width={160} height={600} />
-      </div>
-
-      <Routes>
-        {/* Fase E: la home è ora una pagina dinamica a sé (hero, classifica
-            stagione in corso, calendario, focus on prossima gara, news),
-            non più un redirect verso l'archivio storico — che resta
-            comunque raggiungibile dal tab "Archivio storico". */}
-        <Route path="/" element={<HomeView />} />
-        <Route path="/archivio/:anno" element={<HistoricalView />} />
-        <Route path="/archivio/:anno/:circuito" element={<RaceDetailView />} />
-        <Route path="/piloti" element={<PilotsIndexView />} />
-        <Route path="/piloti/:slug" element={<DriverView />} />
-        <Route path="/circuiti" element={<CircuitsIndexView />} />
-        <Route path="/circuiti/:slug" element={<CircuitView />} />
-        <Route path="/scuderie" element={<ScuderiesIndexView />} />
-        <Route path="/scuderie/:slug" element={<ScuderiaView />} />
-        <Route path="/news" element={<NewsView />} />
-        <Route path="/live" element={<LiveTimingView />} />
-        <Route path="/arcade" element={<ArcadeView />} />
-        <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
-        <Route
-          path="*"
-          element={
-            <main className="main main--historical">
-              <p className="historical-standings__stato">
-                Pagina non trovata. <Link to={`/archivio/${ANNO_DI_DEFAULT}`}>Torna all'archivio storico</Link>.
-              </p>
-            </main>
-          }
-        />
-      </Routes>
-
-      <SiteFooter />
-    </div>
+    </AuthProvider>
   );
 }

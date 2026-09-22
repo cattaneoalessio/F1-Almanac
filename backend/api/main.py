@@ -37,9 +37,10 @@ generata automaticamente da FastAPI.
 from datetime import date
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth import utente_da_token
 from chronoquiz import genera_quiz
 from db import get_connection
 from schemas import (
@@ -49,14 +50,17 @@ from schemas import (
     GaraCircuito,
     GaraScuderia,
     GaraStagione,
+    RichiestaPunteggio,
     RisultatiGara,
     RisultatoPilota,
     RisultatoStoricoPilota,
+    RispostaPunteggio,
     SchedaCircuito,
     SchedaPilota,
     SchedaScuderia,
     VoceAlboOro,
     VoceCircuito,
+    VoceClassificaArcade,
     VoceClassificaPiloti,
     VoceClassificaScuderie,
     VoceIndicePiloti,
@@ -84,7 +88,7 @@ app.add_middleware(
         "http://127.0.0.1:4173",
         "http://localhost:4173",
     ],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -752,3 +756,66 @@ def chronoquiz_questions():
         )
 
     return [DomandaChronoQuiz(**d) for d in domande]
+
+
+@app.post("/arcade/punteggi", response_model=RispostaPunteggio)
+def salva_punteggio_arcade(payload: RichiestaPunteggio, authorization: str = Header(default="")):
+    """Salva un punteggio Arcade SOLO se la richiesta arriva da un utente
+    Netlify Identity valido (header Authorization: Bearer <token>). Login
+    facoltativo in questo progetto: senza token valido non è un errore,
+    risponde comunque 200 con salvato=False — è il caso normale di chi
+    gioca senza account (vedi ChronoQuizView.jsx)."""
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    conn = get_connection()
+    # Autocommit invece di un'unica transazione con commit manuale: serve
+    # a utente_da_token, che può dover ritentare un INSERT dopo un
+    # UniqueViolation (username duplicato) senza restare bloccata da una
+    # transazione già "avvelenata" dall'errore precedente (vedi auth.py).
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            utente_id, username = utente_da_token(cur, token)
+            if utente_id is None:
+                return RispostaPunteggio(salvato=False, username=None)
+
+            cur.execute(
+                """
+                INSERT INTO arcade_punteggi (utente_id, gioco, punti)
+                VALUES (%(utente_id)s, %(gioco)s, %(punti)s)
+                """,
+                {"utente_id": utente_id, "gioco": payload.gioco, "punti": payload.punti},
+            )
+    finally:
+        conn.close()
+
+    return RispostaPunteggio(salvato=True, username=username)
+
+
+@app.get("/arcade/classifica", response_model=list[VoceClassificaArcade])
+def classifica_arcade(gioco: str, limite: int = 10):
+    """Top N punteggi di un gioco Arcade (default 10). Una riga per
+    partita, non solo il record personale — coerente con arcade_punteggi
+    che traccia ogni partita giocata, non solo il massimo per utente."""
+    limite = max(1, min(limite, 50))  # rete di sicurezza contro richieste abnormi
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT u.username, ap.punti, ap.creato_il
+                FROM arcade_punteggi ap
+                JOIN utenti u ON u.id = ap.utente_id
+                WHERE ap.gioco = %(gioco)s
+                ORDER BY ap.punti DESC
+                LIMIT %(limite)s
+                """,
+                {"gioco": gioco, "limite": limite},
+            )
+            righe = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [VoceClassificaArcade(**r) for r in righe]

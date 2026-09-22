@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GlassPanel from '../components/GlassPanel.jsx';
-import { getDomandeChronoQuiz } from '../api/backend.js';
+import { getClassificaArcade, getDomandeChronoQuiz, inviaPunteggioArcade } from '../api/backend.js';
 import { salvaPunteggioSeRecord } from '../utils/arcadeStorage.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 import './ChronoQuizView.css';
 
 const CHIAVE_RECORD = 'monoposto_chronoquiz_high';
@@ -25,6 +26,7 @@ const PAUSA_RIVELAZIONE_MS = 1500;
  * di 10 domande se i dati nel DB non bastano.
  */
 export default function ChronoQuizView() {
+  const { utente, ottieniToken, apriLogin } = useAuth();
   const [fase, setFase] = useState('regole'); // regole | gioco | finale
   const [statoDomande, setStatoDomande] = useState('caricamento'); // caricamento | pronto | errore
   const [domande, setDomande] = useState([]);
@@ -34,6 +36,13 @@ export default function ChronoQuizView() {
   const [punteggioTotale, setPunteggioTotale] = useState(0);
   const [risposteCorrette, setRisposteCorrette] = useState(0);
   const [nuovoRecord, setNuovoRecord] = useState(false);
+  // Esito dell'invio del punteggio al backend, mostrato in fondo alla
+  // schermata finale: 'non-salvato' non è un errore, è il caso normale
+  // di chi ha giocato senza login (facoltativo in questo progetto).
+  const [statoInvio, setStatoInvio] = useState('inattivo'); // inattivo | invio | salvato | non-salvato | errore
+  const [usernameSalvato, setUsernameSalvato] = useState(null);
+  const [classifica, setClassifica] = useState([]);
+  const [statoClassifica, setStatoClassifica] = useState('inattivo'); // inattivo | caricamento | pronto | errore
 
   // Valori "autorevoli" del punteggio/risposte corrette, aggiornati in
   // modo sincrono (a differenza dello state, che si aggiorna al prossimo
@@ -142,6 +151,39 @@ export default function ChronoQuizView() {
     const record = salvaPunteggioSeRecord(CHIAVE_RECORD, punteggioRef.current);
     setNuovoRecord(record);
     setFase('finale');
+    inviaEsitoPartita(punteggioRef.current);
+  }
+
+  // Invia il punteggio al backend (se il giocatore è loggato: senza
+  // login il backend risponde comunque, semplicemente con salvato:false,
+  // vedi backend.js) e carica sempre la classifica subito dopo, così è
+  // visibile anche a chi non era loggato — solo in lettura, per motivarlo
+  // ad accedere la prossima volta.
+  async function inviaEsitoPartita(punti) {
+    setStatoInvio('invio');
+    try {
+      const token = await ottieniToken();
+      const risposta = await inviaPunteggioArcade('chronoquiz', punti, token);
+      setStatoInvio(risposta.salvato ? 'salvato' : 'non-salvato');
+      setUsernameSalvato(risposta.username ?? null);
+    } catch (errore) {
+      console.error('Errore nel salvare il punteggio ChronoQuiz:', errore);
+      setStatoInvio('errore');
+    }
+    caricaClassifica();
+  }
+
+  function caricaClassifica() {
+    setStatoClassifica('caricamento');
+    getClassificaArcade('chronoquiz', 10)
+      .then((dati) => {
+        setClassifica(dati || []);
+        setStatoClassifica('pronto');
+      })
+      .catch((errore) => {
+        console.error('Errore nel caricare la classifica ChronoQuiz:', errore);
+        setStatoClassifica('errore');
+      });
   }
 
   function resetPartita() {
@@ -154,6 +196,9 @@ export default function ChronoQuizView() {
     setFaseDomanda('in-corso');
     setOpzioneSelezionata(null);
     setNuovoRecord(false);
+    setStatoInvio('inattivo');
+    setUsernameSalvato(null);
+    setStatoClassifica('inattivo');
   }
 
   function iniziaPartita() {
@@ -184,6 +229,12 @@ export default function ChronoQuizView() {
             <li>Risposta corretta: 100 punti base, più un bonus fino a 150 punti in base a quanto sei stato veloce.</li>
             <li>Risposta sbagliata o tempo scaduto: 0 punti per quella domanda, si va avanti comunque.</li>
           </ul>
+
+          <p className="chronoquiz-view__regole-nota">
+            {utente
+              ? 'Sei connesso: il punteggio finale verrà salvato in classifica in automatico.'
+              : 'Puoi giocare senza account: accedi dalla barra in alto se vuoi salvare il punteggio in classifica.'}
+          </p>
 
           <button type="button" className="chronoquiz-view__bottone-primario" onClick={iniziaPartita}>
             Inizia a giocare
@@ -266,22 +317,66 @@ export default function ChronoQuizView() {
 
     // fase === 'finale'
     return (
-      <GlassPanel className="chronoquiz-view__panel chronoquiz-view__finale">
-        {nuovoRecord && <span className="badge chronoquiz-view__badge-record">Nuovo record!</span>}
-        <span className="chronoquiz-view__finale-etichetta">Punteggio finale</span>
-        <span className="chronoquiz-view__finale-punteggio tab-num">{punteggioTotale}</span>
-        <p className="chronoquiz-view__finale-dettaglio">
-          {risposteCorrette} risposte corrette su {domande.length}
-        </p>
-        <div className="chronoquiz-view__finale-azioni">
-          <button type="button" className="chronoquiz-view__bottone-primario" onClick={rigioca}>
-            Rigioca
-          </button>
-          <Link to="/arcade" className="chronoquiz-view__torna-arcade">
-            &larr; Torna all'Arcade
-          </Link>
-        </div>
-      </GlassPanel>
+      <>
+        <GlassPanel className="chronoquiz-view__panel chronoquiz-view__finale">
+          {nuovoRecord && <span className="badge chronoquiz-view__badge-record">Nuovo record!</span>}
+          <span className="chronoquiz-view__finale-etichetta">Punteggio finale</span>
+          <span className="chronoquiz-view__finale-punteggio tab-num">{punteggioTotale}</span>
+          <p className="chronoquiz-view__finale-dettaglio">
+            {risposteCorrette} risposte corrette su {domande.length}
+          </p>
+
+          {statoInvio === 'salvato' && (
+            <p className="chronoquiz-view__esito-invio chronoquiz-view__esito-invio--ok">
+              Punteggio salvato in classifica come {usernameSalvato}.
+            </p>
+          )}
+          {statoInvio === 'non-salvato' && (
+            <div className="chronoquiz-view__esito-invio">
+              <p>Accedi per salvare questo punteggio in classifica.</p>
+              <button type="button" className="chronoquiz-view__link-accedi" onClick={apriLogin}>
+                Accedi
+              </button>
+            </div>
+          )}
+          {statoInvio === 'errore' && (
+            <p className="chronoquiz-view__esito-invio chronoquiz-view__esito-invio--errore">
+              Non sono riuscito a salvare il punteggio — riprova più tardi.
+            </p>
+          )}
+
+          <div className="chronoquiz-view__finale-azioni">
+            <button type="button" className="chronoquiz-view__bottone-primario" onClick={rigioca}>
+              Rigioca
+            </button>
+            <Link to="/arcade" className="chronoquiz-view__torna-arcade">
+              &larr; Torna all'Arcade
+            </Link>
+          </div>
+        </GlassPanel>
+
+        <GlassPanel className="chronoquiz-view__panel chronoquiz-view__classifica">
+          <h3 className="chronoquiz-view__classifica-titolo">Classifica ChronoQuiz</h3>
+          {statoClassifica === 'caricamento' && <p className="chronoquiz-view__classifica-stato">Carico la classifica...</p>}
+          {statoClassifica === 'errore' && (
+            <p className="chronoquiz-view__classifica-stato">Non riesco a mostrare la classifica in questo momento.</p>
+          )}
+          {statoClassifica === 'pronto' && classifica.length === 0 && (
+            <p className="chronoquiz-view__classifica-stato">Nessun punteggio salvato ancora: sii il primo.</p>
+          )}
+          {statoClassifica === 'pronto' && classifica.length > 0 && (
+            <ol className="chronoquiz-view__classifica-lista">
+              {classifica.map((voce, indice) => (
+                <li key={`${voce.username}-${voce.creato_il}-${indice}`} className="chronoquiz-view__classifica-voce">
+                  <span className="chronoquiz-view__classifica-posizione tab-num">{indice + 1}</span>
+                  <span className="chronoquiz-view__classifica-nome">{voce.username}</span>
+                  <span className="chronoquiz-view__classifica-punti tab-num">{voce.punti} pts</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </GlassPanel>
+      </>
     );
   }
 

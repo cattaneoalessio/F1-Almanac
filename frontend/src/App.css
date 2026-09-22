@@ -99,6 +99,43 @@
   border-bottom-color: var(--accent-red);
 }
 
+.app-tabs__auth {
+  flex-shrink: 0;
+  margin-left: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: none;
+  color: var(--text-gray);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.app-tabs__auth:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.app-tabs__mobile-auth {
+  margin: 0.4rem 1.1rem 0.6rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 /* Sotto i 700px la riga orizzontale di link lascia il posto al menu a
    scomparsa (hamburger + pannello): stesso breakpoint già usato altrove
    nel sito per "mobile" (vedi .main). Sopra i 700px è l'inverso: il

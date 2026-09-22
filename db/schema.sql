@@ -200,6 +200,47 @@ CREATE INDEX idx_risultati_costruttore ON risultati_gara (costruttore_id);
 -- Indice pensato per la query "risultati per anno + circuito" (Fase C)
 CREATE INDEX idx_gp_stagione_circuito ON gran_premi (stagione_id, circuito_id);
 
+-- ---------------------------------------------------------------------
+-- Arcade: utenti e punteggi
+-- ---------------------------------------------------------------------
+-- Introdotte per portare i punteggi Arcade oltre il localStorage attuale
+-- (solo locale al browser, vedi ArcadeView.jsx/ChronoQuizView.jsx) verso
+-- account utente reali e classifiche persistenti/condivise. auth_id
+-- arriva dal sistema di autenticazione esterno (non ancora deciso al
+-- momento in cui scrivo — Netlify Identity o Clerk sono le due opzioni
+-- allo studio): questa tabella non gestisce password o login in proprio,
+-- solo il collegamento tra quell'identità esterna e i dati Arcade.
+--
+-- NOTA: creato_il qui è TIMESTAMP (senza fuso orario), a differenza di
+-- TIMESTAMPTZ usato da ogni altra tabella di questo schema (piloti,
+-- circuiti, gran_premi, ecc.). Riportato così di proposito, identico a
+-- come è stato creato realmente su Neon: schema.sql deve rispecchiare
+-- il database vero, non la mia opinione su come andrebbe scritto. Da
+-- valutare se allinearlo con una migrazione, non fatto qui.
+CREATE TABLE utenti (
+    id              SERIAL PRIMARY KEY,
+    auth_id         VARCHAR(255) NOT NULL UNIQUE,   -- id univoco dal sistema di login esterno
+    username        VARCHAR(50) NOT NULL UNIQUE,
+    avatar_url      VARCHAR(255),
+    livello_pilota  VARCHAR(50) DEFAULT 'Rookie',
+    creato_il       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Una riga per OGNI partita giocata (non solo il record personale): così
+-- in futuro si possono costruire classifiche per periodo (es. "questo
+-- mese"), non solo quella assoluta. Il record assoluto per gioco resta
+-- comunque un semplice MAX(punti) GROUP BY gioco, non serve altro.
+-- utente_id è nullable (nessun vincolo NOT NULL): da chiarire se è
+-- voluto (punteggi anche da partite senza login) o da stringere.
+CREATE TABLE arcade_punteggi (
+    id          SERIAL PRIMARY KEY,
+    utente_id   INTEGER REFERENCES utenti(id) ON DELETE CASCADE,
+    gioco       VARCHAR(50) NOT NULL,   -- es. 'chronoquiz', in futuro altri slug gioco
+    punti       INTEGER NOT NULL,
+    creato_il   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_arcade_punteggi_gioco_punti ON arcade_punteggi (gioco, punti DESC);
+
 COMMIT;
 
 -- =====================================================================

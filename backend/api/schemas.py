@@ -5,10 +5,10 @@ Definirle qui invece che inline in main.py serve a due cose: FastAPI le
 usa per generare la documentazione automatica (/docs), e chi consuma
 l'API (il frontend React) sa esattamente cosa aspettarsi in risposta.
 """
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RisultatoPilota(BaseModel):
@@ -143,6 +143,26 @@ class DomandaChronoQuiz(BaseModel):
     text: str
     options: list[str]
     correct_option_index: int
+
+
+class RichiestaPunteggio(BaseModel):
+    """Corpo di POST /arcade/punteggi."""
+    gioco: str
+    punti: int = Field(ge=0)
+
+
+class RispostaPunteggio(BaseModel):
+    """Risposta di POST /arcade/punteggi. `salvato=False` non è un errore:
+    è il caso normale di chi ha giocato senza essere loggato (login
+    facoltativo in questo progetto) o con un token scaduto/non valido."""
+    salvato: bool
+    username: Optional[str] = None
+
+
+class VoceClassificaArcade(BaseModel):
+    username: str
+    punti: int
+    creato_il: datetime
 
 
 class VoceAlboOro(BaseModel):

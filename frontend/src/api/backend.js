@@ -91,3 +91,31 @@ export function getSchedaScuderia(slug) {
 export function getDomandeChronoQuiz() {
   return fetchBackend('/arcade/chronoquiz/questions');
 }
+
+/** Invia un punteggio Arcade al backend. `token` è il JWT di Netlify
+ * Identity (o `null`/`undefined` se non loggato): senza un token valido
+ * il backend risponde comunque con successo ma `salvato: false` — non è
+ * un errore, è il caso normale di chi gioca senza account. */
+export async function inviaPunteggioArcade(gioco, punti, token) {
+  const url = new URL('/arcade/punteggi', BASE_URL);
+  const risposta = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ gioco, punti }),
+  });
+
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} inviando il punteggio a ${url.pathname}`);
+  }
+
+  return risposta.json();
+}
+
+/** Classifica di un gioco Arcade (una riga per partita, non solo il
+ * record di ciascun utente). */
+export function getClassificaArcade(gioco, limite = 10) {
+  return fetchBackend('/arcade/classifica', { gioco, limite });
+}
