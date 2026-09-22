@@ -11,6 +11,8 @@ import CircuitView from './views/CircuitView.jsx';
 import ScuderiesIndexView from './views/ScuderiesIndexView.jsx';
 import ScuderiaView from './views/ScuderiaView.jsx';
 import NewsView from './views/NewsView.jsx';
+import ArcadeView from './views/ArcadeView.jsx';
+import ChronoQuizView from './views/ChronoQuizView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
 import AdSlot from './components/AdSlot.jsx';
 
@@ -84,6 +86,8 @@ export default function App() {
         <Route path="/scuderie/:slug" element={<ScuderiaView />} />
         <Route path="/news" element={<NewsView />} />
         <Route path="/live" element={<LiveTimingView />} />
+        <Route path="/arcade" element={<ArcadeView />} />
+        <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
         <Route
           path="*"
           element={
