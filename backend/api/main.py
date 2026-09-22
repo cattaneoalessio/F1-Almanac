@@ -858,6 +858,19 @@ def _circuito_da_slug(cur, slug):
     return cur.fetchone()
 
 
+def _giorni_trascorsi_da(timestamp):
+    """Giorni trascorsi da `timestamp` a adesso. Robusto sia che
+    psycopg2 l'abbia restituito "aware" (con fuso orario, atteso per una
+    colonna TIMESTAMPTZ) sia "naive" (senza): un mismatch tra i due nella
+    sottrazione diretta solleva un TypeError non gestito (un 500 grezzo,
+    non un errore applicativo nostro) — meglio non fidarsi ciecamente del
+    tipo esatto della colonna sul database reale."""
+    ora = datetime.now(timezone.utc)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+    return (ora - timestamp).days
+
+
 @app.post("/game/submit", response_model=RispostaInvioTempo)
 def invia_tempo_gioco(payload: InvioTempoGioco, authorization: str = Header(default="")):
     """Salva un tempo ufficiale di Time Attack. A differenza di
@@ -1108,7 +1121,7 @@ def chiudi_gp_automatico(x_admin_key: str = Header(default="")):
             candidati = cur.fetchall()
 
             for candidato in candidati:
-                giorni_trascorsi = (datetime.now(timezone.utc) - candidato["primo_tempo"]).days
+                giorni_trascorsi = _giorni_trascorsi_da(candidato["primo_tempo"])
                 if not gp_pronto_per_chiusura(candidato["partecipanti"], giorni_trascorsi):
                     continue
 
