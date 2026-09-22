@@ -1,0 +1,44 @@
+name: Chiudi GP automaticamente
+
+# Si attiva da sola ogni notte, ma puoi anche lanciarla a mano da
+# GitHub: Actions -> "Chiudi GP automaticamente" -> "Run workflow".
+#
+# La decisione VERA (quali circuiti sono pronti) la prende il backend
+# (POST /game/close-gp-automatico, vedi backend/api/game.py per le
+# soglie): questo workflow si limita a chiamarlo, non duplica la
+# logica qui. Soglie attuali: almeno 25 piloti diversi hanno fatto la
+# Gara su quel circuito, OPPURE sono passati almeno 10 giorni dal primo
+# tempo di Gara registrato lì (basta una delle due condizioni).
+on:
+  schedule:
+    # 03:00 UTC: comodamente notte in Italia tutto l'anno (04:00 CET
+    # d'inverno, 05:00 CEST d'estate — se preferisci un orario più
+    # preciso rispetto all'ora italiana, vedi la nota sul cambio ora
+    # legale in update-pirelli.yml).
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  chiudi-gp:
+    runs-on: ubuntu-latest
+    steps:
+      # Render (piano free) addormenta il servizio dopo 15 minuti senza
+      # richieste: la prima chiamata dopo una pausa lunga (come una
+      # schedulazione notturna) può impiegare fino a un minuto per
+      # svegliarlo. Una richiesta di riscaldamento separata, prima di
+      # quella vera, evita che la chiamata che conta vada in timeout.
+      - name: Sveglia il backend (Render si addormenta dopo inattività)
+        run: curl -sS --max-time 90 "${{ secrets.BACKEND_URL }}/" || true
+
+      - name: Chiudi i GP pronti
+        run: |
+          codice=$(curl -sS --max-time 90 -o /tmp/risposta.json -w '%{http_code}' -X POST \
+            "${{ secrets.BACKEND_URL }}/game/close-gp-automatico" \
+            -H "X-Admin-Key: ${{ secrets.GAME_ADMIN_KEY }}")
+          echo "Codice HTTP: $codice"
+          echo "Risposta:"
+          cat /tmp/risposta.json
+          if [ "$codice" != "200" ]; then
+            echo "::error::Chiamata fallita con codice $codice"
+            exit 1
+          fi
