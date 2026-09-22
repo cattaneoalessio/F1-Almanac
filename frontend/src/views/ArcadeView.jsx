@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GlassPanel from '../components/GlassPanel.jsx';
+import { leggiPunteggioSalvato } from '../utils/arcadeStorage.js';
 import './ArcadeView.css';
 
 /**
@@ -79,17 +80,6 @@ const LIVELLI_PILOTA = [
   { soglia: 0, nome: 'Rookie' },
 ];
 
-function leggiInteroSalvato(chiave) {
-  try {
-    const numero = Number(window.localStorage.getItem(chiave));
-    return Number.isFinite(numero) && numero > 0 ? numero : 0;
-  } catch {
-    // localStorage non disponibile (es. navigazione privata): degrada a 0
-    // invece di far fallire il rendering della dashboard.
-    return 0;
-  }
-}
-
 /**
  * Punti totali del pilota. Oggi coincide col record di ChronoQuiz perché
  * è l'unico gioco attivo: quando gli altri giochi salveranno un proprio
@@ -109,7 +99,7 @@ export default function ArcadeView() {
   const [recordChronoQuiz, setRecordChronoQuiz] = useState(0);
 
   useEffect(() => {
-    setRecordChronoQuiz(leggiInteroSalvato(CHIAVE_RECORD_CHRONOQUIZ));
+    setRecordChronoQuiz(leggiPunteggioSalvato(CHIAVE_RECORD_CHRONOQUIZ));
   }, []);
 
   const giochiAttivi = useMemo(() => GIOCHI.filter((gioco) => gioco.attivo).length, []);

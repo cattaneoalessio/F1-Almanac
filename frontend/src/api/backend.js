@@ -84,3 +84,10 @@ export function getElencoScuderie() {
 export function getSchedaScuderia(slug) {
   return fetchBackend(`/scuderie/${encodeURIComponent(slug)}`);
 }
+
+/** 10 domande generate a caso per una partita a ChronoQuiz (Arcade).
+ * Può restituire meno di 10 elementi se il DB non ha abbastanza dati
+ * per generarne di più (mai domande inventate, vedi il backend). */
+export function getDomandeChronoQuiz() {
+  return fetchBackend('/arcade/chronoquiz/questions');
+}

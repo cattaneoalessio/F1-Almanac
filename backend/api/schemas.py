@@ -133,6 +133,18 @@ class GaraCircuito(BaseModel):
     vincitore_slug: Optional[str] = None
 
 
+class DomandaChronoQuiz(BaseModel):
+    """Domanda del gioco Arcade ChronoQuiz (GET /arcade/chronoquiz/questions).
+
+    Nomi campi in inglese per scelta esplicita della specifica ricevuta
+    per questo endpoint — deviazione intenzionale dalla convenzione in
+    italiano usata nel resto di questo file, non una dimenticanza."""
+    id: str
+    text: str
+    options: list[str]
+    correct_option_index: int
+
+
 class VoceAlboOro(BaseModel):
     pilota: str
     pilota_slug: str

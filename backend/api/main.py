@@ -40,10 +40,12 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from chronoquiz import genera_quiz
 from db import get_connection
 from schemas import (
     ConfigurazioneCircuito,
     CurvaCircuito,
+    DomandaChronoQuiz,
     GaraCircuito,
     GaraScuderia,
     GaraStagione,
@@ -721,3 +723,32 @@ def scheda_scuderia(slug: str):
         gare=gare,
         piloti=[VocePilotaScuderia(**v) for v in piloti],
     )
+
+
+# == Arcade ==
+# Endpoint dei giochi della sezione /arcade del frontend. La logica di
+# generazione vera e propria vive in chronoquiz.py (vedi il modulo per
+# il perché): questo endpoint resta un guscio sottile, stesso stile di
+# connessione apri/chiudi degli altri qui sopra.
+
+
+@app.get("/arcade/chronoquiz/questions", response_model=list[DomandaChronoQuiz])
+def chronoquiz_questions():
+    """10 domande generate a caso per una partita a ChronoQuiz (possono
+    essere meno di 10 se il DB non ha abbastanza dati per generarne di
+    più — vedi policy "meglio vuoto che inventato" in chronoquiz.py).
+    Nessun parametro: ogni chiamata genera un set nuovo e indipendente,
+    non c'è un concetto di sessione/utente da tracciare lato server."""
+    conn = get_connection()
+    try:
+        domande = genera_quiz(conn, n_domande=10)
+    finally:
+        conn.close()
+
+    if not domande:
+        raise HTTPException(
+            status_code=503,
+            detail="Impossibile generare domande in questo momento: dati insufficienti nel database.",
+        )
+
+    return [DomandaChronoQuiz(**d) for d in domande]
