@@ -6,7 +6,7 @@ usa per generare la documentazione automatica (/docs), e chi consuma
 l'API (il frontend React) sa esattamente cosa aspettarsi in risposta.
 """
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -240,3 +240,57 @@ class SchedaScuderia(BaseModel):
     gare_totali: int
     gare: list[GaraScuderia]
     piloti: list[VocePilotaScuderia]
+
+
+class CheckpointTelemetria(BaseModel):
+    """Un passaggio da un checkpoint durante la sessione di gioco.
+    giro: numero di giro (1-based). indice: 0/1/2 = checkpoint intermedi,
+    3 = linea del traguardo (chiude il giro). t: millisecondi trascorsi
+    dall'inizio della sessione (non del giro)."""
+    giro: int = Field(ge=1)
+    indice: int = Field(ge=0, le=3)
+    t: float = Field(ge=0)
+
+
+class InvioTempoGioco(BaseModel):
+    """Corpo di POST /game/submit. circuito_slug, non circuito_id: come
+    ogni altro endpoint di questa API, il frontend parla per slug, mai
+    per id numerico interno (vedi /circuiti/{slug}, /piloti/{slug}...)."""
+    circuito_slug: str
+    tipo_sessione: Literal["qualifica", "gara"]
+    tempo_totale: float = Field(gt=0)
+    checkpoint: list[CheckpointTelemetria]
+
+
+class RispostaInvioTempo(BaseModel):
+    """salvato=False non è un errore HTTP: copre sia l'anti-cheat (tempo
+    non plausibile, telemetria incoerente) sia il caso "non hai battuto
+    il tuo record" sia "non sei loggato" — motivo_rifiuto spiega quale."""
+    salvato: bool
+    record_personale: bool = False
+    motivo_rifiuto: Optional[str] = None
+
+
+class VoceClassificaTempi(BaseModel):
+    username: str
+    tempo_totale: float
+    creato_il: datetime
+
+
+class ClassificaTempiCircuito(BaseModel):
+    circuito: str
+    qualifica: list[VoceClassificaTempi]
+    gara: list[VoceClassificaTempi]
+
+
+class VoceClassificaCampionato(BaseModel):
+    posizione: int
+    username: str
+    punti_totali: int
+    gare_disputate: int
+
+
+class RispostaChiusuraGp(BaseModel):
+    circuito: str
+    piloti_classificati: int
+    punti_assegnati: dict[str, int]

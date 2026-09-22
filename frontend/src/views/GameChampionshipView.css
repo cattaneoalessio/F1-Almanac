@@ -1,0 +1,316 @@
+/* GameChampionshipView.css — Time Attack asincrono (Monoposto Virtual
+   Arena) + Campionato Mondiale Virtuale. Solo token di theme.css, stessa
+   convenzione già usata da ArcadeView.css/ChronoQuizView.css. */
+
+.game-championship-view__header {
+  max-width: 720px;
+  margin: 0 auto 1.4rem;
+}
+
+.game-championship-view__titolo {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.game-championship-view__titolo-accento {
+  color: var(--accent-cyan);
+}
+
+.game-championship-view__sottotitolo {
+  margin-top: 0.6rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.game-championship-view__nota-login {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-gray);
+}
+
+.game-championship-view__panel {
+  max-width: 720px;
+  margin: 0 auto 1.2rem;
+}
+
+.game-championship-view__bottone-primario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.6rem;
+  border: none;
+  border-radius: 4px;
+  background: var(--accent-cyan);
+  color: #04131a;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.game-championship-view__bottone-primario:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.game-championship-view__bottone-primario:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Selezione --- */
+
+.game-championship-view__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-gray);
+}
+
+.game-championship-view__select {
+  padding: 0.6rem 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.game-championship-view__nota-circuito {
+  margin: -0.6rem 0 1.2rem;
+  font-size: 0.8rem;
+  color: var(--accent-gold);
+}
+
+.game-championship-view__sessioni {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.game-championship-view__sessione-bottone {
+  padding: 0.55rem 1rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.game-championship-view__sessione-bottone--attiva {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(63, 208, 255, 0.1);
+}
+
+/* --- In pista --- */
+
+.game-championship-view__in-pista {
+  max-width: 940px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.game-championship-view__hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  align-items: baseline;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--text-gray);
+}
+.game-championship-view__hud .tab-num {
+  color: var(--accent-gold);
+  font-size: 1rem;
+}
+.game-championship-view__fuori-pista {
+  color: var(--accent-red);
+  font-weight: 800;
+}
+
+.game-championship-view__canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #16241a;
+  display: block;
+}
+
+.game-championship-view__controlli-info {
+  font-size: 0.78rem;
+  color: var(--text-gray);
+  text-align: center;
+}
+
+.game-championship-view__abbandona {
+  align-self: center;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text-gray);
+  font-size: 0.8rem;
+  padding: 0.5rem 1.2rem;
+  cursor: pointer;
+}
+.game-championship-view__abbandona:hover {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+/* --- Riepilogo --- */
+
+.game-championship-view__riepilogo {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.game-championship-view__badge-record {
+  background: var(--accent-gold);
+  color: #2a1f04;
+  margin-bottom: 0.4rem;
+}
+
+.game-championship-view__riepilogo-etichetta {
+  font-size: 0.8rem;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.game-championship-view__riepilogo-tempo {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 8vw, 3.6rem);
+  font-weight: 900;
+  color: var(--accent-cyan);
+  line-height: 1;
+}
+
+.game-championship-view__esito {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-gray);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.game-championship-view__esito--ok {
+  color: var(--accent-cyan);
+}
+.game-championship-view__esito--errore {
+  color: var(--accent-red);
+}
+
+.game-championship-view__link-accedi {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+.game-championship-view__link-accedi:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.game-championship-view__riepilogo-azioni {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.game-championship-view__torna-selezione {
+  background: none;
+  border: none;
+  color: var(--text-gray);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.game-championship-view__torna-selezione:hover {
+  color: var(--accent-cyan);
+}
+
+/* --- Classifiche (circuito + campionato) --- */
+
+.game-championship-view__classifica-titolo {
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.9rem;
+}
+
+.game-championship-view__classifica-stato {
+  font-size: 0.85rem;
+  color: var(--text-gray);
+}
+
+.game-championship-view__classifica-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.game-championship-view__classifica-voce {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+.game-championship-view__classifica-voce:last-child {
+  border-bottom: none;
+}
+.game-championship-view__classifica-voce .tab-num:first-child {
+  width: 1.6rem;
+  flex-shrink: 0;
+  color: var(--text-gray);
+  font-family: var(--font-display);
+}
+
+.game-championship-view__classifica-nome {
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-championship-view__torna-arcade {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+.game-championship-view__torna-arcade a {
+  color: var(--text-gray);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.game-championship-view__torna-arcade a:hover {
+  color: var(--accent-cyan);
+}

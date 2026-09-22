@@ -119,3 +119,42 @@ export async function inviaPunteggioArcade(gioco, punti, token) {
 export function getClassificaArcade(gioco, limite = 10) {
   return fetchBackend('/arcade/classifica', { gioco, limite });
 }
+
+/** Invia un tempo di Time Attack. A differenza di inviaPunteggioArcade,
+ * qui il login NON è facoltativo lato server: senza token valido la
+ * risposta è un 401 (fetchBackend lo propaga come eccezione, il
+ * chiamante lo intercetta per mostrare "accedi per salvare"). */
+export async function inviaTempoGioco(circuitoSlug, tipoSessione, tempoTotale, checkpoint, token) {
+  const url = new URL('/game/submit', BASE_URL);
+  const risposta = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      circuito_slug: circuitoSlug,
+      tipo_sessione: tipoSessione,
+      tempo_totale: tempoTotale,
+      checkpoint,
+    }),
+  });
+
+  if (risposta.status === 401) {
+    return { salvato: false, motivo_rifiuto: 'login_richiesto' };
+  }
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} inviando il tempo a ${url.pathname}`);
+  }
+  return risposta.json();
+}
+
+/** Classifica Qualifica/Gara di Time Attack per un circuito. `null` se lo slug non esiste. */
+export function getClassificaTempiCircuito(slug, limite = 10) {
+  return fetchBackend(`/game/leaderboard/${encodeURIComponent(slug)}`, { limite });
+}
+
+/** Classifica generale del Campionato Mondiale Virtuale. */
+export function getClassificaCampionato() {
+  return fetchBackend('/game/campionato');
+}

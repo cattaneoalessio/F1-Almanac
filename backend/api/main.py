@@ -35,25 +35,32 @@ Poi apri http://127.0.0.1:8000/docs per la documentazione interattiva
 generata automaticamente da FastAPI.
 """
 from datetime import date
+import os
 from typing import Optional
 
+import psycopg2.extras
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from auth import utente_da_token
 from chronoquiz import genera_quiz
 from db import get_connection
+from game import PUNTI_PER_POSIZIONE, valida_tentativo
 from schemas import (
+    ClassificaTempiCircuito,
     ConfigurazioneCircuito,
     CurvaCircuito,
     DomandaChronoQuiz,
     GaraCircuito,
     GaraScuderia,
     GaraStagione,
+    InvioTempoGioco,
     RichiestaPunteggio,
     RisultatiGara,
     RisultatoPilota,
     RisultatoStoricoPilota,
+    RispostaChiusuraGp,
+    RispostaInvioTempo,
     RispostaPunteggio,
     SchedaCircuito,
     SchedaPilota,
@@ -61,8 +68,10 @@ from schemas import (
     VoceAlboOro,
     VoceCircuito,
     VoceClassificaArcade,
+    VoceClassificaCampionato,
     VoceClassificaPiloti,
     VoceClassificaScuderie,
+    VoceClassificaTempi,
     VoceIndicePiloti,
     VocePilotaScuderia,
     VoceScuderia,
@@ -91,6 +100,14 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Chiave condivisa per proteggere /game/close-gp: non c'è ancora un
+# concetto di ruolo/admin in questo progetto (utenti sono tutti alla pari
+# via Netlify Identity), quindi questo è il minimo indispensabile per
+# evitare che chiunque possa chiudere un GP e assegnare punti a piacere.
+# Se GAME_ADMIN_KEY non è impostata, l'endpoint rifiuta sempre — fail
+# closed, non fail open.
+GAME_ADMIN_KEY = os.environ.get("GAME_ADMIN_KEY", "")
 
 
 @app.get("/")
@@ -819,3 +836,224 @@ def classifica_arcade(gioco: str, limite: int = 10):
         conn.close()
 
     return [VoceClassificaArcade(**r) for r in righe]
+
+
+# == Time Attack ("Monoposto Virtual Arena") ==
+# Stessa filosofia di ChronoQuiz: login sempre facoltativo per GIOCARE,
+# ma qui — a differenza di ChronoQuiz — è obbligatorio per SALVARE un
+# tempo ufficiale (Qualifica/Gara): il concetto stesso di campionato
+# richiede un'identità persistente. Le Prove Libere non passano mai da
+# qui: girano solo lato frontend, nessuna chiamata a questi endpoint.
+
+
+def _circuito_da_slug(cur, slug):
+    """Risolve uno slug nel suo id interno + nome, o None se non esiste.
+    Helper condiviso dai 3 endpoint sotto che accettano uno slug."""
+    cur.execute(
+        "SELECT id, nome FROM circuiti WHERE codice_riferimento = %(slug)s",
+        {"slug": slug},
+    )
+    return cur.fetchone()
+
+
+@app.post("/game/submit", response_model=RispostaInvioTempo)
+def invia_tempo_gioco(payload: InvioTempoGioco, authorization: str = Header(default="")):
+    """Salva un tempo ufficiale di Time Attack. A differenza di
+    /arcade/punteggi, qui il login NON è facoltativo: senza un token
+    Netlify Identity valido la richiesta è rifiutata con 401 (il
+    campionato ha senso solo con un'identità persistente)."""
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    conn = get_connection()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            utente_id, _username = utente_da_token(cur, token)
+            if utente_id is None:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Login richiesto per salvare un tempo ufficiale (Prove Libere restano gratuite e locali).",
+                )
+
+            circuito = _circuito_da_slug(cur, payload.circuito_slug)
+            if circuito is None:
+                raise HTTPException(status_code=404, detail="Circuito non trovato.")
+
+            valido, motivo = valida_tentativo(payload.tipo_sessione, payload.tempo_totale, payload.checkpoint)
+            if not valido:
+                return RispostaInvioTempo(salvato=False, motivo_rifiuto=motivo)
+
+            cur.execute(
+                """
+                SELECT tempo_totale FROM gioco_tempi
+                WHERE utente_id = %(u)s AND circuito_id = %(c)s AND tipo_sessione = %(t)s
+                """,
+                {"u": utente_id, "c": circuito["id"], "t": payload.tipo_sessione},
+            )
+            precedente = cur.fetchone()
+            if precedente is not None and payload.tempo_totale >= float(precedente["tempo_totale"]):
+                return RispostaInvioTempo(
+                    salvato=False,
+                    record_personale=False,
+                    motivo_rifiuto="Tempo non migliore del tuo record precedente su questo circuito e sessione.",
+                )
+
+            cur.execute(
+                """
+                INSERT INTO gioco_tempi (utente_id, circuito_id, tipo_sessione, tempo_totale, telemetria_json)
+                VALUES (%(u)s, %(c)s, %(t)s, %(tempo)s, %(tel)s)
+                ON CONFLICT (utente_id, circuito_id, tipo_sessione) DO UPDATE SET
+                    tempo_totale = EXCLUDED.tempo_totale,
+                    telemetria_json = EXCLUDED.telemetria_json,
+                    creato_il = now()
+                """,
+                {
+                    "u": utente_id,
+                    "c": circuito["id"],
+                    "t": payload.tipo_sessione,
+                    "tempo": payload.tempo_totale,
+                    "tel": psycopg2.extras.Json([cp.model_dump() for cp in payload.checkpoint]),
+                },
+            )
+    finally:
+        conn.close()
+
+    return RispostaInvioTempo(salvato=True, record_personale=True)
+
+
+@app.get("/game/leaderboard/{slug}", response_model=ClassificaTempiCircuito)
+def classifica_tempi_circuito(slug: str, limite: int = 10):
+    """Classifica Qualifica e Gara per un circuito, separate. Un solo
+    tempo per utente per sessione (il record personale, vedi
+    gioco_tempi), quindi nessuna riga duplicata per lo stesso pilota."""
+    limite = max(1, min(limite, 50))
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            circuito = _circuito_da_slug(cur, slug)
+            if circuito is None:
+                raise HTTPException(status_code=404, detail="Circuito non trovato.")
+
+            classifiche = {}
+            for tipo in ("qualifica", "gara"):
+                cur.execute(
+                    """
+                    SELECT u.username, gt.tempo_totale, gt.creato_il
+                    FROM gioco_tempi gt
+                    JOIN utenti u ON u.id = gt.utente_id
+                    WHERE gt.circuito_id = %(id)s AND gt.tipo_sessione = %(tipo)s
+                    ORDER BY gt.tempo_totale ASC
+                    LIMIT %(limite)s
+                    """,
+                    {"id": circuito["id"], "tipo": tipo, "limite": limite},
+                )
+                classifiche[tipo] = [VoceClassificaTempi(**r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+    return ClassificaTempiCircuito(
+        circuito=circuito["nome"],
+        qualifica=classifiche["qualifica"],
+        gara=classifiche["gara"],
+    )
+
+
+@app.get("/game/campionato", response_model=list[VoceClassificaCampionato])
+def classifica_campionato():
+    """Classifica generale del Campionato Mondiale Virtuale, per punti
+    totali (i punti si accumulano solo chiudendo un GP, vedi
+    /game/close-gp — non appena qualcuno registra un tempo di gara)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT u.username, gc.punti_totali, gc.gare_disputate
+                FROM gioco_classifica_campionato gc
+                JOIN utenti u ON u.id = gc.utente_id
+                ORDER BY gc.punti_totali DESC, gc.gare_disputate ASC
+                """
+            )
+            righe = cur.fetchall()
+    finally:
+        conn.close()
+
+    return [
+        VoceClassificaCampionato(
+            posizione=indice + 1,
+            username=riga["username"],
+            punti_totali=riga["punti_totali"],
+            gare_disputate=riga["gare_disputate"],
+        )
+        for indice, riga in enumerate(righe)
+    ]
+
+
+@app.post("/game/close-gp/{slug}", response_model=RispostaChiusuraGp)
+def chiudi_gp(slug: str, x_admin_key: str = Header(default="")):
+    """Assegna i punti campionato (25-18-15-...-1, sistema F1 2019-oggi)
+    in base alla classifica Gara del circuito, poi marca il GP come
+    chiuso (idempotente: una seconda chiamata sullo stesso circuito
+    restituisce 409, non assegna i punti due volte).
+
+    Protetto da una chiave condivisa (header X-Admin-Key) invece che da
+    un vero sistema di ruoli, che questo progetto non ha ancora: fail
+    closed se GAME_ADMIN_KEY non è configurata su Render. In futuro
+    questa operazione ha più senso come task pianificato che come
+    endpoint esposto — non implementato qui, fuori scope per questa
+    richiesta (Render free tier non ha un cron integrato semplice)."""
+    if not GAME_ADMIN_KEY or x_admin_key != GAME_ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Non autorizzato.")
+
+    conn = get_connection()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            circuito = _circuito_da_slug(cur, slug)
+            if circuito is None:
+                raise HTTPException(status_code=404, detail="Circuito non trovato.")
+
+            cur.execute("SELECT 1 FROM gioco_gp_chiusi WHERE circuito_id = %(id)s", {"id": circuito["id"]})
+            if cur.fetchone() is not None:
+                raise HTTPException(status_code=409, detail="Il GP per questo circuito è già stato chiuso.")
+
+            cur.execute(
+                """
+                SELECT u.id AS utente_id, u.username
+                FROM gioco_tempi gt
+                JOIN utenti u ON u.id = gt.utente_id
+                WHERE gt.circuito_id = %(id)s AND gt.tipo_sessione = 'gara'
+                ORDER BY gt.tempo_totale ASC
+                """,
+                {"id": circuito["id"]},
+            )
+            classifica_gara = cur.fetchall()
+
+            punti_assegnati = {}
+            for posizione, riga in enumerate(classifica_gara, start=1):
+                punti = PUNTI_PER_POSIZIONE[posizione - 1] if posizione <= len(PUNTI_PER_POSIZIONE) else 0
+                if punti > 0:
+                    punti_assegnati[riga["username"]] = punti
+                cur.execute(
+                    """
+                    INSERT INTO gioco_classifica_campionato (utente_id, punti_totali, gare_disputate)
+                    VALUES (%(utente_id)s, %(punti)s, 1)
+                    ON CONFLICT (utente_id) DO UPDATE SET
+                        punti_totali = gioco_classifica_campionato.punti_totali + EXCLUDED.punti_totali,
+                        gare_disputate = gioco_classifica_campionato.gare_disputate + 1,
+                        aggiornato_il = now()
+                    """,
+                    {"utente_id": riga["utente_id"], "punti": punti},
+                )
+
+            cur.execute("INSERT INTO gioco_gp_chiusi (circuito_id) VALUES (%(id)s)", {"id": circuito["id"]})
+    finally:
+        conn.close()
+
+    return RispostaChiusuraGp(
+        circuito=circuito["nome"],
+        piloti_classificati=len(classifica_gara),
+        punti_assegnati=punti_assegnati,
+    )

@@ -25,6 +25,15 @@ const GIOCHI = [
     path: '/arcade/chronoquiz',
   },
   {
+    slug: 'time-attack',
+    nome: 'Time Attack',
+    descrizione:
+      'Guida un giro cronometrato sulla Monoposto Virtual Arena. Scegli un circuito reale dall\u2019archivio, scala la classifica e il Campionato Mondiale Virtuale.',
+    tipo: 'Guida',
+    attivo: true,
+    path: '/arcade/time-attack',
+  },
+  {
     slug: 'driverle',
     nome: 'Driverle',
     descrizione:

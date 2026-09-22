@@ -14,6 +14,7 @@ import ScuderiaView from './views/ScuderiaView.jsx';
 import NewsView from './views/NewsView.jsx';
 import ArcadeView from './views/ArcadeView.jsx';
 import ChronoQuizView from './views/ChronoQuizView.jsx';
+import GameChampionshipView from './views/GameChampionshipView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
 import AdSlot from './components/AdSlot.jsx';
 import { AuthProvider, nomeUtente, useAuth } from './auth/AuthContext.jsx';
@@ -176,6 +177,7 @@ export default function App() {
           <Route path="/live" element={<LiveTimingView />} />
           <Route path="/arcade" element={<ArcadeView />} />
           <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
+          <Route path="/arcade/time-attack" element={<GameChampionshipView />} />
           <Route
             path="*"
             element={

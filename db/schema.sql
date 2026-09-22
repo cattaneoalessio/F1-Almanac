@@ -241,6 +241,52 @@ CREATE TABLE arcade_punteggi (
 );
 CREATE INDEX idx_arcade_punteggi_gioco_punti ON arcade_punteggi (gioco, punti DESC);
 
+-- ---------------------------------------------------------------------
+-- Arcade: Time Attack asincrono ("Monoposto Virtual Arena")
+-- ---------------------------------------------------------------------
+-- Nessuna tabella utenti_gioco separata: riusa la utenti già collegata a
+-- Netlify Identity qui sopra, stessa identità/stesso "Livello Pilota" di
+-- ChronoQuiz. Nessuna geometria di circuito salvata qui (né altrove):
+-- il tracciato di gioco è generico e generato lato frontend, i circuiti
+-- reali del DB influenzano solo un modificatore numerico (lunghezza del
+-- rettilineo), non la forma — vedi frontend/src/game/pista.js.
+
+-- Un solo tempo ufficiale per utente/circuito/tipo sessione: la riga
+-- viene AGGIORNATA (non duplicata) quando arriva un tempo migliore del
+-- precedente, la logica "solo se migliora" vive nel backend (vedi
+-- backend/api/game.py), qui il vincolo garantisce solo l'unicità.
+CREATE TABLE gioco_tempi (
+    id               SERIAL PRIMARY KEY,
+    utente_id        INTEGER NOT NULL REFERENCES utenti(id) ON DELETE CASCADE,
+    circuito_id      INTEGER NOT NULL REFERENCES circuiti(id) ON DELETE CASCADE,
+    tipo_sessione    VARCHAR(20) NOT NULL CHECK (tipo_sessione IN ('qualifica', 'gara')),
+    tempo_totale     NUMERIC(8,3) NOT NULL,   -- secondi, es. 47.812
+    telemetria_json  JSONB,                   -- checkpoint [{giro, indice, t}], vedi game.py
+    creato_il        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (utente_id, circuito_id, tipo_sessione)
+);
+-- Indice pensato per la query di classifica di un circuito (Fase C-gioco):
+-- filtra per circuito+tipo, ordina per tempo — esattamente l'ordinamento
+-- della query, quindi utilizzabile direttamente dal planner senza sort.
+CREATE INDEX idx_gioco_tempi_circuito_tipo_tempo ON gioco_tempi (circuito_id, tipo_sessione, tempo_totale ASC);
+
+CREATE TABLE gioco_classifica_campionato (
+    utente_id       INTEGER PRIMARY KEY REFERENCES utenti(id) ON DELETE CASCADE,
+    punti_totali    INTEGER NOT NULL DEFAULT 0,
+    gare_disputate  INTEGER NOT NULL DEFAULT 0,
+    aggiornato_il   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Traccia quali GP (circuiti) sono già stati "chiusi" (punti assegnati):
+-- senza questa tabella, chiamare due volte /game/close-gp sullo stesso
+-- circuito assegnerebbe i punti due volte. Non prevista nella richiesta
+-- originale, aggiunta per rendere l'operazione sicura da ripetere per
+-- errore (vedi nota nel backend).
+CREATE TABLE gioco_gp_chiusi (
+    circuito_id  INTEGER PRIMARY KEY REFERENCES circuiti(id) ON DELETE CASCADE,
+    chiuso_il    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 COMMIT;
 
 -- =====================================================================
