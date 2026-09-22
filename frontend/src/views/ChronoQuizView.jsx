@@ -102,6 +102,13 @@ export default function ChronoQuizView() {
     gestitoRef.current = true;
     if (timeoutScadenzaRef.current) clearTimeout(timeoutScadenzaRef.current);
 
+    // Toglie il focus dal bottone appena cliccato: altrimenti il cerchio
+    // di focus nativo del browser (visibile al click col mouse, non solo
+    // da tastiera) può restare visivamente "attaccato" a quella posizione.
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
     const domandaCorrente = domande[indiceDomanda];
     const secondiTrascorsi = (Date.now() - inizioDomandaRef.current) / 1000;
     const secondiRimasti = Math.max(0, DURATA_DOMANDA_SECONDI - secondiTrascorsi);
@@ -241,7 +248,7 @@ export default function ChronoQuizView() {
                 }
                 return (
                   <button
-                    key={indice}
+                    key={`${domandaCorrente.id}-${indice}`}
                     type="button"
                     className={`chronoquiz-view__opzione ${modificatore}`.trim()}
                     onClick={() => gestisciRisposta(indice)}
