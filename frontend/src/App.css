@@ -64,10 +64,12 @@
   display: flex;
   gap: 0.4rem;
   min-width: 0;
-  /* Su schermi stretti le voci scorrono in orizzontale invece di andare
-     a capo: con 7 voci (Home, Archivio storico, Piloti, Scuderie,
-     Circuiti, News, Live Timing) andare a capo romperebbe il layout
-     "mobile first" richiesto fin dall'inizio del progetto. */
+  /* Visibile solo da 700px in su (sotto quella soglia la sostituisce il
+     menu hamburger, vedi .app-tabs__hamburger più sotto). Lo scroll
+     orizzontale resta come rete di sicurezza: con 8 voci (Home, Archivio
+     storico, Piloti, Scuderie, Circuiti, News, Live Timing, Arcade) una
+     tablet appena sopra i 700px potrebbe non avere spazio per tutte in
+     una riga senza andare a capo. */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -95,6 +97,105 @@
 .app-tabs__item--attiva {
   color: var(--accent-red);
   border-bottom-color: var(--accent-red);
+}
+
+/* Sotto i 700px la riga orizzontale di link lascia il posto al menu a
+   scomparsa (hamburger + pannello): stesso breakpoint già usato altrove
+   nel sito per "mobile" (vedi .main). Sopra i 700px è l'inverso: il
+   bottone hamburger e il pannello restano nascosti, la riga orizzontale
+   di sempre resta l'unica visibile. */
+@media (max-width: 699.98px) {
+  .app-tabs__links {
+    display: none;
+  }
+}
+
+.app-tabs__hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+@media (max-width: 699.98px) {
+  .app-tabs__hamburger {
+    display: flex;
+  }
+}
+.app-tabs__hamburger-barra {
+  width: 22px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+/* Le 3 barre diventano una X quando il menu è aperto: la prima ruota
+   45°, la centrale sparisce, la terza ruota -45° — le due che restano
+   si sovrappongono al centro (stessa gap traslata in transform). */
+.app-tabs__hamburger--aperto .app-tabs__hamburger-barra:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.app-tabs__hamburger--aperto .app-tabs__hamburger-barra:nth-child(2) {
+  opacity: 0;
+}
+.app-tabs__hamburger--aperto .app-tabs__hamburger-barra:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Pannello a scomparsa: assoluto rispetto a .app-tabs (che è già
+   "positioned" grazie a position:sticky), così non partecipa al layout
+   flex della barra e scorre sopra il contenuto sottostante invece di
+   spingerlo giù. Collassato di default via max-height, non display:none,
+   per poter animare l'apertura con una transizione invece di uno scatto. */
+.app-tabs__mobile-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  flex-direction: column;
+  max-height: 0;
+  overflow: hidden;
+  background: rgba(11, 12, 16, 0.97);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  transition: max-height 0.25s ease;
+}
+@media (max-width: 699.98px) {
+  .app-tabs__mobile-menu {
+    display: flex;
+  }
+}
+.app-tabs__mobile-menu--aperto {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.app-tabs__mobile-item {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-gray);
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.app-tabs__mobile-item:last-child {
+  border-bottom: none;
+}
+.app-tabs__mobile-item--attiva {
+  color: var(--accent-red);
 }
 
 .page {
