@@ -31,6 +31,25 @@ TOLLERANZA_COERENZA_TEMPO_SECONDI = 1.0
 
 PUNTI_PER_POSIZIONE = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]  # posizioni 1-10, sistema F1 2019-oggi
 
+# Soglie per la chiusura AUTOMATICA di un GP (vedi
+# POST /game/close-gp-automatico e .github/workflows/chiudi-gp-automatico.yml):
+# condizione OR, non AND — basta soddisfarne una delle due.
+SOGLIA_PARTECIPANTI_CHIUSURA_AUTOMATICA = 25
+SOGLIA_GIORNI_CHIUSURA_AUTOMATICA = 10
+
+
+def gp_pronto_per_chiusura(numero_partecipanti, giorni_dal_primo_tempo):
+    """True se un GP è pronto per la chiusura automatica: almeno
+    SOGLIA_PARTECIPANTI_CHIUSURA_AUTOMATICA piloti diversi hanno
+    registrato un tempo di Gara sul circuito, OPPURE sono passati
+    almeno SOGLIA_GIORNI_CHIUSURA_AUTOMATICA giorni dal PRIMO tempo di
+    Gara registrato lì. Pura: il chiamante calcola i due numeri dal DB,
+    questa funzione decide soltanto."""
+    return (
+        numero_partecipanti >= SOGLIA_PARTECIPANTI_CHIUSURA_AUTOMATICA
+        or giorni_dal_primo_tempo >= SOGLIA_GIORNI_CHIUSURA_AUTOMATICA
+    )
+
 
 def valida_tentativo(tipo_sessione, tempo_totale, checkpoint):
     """Verifica un tentativo prima di salvarlo. Ritorna (valido: bool,

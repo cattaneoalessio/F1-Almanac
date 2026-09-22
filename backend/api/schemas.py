@@ -296,6 +296,13 @@ class RispostaChiusuraGp(BaseModel):
     punti_assegnati: dict[str, int]
 
 
+class RispostaChiusuraAutomatica(BaseModel):
+    """Risposta di POST /game/close-gp-automatico. Lista vuota è un
+    esito normale: nessun circuito ha ancora raggiunto una delle due
+    soglie di chiusura."""
+    gp_chiusi: list[RispostaChiusuraGp]
+
+
 class RispostaLivelloPilota(BaseModel):
     """Livello Pilota unificato tra tutti i giochi Arcade (oggi:
     ChronoQuiz + Time Attack). Vedi GET /arcade/livello."""

@@ -34,7 +34,7 @@ Avvio in locale:
 Poi apri http://127.0.0.1:8000/docs per la documentazione interattiva
 generata automaticamente da FastAPI.
 """
-from datetime import date
+from datetime import date, datetime, timezone
 import os
 from typing import Optional
 
@@ -45,7 +45,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from auth import utente_da_token
 from chronoquiz import genera_quiz
 from db import get_connection
-from game import PUNTI_PER_POSIZIONE, valida_tentativo
+from game import PUNTI_PER_POSIZIONE, gp_pronto_per_chiusura, valida_tentativo
 from schemas import (
     ClassificaTempiCircuito,
     ConfigurazioneCircuito,
@@ -59,6 +59,7 @@ from schemas import (
     RisultatiGara,
     RisultatoPilota,
     RisultatoStoricoPilota,
+    RispostaChiusuraAutomatica,
     RispostaChiusuraGp,
     RispostaInvioTempo,
     RispostaLivelloPilota,
@@ -992,19 +993,59 @@ def classifica_campionato():
     ]
 
 
+def _chiudi_gp_circuito(cur, circuito_id):
+    """Logica di chiusura condivisa tra /game/close-gp/{slug} (manuale)
+    e /game/close-gp-automatico (schedulato): assegna i punti
+    campionato (25-18-15-...-1) in base alla classifica Gara del
+    circuito e lo marca come chiuso. Il chiamante deve aver già
+    verificato che il circuito non sia già chiuso — questa funzione non
+    lo ricontrolla, per evitare due query identiche quando il chiamante
+    l'ha già fatta (vedi chiudi_gp_automatico, che filtra a monte con
+    una NOT IN)."""
+    cur.execute(
+        """
+        SELECT u.id AS utente_id, u.username
+        FROM gioco_tempi gt
+        JOIN utenti u ON u.id = gt.utente_id
+        WHERE gt.circuito_id = %(id)s AND gt.tipo_sessione = 'gara'
+        ORDER BY gt.tempo_totale ASC
+        """,
+        {"id": circuito_id},
+    )
+    classifica_gara = cur.fetchall()
+
+    punti_assegnati = {}
+    for posizione, riga in enumerate(classifica_gara, start=1):
+        punti = PUNTI_PER_POSIZIONE[posizione - 1] if posizione <= len(PUNTI_PER_POSIZIONE) else 0
+        if punti > 0:
+            punti_assegnati[riga["username"]] = punti
+        cur.execute(
+            """
+            INSERT INTO gioco_classifica_campionato (utente_id, punti_totali, gare_disputate)
+            VALUES (%(utente_id)s, %(punti)s, 1)
+            ON CONFLICT (utente_id) DO UPDATE SET
+                punti_totali = gioco_classifica_campionato.punti_totali + EXCLUDED.punti_totali,
+                gare_disputate = gioco_classifica_campionato.gare_disputate + 1,
+                aggiornato_il = now()
+            """,
+            {"utente_id": riga["utente_id"], "punti": punti},
+        )
+
+    cur.execute("INSERT INTO gioco_gp_chiusi (circuito_id) VALUES (%(id)s)", {"id": circuito_id})
+    return punti_assegnati, len(classifica_gara)
+
+
 @app.post("/game/close-gp/{slug}", response_model=RispostaChiusuraGp)
 def chiudi_gp(slug: str, x_admin_key: str = Header(default="")):
-    """Assegna i punti campionato (25-18-15-...-1, sistema F1 2019-oggi)
-    in base alla classifica Gara del circuito, poi marca il GP come
-    chiuso (idempotente: una seconda chiamata sullo stesso circuito
-    restituisce 409, non assegna i punti due volte).
+    """Chiude un GP a mano, per un circuito specifico, indipendentemente
+    dalle soglie della chiusura automatica (vedi close-gp-automatico
+    più sotto) — usato dal pannello /admin/chiudi-gp per forzare una
+    chiusura anticipata. Idempotente: una seconda chiamata sullo stesso
+    circuito restituisce 409, non assegna i punti due volte.
 
     Protetto da una chiave condivisa (header X-Admin-Key) invece che da
     un vero sistema di ruoli, che questo progetto non ha ancora: fail
-    closed se GAME_ADMIN_KEY non è configurata su Render. In futuro
-    questa operazione ha più senso come task pianificato che come
-    endpoint esposto — non implementato qui, fuori scope per questa
-    richiesta (Render free tier non ha un cron integrato semplice)."""
+    closed se GAME_ADMIN_KEY non è configurata su Render."""
     if not GAME_ADMIN_KEY or x_admin_key != GAME_ADMIN_KEY:
         raise HTTPException(status_code=403, detail="Non autorizzato.")
 
@@ -1020,44 +1061,69 @@ def chiudi_gp(slug: str, x_admin_key: str = Header(default="")):
             if cur.fetchone() is not None:
                 raise HTTPException(status_code=409, detail="Il GP per questo circuito è già stato chiuso.")
 
-            cur.execute(
-                """
-                SELECT u.id AS utente_id, u.username
-                FROM gioco_tempi gt
-                JOIN utenti u ON u.id = gt.utente_id
-                WHERE gt.circuito_id = %(id)s AND gt.tipo_sessione = 'gara'
-                ORDER BY gt.tempo_totale ASC
-                """,
-                {"id": circuito["id"]},
-            )
-            classifica_gara = cur.fetchall()
-
-            punti_assegnati = {}
-            for posizione, riga in enumerate(classifica_gara, start=1):
-                punti = PUNTI_PER_POSIZIONE[posizione - 1] if posizione <= len(PUNTI_PER_POSIZIONE) else 0
-                if punti > 0:
-                    punti_assegnati[riga["username"]] = punti
-                cur.execute(
-                    """
-                    INSERT INTO gioco_classifica_campionato (utente_id, punti_totali, gare_disputate)
-                    VALUES (%(utente_id)s, %(punti)s, 1)
-                    ON CONFLICT (utente_id) DO UPDATE SET
-                        punti_totali = gioco_classifica_campionato.punti_totali + EXCLUDED.punti_totali,
-                        gare_disputate = gioco_classifica_campionato.gare_disputate + 1,
-                        aggiornato_il = now()
-                    """,
-                    {"utente_id": riga["utente_id"], "punti": punti},
-                )
-
-            cur.execute("INSERT INTO gioco_gp_chiusi (circuito_id) VALUES (%(id)s)", {"id": circuito["id"]})
+            punti_assegnati, n_partecipanti = _chiudi_gp_circuito(cur, circuito["id"])
     finally:
         conn.close()
 
     return RispostaChiusuraGp(
         circuito=circuito["nome"],
-        piloti_classificati=len(classifica_gara),
+        piloti_classificati=n_partecipanti,
         punti_assegnati=punti_assegnati,
     )
+
+
+@app.post("/game/close-gp-automatico", response_model=RispostaChiusuraAutomatica)
+def chiudi_gp_automatico(x_admin_key: str = Header(default="")):
+    """Chiude automaticamente OGNI GP pronto (vedi game.gp_pronto_per_chiusura:
+    almeno SOGLIA_PARTECIPANTI_CHIUSURA_AUTOMATICA piloti diversi hanno
+    fatto una Gara su quel circuito, OPPURE sono passati almeno
+    SOGLIA_GIORNI_CHIUSURA_AUTOMATICA giorni dal primo tempo di Gara
+    registrato lì) tra i circuiti non ancora chiusi. Nessuno slug da
+    passare: valuta tutti i circuiti in un colpo solo.
+
+    Pensata per essere chiamata periodicamente da un job schedulato,
+    non da un utente — vedi .github/workflows/chiudi-gp-automatico.yml.
+    Zero GP chiusi in una chiamata è un esito normale (nessun circuito
+    ha ancora raggiunto una delle due soglie), non un errore."""
+    if not GAME_ADMIN_KEY or x_admin_key != GAME_ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Non autorizzato.")
+
+    conn = get_connection()
+    conn.autocommit = True
+    gp_chiusi = []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ci.id, ci.nome,
+                       COUNT(DISTINCT gt.utente_id) AS partecipanti,
+                       MIN(gt.creato_il) AS primo_tempo
+                FROM gioco_tempi gt
+                JOIN circuiti ci ON ci.id = gt.circuito_id
+                WHERE gt.tipo_sessione = 'gara'
+                  AND ci.id NOT IN (SELECT circuito_id FROM gioco_gp_chiusi)
+                GROUP BY ci.id, ci.nome
+                """
+            )
+            candidati = cur.fetchall()
+
+            for candidato in candidati:
+                giorni_trascorsi = (datetime.now(timezone.utc) - candidato["primo_tempo"]).days
+                if not gp_pronto_per_chiusura(candidato["partecipanti"], giorni_trascorsi):
+                    continue
+
+                punti_assegnati, n_partecipanti = _chiudi_gp_circuito(cur, candidato["id"])
+                gp_chiusi.append(
+                    RispostaChiusuraGp(
+                        circuito=candidato["nome"],
+                        piloti_classificati=n_partecipanti,
+                        punti_assegnati=punti_assegnati,
+                    )
+                )
+    finally:
+        conn.close()
+
+    return RispostaChiusuraAutomatica(gp_chiusi=gp_chiusi)
 
 
 # == Livello Pilota unificato ==
