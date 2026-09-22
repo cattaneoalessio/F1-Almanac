@@ -61,6 +61,7 @@ from schemas import (
     RisultatoStoricoPilota,
     RispostaChiusuraGp,
     RispostaInvioTempo,
+    RispostaLivelloPilota,
     RispostaPunteggio,
     SchedaCircuito,
     SchedaPilota,
@@ -1056,4 +1057,79 @@ def chiudi_gp(slug: str, x_admin_key: str = Header(default="")):
         circuito=circuito["nome"],
         piloti_classificati=len(classifica_gara),
         punti_assegnati=punti_assegnati,
+    )
+
+
+# == Livello Pilota unificato ==
+# Somma i punteggi di TUTTI i giochi Arcade in un solo "Livello Pilota",
+# invece di lasciarlo calcolato solo lato frontend da un unico gioco
+# (com'era finché esisteva solo ChronoQuiz). Richiede login: senza
+# un'identità non c'è nulla da sommare — il frontend usa questo
+# endpoint solo se il visitatore è loggato, altrimenti mantiene il
+# vecchio calcolo locale (solo ChronoQuiz, da localStorage) come
+# fallback per chi gioca senza account.
+#
+# La colonna utenti.livello_pilota non viene letta né scritta qui: il
+# livello è ricalcolato al volo dalle tabelle dei punteggi ogni volta
+# che viene chiesto, invece di tenere un valore salvato che rischia di
+# disallinearsi (nessun trigger/job che lo aggiornerebbe altrimenti).
+
+LIVELLI_PILOTA = [
+    (1000, "Campione del Mondo"),
+    (500, "Collaudatore"),
+    (200, "Meccanico"),
+    (0, "Rookie"),
+]
+
+
+def _livello_da_punti(punti_totali):
+    for soglia, nome in LIVELLI_PILOTA:
+        if punti_totali >= soglia:
+            return nome
+    return "Rookie"
+
+
+@app.get("/arcade/livello", response_model=RispostaLivelloPilota)
+def livello_pilota(authorization: str = Header(default="")):
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    conn = get_connection()
+    # Autocommit anche qui, pur essendo un endpoint "di sola lettura" per
+    # i punteggi: utente_da_token può scrivere una riga nuova in utenti
+    # al primo accesso di qualcuno, e senza autocommit quella scrittura
+    # verrebbe annullata alla chiusura della connessione (bug reale
+    # trovato testando questo endpoint, non solo per prudenza).
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            utente_id, username = utente_da_token(cur, token)
+            if utente_id is None:
+                raise HTTPException(status_code=401, detail="Login richiesto.")
+
+            cur.execute(
+                """
+                SELECT COALESCE(MAX(punti), 0) AS record
+                FROM arcade_punteggi
+                WHERE utente_id = %(u)s AND gioco = 'chronoquiz'
+                """,
+                {"u": utente_id},
+            )
+            record_chronoquiz = cur.fetchone()["record"]
+
+            cur.execute(
+                "SELECT punti_totali FROM gioco_classifica_campionato WHERE utente_id = %(u)s",
+                {"u": utente_id},
+            )
+            riga_campionato = cur.fetchone()
+            punti_campionato = riga_campionato["punti_totali"] if riga_campionato else 0
+    finally:
+        conn.close()
+
+    punti_totali = record_chronoquiz + punti_campionato
+    return RispostaLivelloPilota(
+        username=username,
+        punti_totali=punti_totali,
+        livello=_livello_da_punti(punti_totali),
     )

@@ -294,3 +294,11 @@ class RispostaChiusuraGp(BaseModel):
     circuito: str
     piloti_classificati: int
     punti_assegnati: dict[str, int]
+
+
+class RispostaLivelloPilota(BaseModel):
+    """Livello Pilota unificato tra tutti i giochi Arcade (oggi:
+    ChronoQuiz + Time Attack). Vedi GET /arcade/livello."""
+    username: str
+    punti_totali: int
+    livello: str

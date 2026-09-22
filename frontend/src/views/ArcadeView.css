@@ -59,6 +59,12 @@
   text-transform: uppercase;
 }
 
+.arcade-view__stat-sotto {
+  font-size: 0.68rem;
+  color: var(--text-gray);
+  margin-top: 0.15rem;
+}
+
 /* --- Griglia giochi --- */
 
 .arcade-view__grid {

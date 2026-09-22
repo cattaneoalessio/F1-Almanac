@@ -15,6 +15,7 @@ import NewsView from './views/NewsView.jsx';
 import ArcadeView from './views/ArcadeView.jsx';
 import ChronoQuizView from './views/ChronoQuizView.jsx';
 import GameChampionshipView from './views/GameChampionshipView.jsx';
+import AdminGpView from './views/AdminGpView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
 import AdSlot from './components/AdSlot.jsx';
 import { AuthProvider, nomeUtente, useAuth } from './auth/AuthContext.jsx';
@@ -178,6 +179,7 @@ export default function App() {
           <Route path="/arcade" element={<ArcadeView />} />
           <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
           <Route path="/arcade/time-attack" element={<GameChampionshipView />} />
+          <Route path="/admin/chiudi-gp" element={<AdminGpView />} />
           <Route
             path="*"
             element={

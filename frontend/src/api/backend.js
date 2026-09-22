@@ -158,3 +158,31 @@ export function getClassificaTempiCircuito(slug, limite = 10) {
 export function getClassificaCampionato() {
   return fetchBackend('/game/campionato');
 }
+
+/** Livello Pilota unificato (ChronoQuiz + Time Attack), calcolato lato
+ * server. Richiede login: senza token lancia — il chiamante controlla
+ * se c'è un utente prima di invocarla (vedi ArcadeView.jsx). */
+export async function getLivelloPilota(token) {
+  const url = new URL('/arcade/livello', BASE_URL);
+  const risposta = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} chiamando ${url.pathname}`);
+  }
+  return risposta.json();
+}
+
+/** Chiude il GP di un circuito (assegna i punti Campionato in base alla
+ * classifica Gara), richiede la chiave admin nell'header X-Admin-Key.
+ * Non usa fetchBackend: 403/404/409 sono esiti distinti che il
+ * chiamante deve poter distinguere, non un'unica eccezione generica. */
+export async function chiudiGp(slug, chiaveAdmin) {
+  const url = new URL(`/game/close-gp/${encodeURIComponent(slug)}`, BASE_URL);
+  const risposta = await fetch(url, {
+    method: 'POST',
+    headers: { 'X-Admin-Key': chiaveAdmin },
+  });
+  const corpo = await risposta.json().catch(() => null);
+  return { ok: risposta.ok, status: risposta.status, corpo };
+}
