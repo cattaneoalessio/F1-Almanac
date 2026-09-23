@@ -324,6 +324,30 @@ export default function GameChampionshipView() {
     setFase('selezione');
   }
 
+  /**
+   * Collega un pulsante su schermo allo stesso inputRef già usato dalla
+   * tastiera: stesso "campo" (accelera/frena/sterzaSinistra/sterzaDestra),
+   * quindi la fisica non sa né le importa da dove arriva l'input. Gestisce
+   * sia touch che mouse (comodo anche su desktop, e utile per testare):
+   * preventDefault evita che il touch generi anche un click sintetico
+   * dopo, che raddoppierebbe l'input, e blocca lo scroll/zoom della pagina
+   * mentre si tocca il pulsante.
+   */
+  function gestoriPulsanteControllo(campo) {
+    const imposta = (valore) => (evento) => {
+      evento.preventDefault();
+      inputRef.current[campo] = valore;
+    };
+    return {
+      onTouchStart: imposta(true),
+      onTouchEnd: imposta(false),
+      onTouchCancel: imposta(false),
+      onMouseDown: imposta(true),
+      onMouseUp: imposta(false),
+      onMouseLeave: imposta(false),
+    };
+  }
+
   function concludiSessione(tempoTotaleSecondi) {
     const telemetria = [...telemetriaRef.current];
     setRisultatoFinale({ tempoTotale: tempoTotaleSecondi });
@@ -394,8 +418,64 @@ export default function GameChampionshipView() {
             height={ALTEZZA_CANVAS}
             className="game-championship-view__canvas"
           />
-          <div className="game-championship-view__controlli-info">
-            Frecce o WASD per guidare &mdash; accelera, frena/retro, sterza
+          <div className="game-championship-view__istruzioni-controlli">
+            <p className="game-championship-view__istruzioni-titolo">Comandi da tastiera</p>
+            <ul className="game-championship-view__istruzioni-lista">
+              <li>
+                <kbd>&uarr;</kbd> <kbd>W</kbd> <span>Accelera</span>
+              </li>
+              <li>
+                <kbd>&darr;</kbd> <kbd>S</kbd> <span>Frena (retromarcia se sei già fermo)</span>
+              </li>
+              <li>
+                <kbd>&larr;</kbd> <kbd>A</kbd> <span>Sterza a sinistra</span>
+              </li>
+              <li>
+                <kbd>&rarr;</kbd> <kbd>D</kbd> <span>Sterza a destra</span>
+              </li>
+            </ul>
+            <p className="game-championship-view__istruzioni-touch-nota">
+              Da mobile o tablet: usa i pulsanti qui sotto al posto della tastiera.
+            </p>
+          </div>
+
+          <div className="game-championship-view__controlli-touch">
+            <div className="game-championship-view__controlli-touch-gruppo">
+              <button
+                type="button"
+                className="game-championship-view__pulsante-touch"
+                aria-label="Sterza a sinistra"
+                {...gestoriPulsanteControllo('sterzaSinistra')}
+              >
+                &larr;
+              </button>
+              <button
+                type="button"
+                className="game-championship-view__pulsante-touch"
+                aria-label="Sterza a destra"
+                {...gestoriPulsanteControllo('sterzaDestra')}
+              >
+                &rarr;
+              </button>
+            </div>
+            <div className="game-championship-view__controlli-touch-gruppo">
+              <button
+                type="button"
+                className="game-championship-view__pulsante-touch game-championship-view__pulsante-touch--freno"
+                aria-label="Frena o retromarcia"
+                {...gestoriPulsanteControllo('frena')}
+              >
+                &darr;
+              </button>
+              <button
+                type="button"
+                className="game-championship-view__pulsante-touch game-championship-view__pulsante-touch--gas"
+                aria-label="Accelera"
+                {...gestoriPulsanteControllo('accelera')}
+              >
+                &uarr;
+              </button>
+            </div>
           </div>
           <button type="button" className="game-championship-view__abbandona" onClick={abbandonaSessione}>
             Abbandona

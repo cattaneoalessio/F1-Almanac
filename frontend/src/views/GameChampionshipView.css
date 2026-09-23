@@ -151,10 +151,121 @@
   display: block;
 }
 
-.game-championship-view__controlli-info {
-  font-size: 0.78rem;
-  color: var(--text-gray);
+.game-championship-view__istruzioni-controlli {
+  max-width: 420px;
+  margin: 0 auto;
   text-align: center;
+}
+
+.game-championship-view__istruzioni-titolo {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-gray);
+  margin-bottom: 0.5rem;
+}
+
+.game-championship-view__istruzioni-lista {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+.game-championship-view__istruzioni-lista li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+@media (max-width: 480px) {
+  .game-championship-view__istruzioni-lista {
+    grid-template-columns: 1fr;
+  }
+}
+
+.game-championship-view__istruzioni-lista kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-card);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--accent-cyan);
+}
+
+.game-championship-view__istruzioni-touch-nota {
+  font-size: 0.72rem;
+  color: var(--text-gray);
+  margin: 0;
+}
+
+/* --- Pulsanti touch: sterzo a sinistra, gas/freno a destra (schema
+   classico dei giochi di guida mobile). Visibili di default — mostrarli
+   solo su una media query "è per forza un touch" rischierebbe di
+   lasciare qualche dispositivo scoperto; li nascondiamo invece nel
+   caso opposto, quando c'è di sicuro un mouse col hover, l'unico caso
+   in cui sappiamo con certezza che non servono. */
+.game-championship-view__controlli-touch {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  max-width: 940px;
+  margin: 0 auto;
+}
+@media (pointer: fine) and (hover: hover) {
+  .game-championship-view__controlli-touch {
+    display: none;
+  }
+}
+
+.game-championship-view__controlli-touch-gruppo {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.game-championship-view__pulsante-touch {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.game-championship-view__pulsante-touch:active {
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+  color: #2a1f04;
+}
+.game-championship-view__pulsante-touch--gas:active {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: #04131a;
+}
+.game-championship-view__pulsante-touch--freno:active {
+  background: var(--accent-red);
+  border-color: var(--accent-red);
+  color: #fff;
 }
 
 .game-championship-view__abbandona {
