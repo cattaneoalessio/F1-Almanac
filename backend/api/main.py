@@ -61,8 +61,10 @@ from schemas import (
     RisultatoStoricoPilota,
     RispostaChiusuraAutomatica,
     RispostaChiusuraGp,
+    RispostaGriglia,
     RispostaInvioTempo,
     RispostaLivelloPilota,
+    RispostaMioRecord,
     RispostaPunteggio,
     SchedaCircuito,
     SchedaPilota,
@@ -1212,3 +1214,94 @@ def livello_pilota(authorization: str = Header(default="")):
         punti_totali=punti_totali,
         livello=_livello_da_punti(punti_totali),
     )
+
+
+@app.get("/game/mio-record/{slug}", response_model=RispostaMioRecord)
+def mio_record(slug: str, authorization: str = Header(default="")):
+    """Il tempo personale dell'utente loggato su questo circuito, per
+    Qualifica e Gara separatamente — usato dal frontend per colorare di
+    viola un giro che batte il proprio record assoluto. Login
+    facoltativo: senza token risponde comunque 200 con entrambi i campi
+    null (nessun errore, semplicemente niente da confrontare)."""
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    conn = get_connection()
+    conn.autocommit = True  # utente_da_token può scrivere una riga nuova al primo accesso
+    try:
+        with conn.cursor() as cur:
+            circuito = _circuito_da_slug(cur, slug)
+            if circuito is None:
+                raise HTTPException(status_code=404, detail="Circuito non trovato.")
+
+            utente_id, _username = utente_da_token(cur, token)
+            if utente_id is None:
+                return RispostaMioRecord(qualifica=None, gara=None)
+
+            valori = {}
+            for tipo in ("qualifica", "gara"):
+                cur.execute(
+                    """
+                    SELECT tempo_totale FROM gioco_tempi
+                    WHERE utente_id = %(u)s AND circuito_id = %(c)s AND tipo_sessione = %(t)s
+                    """,
+                    {"u": utente_id, "c": circuito["id"], "t": tipo},
+                )
+                riga = cur.fetchone()
+                valori[tipo] = float(riga["tempo_totale"]) if riga is not None else None
+    finally:
+        conn.close()
+
+    return RispostaMioRecord(**valori)
+
+
+@app.get("/game/griglia/{slug}", response_model=RispostaGriglia)
+def griglia_partenza(slug: str, authorization: str = Header(default="")):
+    """Posizione di partenza in griglia per la Gara: quanti piloti hanno
+    un tempo di Qualifica su questo circuito più veloce del proprio.
+    Login facoltativo: senza token (o senza un tempo di qualifica lì)
+    risponde comunque 200 con posizione=null — in F1 senza un tempo di
+    qualifica si parte comunque, dal fondo, non è un errore."""
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    conn = get_connection()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            circuito = _circuito_da_slug(cur, slug)
+            if circuito is None:
+                raise HTTPException(status_code=404, detail="Circuito non trovato.")
+
+            cur.execute(
+                "SELECT COUNT(*) AS n FROM gioco_tempi WHERE circuito_id = %(c)s AND tipo_sessione = 'qualifica'",
+                {"c": circuito["id"]},
+            )
+            piloti_totali = cur.fetchone()["n"]
+
+            posizione = None
+            utente_id, _username = utente_da_token(cur, token)
+            if utente_id is not None:
+                cur.execute(
+                    """
+                    SELECT tempo_totale FROM gioco_tempi
+                    WHERE utente_id = %(u)s AND circuito_id = %(c)s AND tipo_sessione = 'qualifica'
+                    """,
+                    {"u": utente_id, "c": circuito["id"]},
+                )
+                mio_tempo = cur.fetchone()
+                if mio_tempo is not None:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*) AS n FROM gioco_tempi
+                        WHERE circuito_id = %(c)s AND tipo_sessione = 'qualifica' AND tempo_totale < %(t)s
+                        """,
+                        {"c": circuito["id"], "t": mio_tempo["tempo_totale"]},
+                    )
+                    posizione = cur.fetchone()["n"] + 1
+    finally:
+        conn.close()
+
+    return RispostaGriglia(posizione=posizione, piloti_totali=piloti_totali)

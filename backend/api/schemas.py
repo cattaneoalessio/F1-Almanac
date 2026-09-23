@@ -309,3 +309,21 @@ class RispostaLivelloPilota(BaseModel):
     username: str
     punti_totali: int
     livello: str
+
+
+class RispostaMioRecord(BaseModel):
+    """Il record personale (se esiste) dell'utente loggato su un
+    circuito, per Qualifica e Gara separatamente. Campi null se non
+    loggato o se non ha ancora un tempo per quella sessione — non è un
+    errore, è lo stato normale prima del primo tentativo."""
+    qualifica: Optional[float] = None
+    gara: Optional[float] = None
+
+
+class RispostaGriglia(BaseModel):
+    """Posizione di partenza in griglia per la Gara, basata sulla
+    classifica Qualifica del circuito. posizione è null se l'utente non
+    è loggato o non ha ancora un tempo di qualifica lì — in tal caso in
+    F1 si parte dal fondo, non c'è una posizione da calcolare."""
+    posizione: Optional[int] = None
+    piloti_totali: int

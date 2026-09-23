@@ -159,6 +159,36 @@ export function getClassificaCampionato() {
   return fetchBackend('/game/campionato');
 }
 
+/** Il mio record personale (Qualifica e Gara) su un circuito — usato
+ * per colorare di viola un giro che batte il proprio record assoluto.
+ * Login facoltativo: senza token risponde comunque con entrambi i
+ * campi null, non è un errore. */
+export async function getMioRecord(slug, token) {
+  const url = new URL(`/game/mio-record/${encodeURIComponent(slug)}`, BASE_URL);
+  const risposta = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} chiamando ${url.pathname}`);
+  }
+  return risposta.json();
+}
+
+/** Posizione di partenza in griglia per la Gara, basata sulla classifica
+ * Qualifica del circuito. Login facoltativo: senza token o senza un
+ * tempo di qualifica lì, posizione è null (si parte comunque, dal
+ * fondo, come in F1). */
+export async function getGrigliaPartenza(slug, token) {
+  const url = new URL(`/game/griglia/${encodeURIComponent(slug)}`, BASE_URL);
+  const risposta = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} chiamando ${url.pathname}`);
+  }
+  return risposta.json();
+}
+
 /** Livello Pilota unificato (ChronoQuiz + Time Attack), calcolato lato
  * server. Richiede login: senza token lancia — il chiamante controlla
  * se c'è un utente prima di invocarla (vedi ArcadeView.jsx). */

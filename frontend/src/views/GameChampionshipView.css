@@ -151,6 +151,133 @@
   display: block;
 }
 
+/* Wrapper posizionato: serve solo da ancora per il semaforo/flash "VIA!"
+   sovrapposti al canvas, senza toccarne le dimensioni. */
+.game-championship-view__area-pista {
+  position: relative;
+}
+
+/* --- Semaforo di partenza --- */
+
+.game-championship-view__semaforo-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(11, 12, 16, 0.55);
+  border-radius: 8px;
+}
+
+.game-championship-view__semaforo {
+  display: flex;
+  gap: 0.8rem;
+  padding: 0.8rem 1.4rem;
+  background: #0b0c10;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.game-championship-view__luce {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(232, 67, 46, 0.15);
+  border: 1px solid rgba(232, 67, 46, 0.4);
+  transition: background 0.1s ease;
+}
+.game-championship-view__luce--accesa {
+  background: var(--accent-red);
+  box-shadow: 0 0 12px rgba(232, 67, 46, 0.7);
+}
+
+.game-championship-view__griglia-info {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.game-championship-view__via-flash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  font-weight: 900;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 20px rgba(63, 208, 255, 0.6);
+  pointer-events: none;
+  animation: game-championship-view-via-dissolvenza 0.7s ease-out forwards;
+}
+@keyframes game-championship-view-via-dissolvenza {
+  0% {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+/* --- Cronologia giri: verde/viola non fanno parte della palette
+   rosso/oro/ciano del resto del sito — aggiunti apposta qui, sono la
+   convenzione F1 per i tempi sul giro (viola = record assoluto, verde =
+   migliore della sessione) e non hanno un sostituto ragionevole tra i
+   colori già esistenti senza perdere la distinzione tra i due. */
+.game-championship-view__giri-lista-contenitore {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.game-championship-view__giri-lista-titolo {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-gray);
+  margin-bottom: 0.4rem;
+}
+
+.game-championship-view__giri-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.game-championship-view__giro-voce {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+.game-championship-view__giro-voce--verde {
+  color: #4ade80;
+}
+.game-championship-view__giro-voce--viola {
+  color: #c084fc;
+}
+.game-championship-view__giro-voce--non-valido {
+  color: var(--accent-red);
+  opacity: 0.75;
+}
+
 .game-championship-view__istruzioni-controlli {
   max-width: 420px;
   margin: 0 auto;
