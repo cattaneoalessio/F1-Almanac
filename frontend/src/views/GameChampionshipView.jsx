@@ -44,7 +44,13 @@ const DURATA_FLASH_VIA_MS = 700;
 
 // Rendering pseudo-3D
 const NUMERO_SEGMENTI_VISIBILI = 160;
-const ALTEZZA_OCCHI = 1.2; // metri sopra il piano stradale
+// Telecamera in terza persona, dietro e sopra l'auto (cambio deciso
+// insieme all'utente dopo aver visto un riferimento fotografico: non
+// più la vista "dentro l'abitacolo" della prima stesura).
+const DISTANZA_CAMERA_DIETRO = 9; // metri dietro l'auto lungo il tracciato
+const ALTEZZA_CAMERA_SOPRA = 2.3; // metri sopra il piano stradale del punto in cui si trova la telecamera
+const FATTORE_SEGUI_LATERALE = 0.7; // quanto la telecamera insegue lo scarto laterale dell'auto (0=fissa sul centro pista, 1=insegue in pieno, annullando ogni feedback visivo dello sterzo)
+const LARGHEZZA_AUTO_MONDO = 3; // metri, stessa larghezza di fisica3d.js (LARGHEZZA_AUTO)
 const CAMPO_VISIVO_GRADI = 100;
 const PROFONDITA_CAMERA = 1 / Math.tan((CAMPO_VISIVO_GRADI / 2) * (Math.PI / 180));
 const SEGMENTI_PER_STRISCIA_CORDOLO = 4;
@@ -314,37 +320,56 @@ export default function GameChampionshipView() {
       }
     }
 
-    function disegnaAbitacolo(ctx, larghezza, altezza) {
-      const centroX = larghezza / 2;
-      const baseY = altezza;
+    /**
+     * La monoposto vista da dietro, proiettata alla sua posizione nel
+     * mondo (non più fissa in basso allo schermo come il vecchio
+     * abitacolo in prima persona). `punto` viene da proietta(): usa
+     * scala per dimensionarla coerentemente con la pista sotto di
+     * essa. `angolo` è una leggera rotazione (radianti) che segue lo
+     * sterzo, per dare l'impressione che l'auto stia girando.
+     */
+    function disegnaAuto(ctx, punto, larghezzaSchermo, angolo) {
+      const larghezzaAuto = punto.scala * LARGHEZZA_AUTO_MONDO * larghezzaSchermo;
+      if (larghezzaAuto < 4) return; // troppo lontana/piccola per valere la pena
+      const altezzaAuto = larghezzaAuto * 0.42;
 
-      ctx.fillStyle = '#14161a';
-      ctx.beginPath();
-      ctx.ellipse(centroX, baseY + altezza * 0.1, larghezza * 0.24, altezza * 0.22, 0, Math.PI, 0);
-      ctx.fill();
-      ctx.strokeStyle = '#3fd0ff';
-      ctx.lineWidth = Math.max(2, altezza * 0.008);
-      ctx.beginPath();
-      ctx.ellipse(centroX, baseY + altezza * 0.1, larghezza * 0.24, altezza * 0.22, 0, Math.PI * 1.12, Math.PI * 1.88);
-      ctx.stroke();
-
-      const raggioVolante = larghezza * 0.085;
       ctx.save();
-      ctx.translate(centroX, baseY - altezza * 0.01);
-      ctx.rotate(angoloVolanteRef.current);
-      ctx.strokeStyle = '#0b0c10';
-      ctx.lineWidth = raggioVolante * 0.38;
-      ctx.beginPath();
-      ctx.arc(0, 0, raggioVolante, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = '#e8432e';
-      ctx.lineWidth = raggioVolante * 0.16;
-      ctx.beginPath();
-      ctx.moveTo(-raggioVolante * 0.9, 0);
-      ctx.lineTo(raggioVolante * 0.9, 0);
-      ctx.moveTo(0, -raggioVolante * 0.9);
-      ctx.lineTo(0, raggioVolante * 0.15);
-      ctx.stroke();
+      ctx.translate(punto.x, punto.y);
+      ctx.rotate(angolo);
+
+      // Gomme posteriori
+      ctx.fillStyle = '#111214';
+      const largGomma = larghezzaAuto * 0.2;
+      const altGomma = altezzaAuto * 1.05;
+      ctx.fillRect(-larghezzaAuto * 0.58, -altGomma, largGomma, altGomma);
+      ctx.fillRect(larghezzaAuto * 0.38, -altGomma, largGomma, altGomma);
+
+      // Diffusore (sotto il corpo, tra le gomme)
+      ctx.strokeStyle = '#3a3d44';
+      ctx.lineWidth = Math.max(1, larghezzaAuto * 0.012);
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * larghezzaAuto * 0.07, -altezzaAuto * 0.18);
+        ctx.lineTo(i * larghezzaAuto * 0.07, 0);
+        ctx.stroke();
+      }
+
+      // Corpo/pancia centrale
+      ctx.fillStyle = '#1a1d22';
+      ctx.fillRect(-larghezzaAuto * 0.26, -altezzaAuto * 0.75, larghezzaAuto * 0.52, altezzaAuto * 0.75);
+
+      // Fanalino posteriore
+      ctx.fillStyle = '#ff2a2a';
+      ctx.fillRect(-larghezzaAuto * 0.05, -altezzaAuto * 0.42, larghezzaAuto * 0.1, altezzaAuto * 0.1);
+
+      // Ala posteriore: barra + endplate ai due lati + pilone centrale
+      const yAla = -altezzaAuto * 1.45;
+      ctx.fillStyle = '#0d0e10';
+      ctx.fillRect(-larghezzaAuto * 0.56, yAla, larghezzaAuto * 1.12, altezzaAuto * 0.13);
+      ctx.fillRect(-larghezzaAuto * 0.6, yAla, larghezzaAuto * 0.06, altezzaAuto * 0.55);
+      ctx.fillRect(larghezzaAuto * 0.54, yAla, larghezzaAuto * 0.06, altezzaAuto * 0.55);
+      ctx.fillRect(-larghezzaAuto * 0.03, yAla + altezzaAuto * 0.1, larghezzaAuto * 0.06, altezzaAuto * 0.45);
+
       ctx.restore();
     }
 
@@ -359,18 +384,20 @@ export default function GameChampionshipView() {
       disegnaSfondo(ctx, W, H);
 
       const auto = statoAutoRef.current;
-      const segmentoCorrente = segmentoA(Math.floor(auto.distanza / LUNGHEZZA_SEGMENTO));
+      const segmentoAuto = segmentoA(Math.floor(auto.distanza / LUNGHEZZA_SEGMENTO));
+      const distanzaCamera = auto.distanza - DISTANZA_CAMERA_DIETRO;
+      const segmentoCamera = segmentoA(Math.floor(distanzaCamera / LUNGHEZZA_SEGMENTO));
       const camera = {
-        distanza: auto.distanza,
-        mondoX: segmentoCorrente.mondoX + auto.x,
-        mondoY: segmentoCorrente.mondoY + ALTEZZA_OCCHI,
+        distanza: distanzaCamera,
+        mondoX: segmentoCamera.mondoX + auto.x * FATTORE_SEGUI_LATERALE,
+        mondoY: segmentoCamera.mondoY + ALTEZZA_CAMERA_SOPRA,
       };
 
       const segmenti = calcolaSegmentiVisibili(camera, NUMERO_SEGMENTI_VISIBILI);
       const proiettati = [];
       for (const s of segmenti) {
         const p = proietta(s, PROFONDITA_CAMERA, W, H);
-        if (p) proiettati.push({ ...p, ...s, y_mondo: s.y });
+        if (p) proiettati.push({ ...s, ...p, y_mondo: s.y });
       }
 
       for (let i = proiettati.length - 1; i > 0; i--) {
@@ -379,52 +406,66 @@ export default function GameChampionshipView() {
         const semiL = lontano.larghezzaProiettata / 2;
         const semiV = vicino.larghezzaProiettata / 2;
         if (semiV < 0.5) continue;
+        const LIMITE_SEMI_LARGHEZZA = W * 1.3;
+        const semiLDisegno = Math.min(semiL, LIMITE_SEMI_LARGHEZZA);
+        const semiVDisegno = Math.min(semiV, LIMITE_SEMI_LARGHEZZA);
 
         disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, -1);
         disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, 1);
 
         ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2f4a2f' : '#28422c';
         ctx.beginPath();
-        ctx.moveTo(lontano.x - semiL * 1.6, lontano.y);
-        ctx.lineTo(lontano.x + semiL * 1.6, lontano.y);
-        ctx.lineTo(vicino.x + semiV * 1.6, vicino.y);
-        ctx.lineTo(vicino.x - semiV * 1.6, vicino.y);
+        ctx.moveTo(lontano.x - semiLDisegno * 1.6, lontano.y);
+        ctx.lineTo(lontano.x + semiLDisegno * 1.6, lontano.y);
+        ctx.lineTo(vicino.x + semiVDisegno * 1.6, vicino.y);
+        ctx.lineTo(vicino.x - semiVDisegno * 1.6, vicino.y);
         ctx.closePath();
         ctx.fill();
 
         const coloreCordolo = Math.floor(vicino.indiceSegmento / SEGMENTI_PER_STRISCIA_CORDOLO) % 2 === 0 ? '#c0392b' : '#e8e8e8';
         ctx.fillStyle = coloreCordolo;
         ctx.beginPath();
-        ctx.moveTo(lontano.x - semiL * 1.15, lontano.y);
-        ctx.lineTo(lontano.x + semiL * 1.15, lontano.y);
-        ctx.lineTo(vicino.x + semiV * 1.15, vicino.y);
-        ctx.lineTo(vicino.x - semiV * 1.15, vicino.y);
+        ctx.moveTo(lontano.x - semiLDisegno * 1.15, lontano.y);
+        ctx.lineTo(lontano.x + semiLDisegno * 1.15, lontano.y);
+        ctx.lineTo(vicino.x + semiVDisegno * 1.15, vicino.y);
+        ctx.lineTo(vicino.x - semiVDisegno * 1.15, vicino.y);
         ctx.closePath();
         ctx.fill();
 
         ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2a2d33' : '#25282e';
         ctx.beginPath();
-        ctx.moveTo(lontano.x - semiL, lontano.y);
-        ctx.lineTo(lontano.x + semiL, lontano.y);
-        ctx.lineTo(vicino.x + semiV, vicino.y);
-        ctx.lineTo(vicino.x - semiV, vicino.y);
+        ctx.moveTo(lontano.x - semiLDisegno, lontano.y);
+        ctx.lineTo(lontano.x + semiLDisegno, lontano.y);
+        ctx.lineTo(vicino.x + semiVDisegno, vicino.y);
+        ctx.lineTo(vicino.x - semiVDisegno, vicino.y);
         ctx.closePath();
         ctx.fill();
 
         if (vicino.indiceSegmento % 6 < 3) {
           ctx.fillStyle = 'rgba(255,255,255,0.5)';
           ctx.beginPath();
-          ctx.moveTo(lontano.x - semiL * 0.02, lontano.y);
-          ctx.lineTo(lontano.x + semiL * 0.02, lontano.y);
-          ctx.lineTo(vicino.x + semiV * 0.02, vicino.y);
-          ctx.lineTo(vicino.x - semiV * 0.02, vicino.y);
+          ctx.moveTo(lontano.x - semiLDisegno * 0.02, lontano.y);
+          ctx.lineTo(lontano.x + semiLDisegno * 0.02, lontano.y);
+          ctx.lineTo(vicino.x + semiVDisegno * 0.02, vicino.y);
+          ctx.lineTo(vicino.x - semiVDisegno * 0.02, vicino.y);
           ctx.closePath();
           ctx.fill();
         }
       }
 
       disegnaCavalcavia(ctx, proiettati);
-      disegnaAbitacolo(ctx, W, H);
+
+      const puntoAuto = proietta(
+        {
+          x: segmentoAuto.mondoX + auto.x - camera.mondoX,
+          y: segmentoAuto.mondoY - camera.mondoY,
+          z: auto.distanza - camera.distanza,
+        },
+        PROFONDITA_CAMERA,
+        W,
+        H
+      );
+      if (puntoAuto) disegnaAuto(ctx, puntoAuto, W, angoloVolanteRef.current * 0.3);
     }
 
     function fotogramma(timestamp) {
