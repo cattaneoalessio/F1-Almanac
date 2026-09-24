@@ -10,8 +10,15 @@
  * sistema, testabile in isolamento con Node.
  */
 
-/** Il miglior giro VALIDO tra quelli fatti (tempo più basso), o null se
- * nessuno è valido (compreso l'elenco vuoto). */
+// Stesso valore usato lato backend (backend/api/game.py,
+// PENALITA_TAGLIO_CURVA_SECONDI) — se cambia uno va cambiato anche
+// l'altro, o il backend respingerà giri legittimamente penalizzati
+// come "tempo_totale troppo superiore alla telemetria".
+export const PENALITA_TAGLIO_CURVA_SECONDI = 5;
+
+/** Il miglior giro VALIDO tra quelli fatti (tempo più basso — il tempo
+ * già include un'eventuale penalità), o null se nessuno è valido
+ * (compreso l'elenco vuoto). */
 export function trovaMigliorGiroValido(giri) {
   return giri
     .filter((g) => g.valido)

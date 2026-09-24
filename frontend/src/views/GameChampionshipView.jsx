@@ -14,15 +14,21 @@ import {
 import {
   calcolaFattoreRettilineo,
   distanzaDalCentro,
-  eFuoriPista,
+  eSullErba,
   generaCenterline,
   generaCheckpoint,
   LARGHEZZA_PISTA,
   RAGGIO_CATTURA_CHECKPOINT,
-  RIDUZIONE_VELOCITA_FUORI_PISTA,
+  RIDUZIONE_VELOCITA_ERBA,
+  TOLLERANZA_FUORI_PISTA_FRAZIONE,
 } from '../game/pista.js';
 import { avanzaFisica, controllaCatturaCheckpoint, statoIniziale, VELOCITA_MASSIMA_BASE } from '../game/fisica.js';
-import { coloreGiro, estraiCheckpointDelGiro, trovaMigliorGiroValido } from '../game/sessione.js';
+import {
+  coloreGiro,
+  estraiCheckpointDelGiro,
+  PENALITA_TAGLIO_CURVA_SECONDI,
+  trovaMigliorGiroValido,
+} from '../game/sessione.js';
 import './GameChampionshipView.css';
 
 const LARGHEZZA_CANVAS = 900;
@@ -103,7 +109,7 @@ export default function GameChampionshipView() {
   const [campionato, setCampionato] = useState([]);
   const [statoCampionato, setStatoCampionato] = useState('caricamento');
 
-  const [hud, setHud] = useState({ tempoTrascorso: 0, giro: 1, fuoriPista: false, velocitaKmh: 0 });
+  const [hud, setHud] = useState({ tempoTrascorso: 0, giro: 1, suErba: false, velocitaKmh: 0 });
 
   // Semaforo di partenza.
   const [numeroLuciAccese, setNumeroLuciAccese] = useState(0);
@@ -129,7 +135,7 @@ export default function GameChampionshipView() {
   const telemetriaRef = useRef([]);
   const tempoInizioRef = useRef(0);
   const inizioGiroRef = useRef(0);
-  const giroValidoRef = useRef(true);
+  const giroPenalizzatoRef = useRef(false);
   const giriCompletatiRef = useRef([]);
   const viaRef = useRef(false);
   const mioRecordRef = useRef({ qualifica: null, gara: null });
@@ -347,9 +353,9 @@ export default function GameChampionshipView() {
       }
 
       const { distanza } = distanzaDalCentro(statoAutoRef.current.x, statoAutoRef.current.y, centerlineRef.current);
-      const fuoriPista = eFuoriPista(distanza);
-      if (fuoriPista) giroValidoRef.current = false; // basta un istante fuori pista per invalidare il giro
-      const velocitaMassima = VELOCITA_MASSIMA_BASE * (fuoriPista ? RIDUZIONE_VELOCITA_FUORI_PISTA : 1);
+      const suErba = eSullErba(distanza);
+      if (suErba) giroPenalizzatoRef.current = true; // basta un istante sull'erba per penalizzare il giro
+      const velocitaMassima = VELOCITA_MASSIMA_BASE * (suErba ? RIDUZIONE_VELOCITA_ERBA : 1);
       statoAutoRef.current = avanzaFisica(statoAutoRef.current, inputRef.current, dt, velocitaMassima);
 
       // Un solo timestamp per tutto il fotogramma (telemetria, durata
@@ -370,16 +376,23 @@ export default function GameChampionshipView() {
         telemetriaRef.current.push({ giro: giroCorrenteRef.current, indice: checkpointAttesoRef.current, t: tSessione });
 
         if (checkpointAttesoRef.current === 3) {
-          // Giro completato: lo registriamo SEMPRE (Qualifica, Prove
-          // Libere e Gara), valido o no.
+          // Giro completato: si registra SEMPRE (Qualifica, Prove Libere
+          // e Gara) — è sempre "valido" in senso stretto (ha passato
+          // tutti i checkpoint, altrimenti non saremmo arrivati qui),
+          // ma può essere penalizzato (+5s) se è finito sull'erba anche
+          // solo per un istante durante il giro.
           const numeroGiroCompletato = giroCorrenteRef.current;
-          const tempoGiroSecondi = (adesso - inizioGiroRef.current) / 1000;
-          const giroValido = giroValidoRef.current;
+          const tempoBaseSecondi = (adesso - inizioGiroRef.current) / 1000;
+          const penalizzato = giroPenalizzatoRef.current;
+          const tempoConPenalita = tempoBaseSecondi + (penalizzato ? PENALITA_TAGLIO_CURVA_SECONDI : 0);
 
           // Checkpoint di QUESTO giro soltanto, ritemporizzati da 0: è il
           // formato che serve per un'eventuale invio come "giro singolo"
           // (Qualifica invia solo il suo giro migliore, non l'intera
-          // sessione — vedi commento in cima al file).
+          // sessione — vedi commento in cima al file). NON includono la
+          // penalità: sono i timestamp reali dei checkpoint, la
+          // penalità si somma solo al tempo finale (vedi anche il
+          // backend, game.py, che ammette questa differenza).
           const inizioGiroRelativoASessione = inizioGiroRef.current - tempoInizioRef.current;
           const checkpointDiQuestoGiro = estraiCheckpointDelGiro(
             telemetriaRef.current,
@@ -389,16 +402,29 @@ export default function GameChampionshipView() {
 
           giriCompletatiRef.current = [
             ...giriCompletatiRef.current,
-            { numero: numeroGiroCompletato, tempo: tempoGiroSecondi, valido: giroValido, checkpoint: checkpointDiQuestoGiro },
+            {
+              numero: numeroGiroCompletato,
+              tempo: tempoConPenalita,
+              penalizzato,
+              valido: true,
+              checkpoint: checkpointDiQuestoGiro,
+            },
           ];
           setGiriCompletati(giriCompletatiRef.current);
 
-          giroValidoRef.current = true; // si riparte "validi" dal prossimo giro
+          giroPenalizzatoRef.current = false; // si riparte "puliti" dal prossimo giro
           inizioGiroRef.current = adesso;
 
           if (tipoSessione === 'gara' && giroCorrenteRef.current >= GIRI_GARA) {
             fermo = true;
-            concludiGara(tSessione / 1000);
+            // Il tempo totale di Gara somma anche le penalità di TUTTI i
+            // giri appena registrati (incluso quest'ultimo): tSessione è
+            // il tempo "grezzo" di guida, senza penalità.
+            const penalitaTotali = giriCompletatiRef.current.reduce(
+              (totale, g) => totale + (g.penalizzato ? PENALITA_TAGLIO_CURVA_SECONDI : 0),
+              0
+            );
+            concludiGara(tSessione / 1000 + penalitaTotali);
             return;
           }
           giroCorrenteRef.current += 1;
@@ -425,7 +451,7 @@ export default function GameChampionshipView() {
         setHud({
           tempoTrascorso: (performance.now() - tempoInizioRef.current) / 1000,
           giro: giroCorrenteRef.current,
-          fuoriPista,
+          suErba,
           // Fattore di conversione arbitrario px/s -> km/h, solo per dare
           // un numero "leggibile" in HUD: non corrisponde a una vera
           // scala fisica del tracciato (che non esiste, è generico).
@@ -457,7 +483,7 @@ export default function GameChampionshipView() {
     giroCorrenteRef.current = 1;
     telemetriaRef.current = [];
     giriCompletatiRef.current = [];
-    giroValidoRef.current = true;
+    giroPenalizzatoRef.current = false;
     ultimoAggiornamentoHudRef.current = 0;
     // tempoInizioRef/inizioGiroRef vengono impostati quando scatta il
     // verde (vedi l'effetto della sequenza semaforo), non qui.
@@ -468,7 +494,7 @@ export default function GameChampionshipView() {
     setNuovoRecord(false);
     setRisultatoFinale(null);
     setGiriCompletati([]);
-    setHud({ tempoTrascorso: 0, giro: 1, fuoriPista: false, velocitaKmh: 0 });
+    setHud({ tempoTrascorso: 0, giro: 1, suErba: false, velocitaKmh: 0 });
 
     // Il mio record personale su questo circuito, per colorare di viola
     // un giro che lo batte (non blocca l'avvio: se non è ancora
@@ -616,8 +642,8 @@ export default function GameChampionshipView() {
             )}
             <span className="tab-num">{tipoSessione === 'gara' ? `Giro ${hud.giro}/${GIRI_GARA}` : `Giro ${hud.giro}`}</span>
             <span className="tab-num">{hud.velocitaKmh} km/h</span>
-            <span className={hud.fuoriPista ? 'game-championship-view__fuori-pista' : ''}>
-              {hud.fuoriPista ? 'FUORI PISTA' : ''}
+            <span className={hud.suErba ? 'game-championship-view__su-erba' : ''}>
+              {hud.suErba ? 'SULL\u2019ERBA' : ''}
             </span>
           </div>
 
@@ -668,14 +694,18 @@ export default function GameChampionshipView() {
               <ol className="game-championship-view__giri-lista">
                 {giriCompletati.map((giro) => {
                   const colore = coloreGiro(giro, giriCompletati, mioRecordRef.current?.[tipoSessione]);
-                  const modificatore = !giro.valido ? 'non-valido' : colore;
                   return (
                     <li
                       key={giro.numero}
-                      className={`game-championship-view__giro-voce ${modificatore ? `game-championship-view__giro-voce--${modificatore}` : ''}`}
+                      className={`game-championship-view__giro-voce ${colore ? `game-championship-view__giro-voce--${colore}` : ''}`}
                     >
                       <span className="tab-num">Giro {giro.numero}</span>
-                      <span className="tab-num">{giro.valido ? formattaTempo(giro.tempo) : 'Non valido'}</span>
+                      <span className="game-championship-view__giro-tempo">
+                        <span className="tab-num">{formattaTempo(giro.tempo)}</span>
+                        {giro.penalizzato && (
+                          <span className="game-championship-view__giro-penalita">+{PENALITA_TAGLIO_CURVA_SECONDI}s taglio curva</span>
+                        )}
+                      </span>
                     </li>
                   );
                 })}
@@ -883,6 +913,24 @@ export default function GameChampionshipView() {
               ))}
             </div>
           </div>
+
+          <ul className="game-championship-view__regole-lista">
+            <li>
+              Puoi uscire di pista fino al {Math.round(TOLLERANZA_FUORI_PISTA_FRAZIONE * 100)}% della larghezza
+              della strada senza conseguenze.
+            </li>
+            <li>Oltre quel margine sei sull&rsquo;erba: velocità massima ridotta dell&rsquo;{Math.round((1 - RIDUZIONE_VELOCITA_ERBA) * 100)}%.</li>
+            <li>
+              Un giro è valido se passi tutti i checkpoint; se durante il giro finisci sull&rsquo;erba (taglio di
+              curva), quel giro riceve una penalità di +{PENALITA_TAGLIO_CURVA_SECONDI}s.
+            </li>
+            {tipoSessione === 'qualifica' && (
+              <li>
+                Qualifica: hai <strong>{formattaTempo(LIMITE_TEMPO_QUALIFICA_SECONDI)}</strong> a partire dal semaforo
+                verde per fare tutti i giri che vuoi — conta solo il migliore (tempo di penalità incluso).
+              </li>
+            )}
+          </ul>
 
           <button
             type="button"

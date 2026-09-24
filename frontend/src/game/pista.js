@@ -15,8 +15,14 @@
  * apposta per poterle testare con Node senza un vero browser.
  */
 
-export const LARGHEZZA_PISTA = 90; // larghezza drivabile totale (px)
-export const RIDUZIONE_VELOCITA_FUORI_PISTA = 0.4; // velocità massima moltiplicata per questo, fuori pista (-60%)
+export const LARGHEZZA_PISTA = 90; // larghezza drivabile (pavimentata) totale (px)
+// Oltre il bordo pista, si può uscire fino a questa frazione della
+// larghezza pista SENZA alcuna conseguenza (né rallentamento né
+// penalità) — un cordolo/margine tollerato, non ancora erba vera.
+export const TOLLERANZA_FUORI_PISTA_FRAZIONE = 0.5;
+// Sull'erba vera (oltre la tolleranza) la velocità massima diventa
+// questa frazione di quella normale: -80%.
+export const RIDUZIONE_VELOCITA_ERBA = 0.2;
 export const RAGGIO_CATTURA_CHECKPOINT = 55; // px
 
 const SEMIASSE_X_BASE = 380;
@@ -126,9 +132,15 @@ export function distanzaDalCentro(x, y, centerline) {
   return { distanza: minDist, indiceVicino, frazionePista: indiceVicino / centerline.length };
 }
 
-/** true se (x,y) è entro la larghezza drivabile della pista. */
-export function eFuoriPista(distanzaDalCentroPista) {
-  return distanzaDalCentroPista > LARGHEZZA_PISTA / 2;
+/**
+ * true se (x,y) è sull'erba vera e propria — oltre il bordo pista E
+ * oltre la zona di tolleranza (TOLLERANZA_FUORI_PISTA_FRAZIONE): fino a
+ * quel punto si è ancora considerati "in pista" a tutti gli effetti
+ * (velocità piena, nessuna penalità), è un margine tollerato apposta.
+ */
+export function eSullErba(distanzaDalCentroPista) {
+  const bordoConTolleranza = (LARGHEZZA_PISTA / 2) * (1 + TOLLERANZA_FUORI_PISTA_FRAZIONE);
+  return distanzaDalCentroPista > bordoConTolleranza;
 }
 
 /**

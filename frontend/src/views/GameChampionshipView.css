@@ -113,6 +113,21 @@
   background: rgba(63, 208, 255, 0.1);
 }
 
+.game-championship-view__regole-lista {
+  margin: 0 0 1.4rem;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-gray);
+  line-height: 1.4;
+}
+.game-championship-view__regole-lista strong {
+  color: var(--accent-cyan);
+  font-family: var(--font-display);
+}
+
 /* --- In pista --- */
 
 .game-championship-view__in-pista {
@@ -136,7 +151,7 @@
   color: var(--accent-gold);
   font-size: 1rem;
 }
-.game-championship-view__fuori-pista {
+.game-championship-view__su-erba {
   color: var(--accent-red);
   font-weight: 800;
 }
@@ -262,6 +277,7 @@
 .game-championship-view__giro-voce {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   padding: 0.3rem 0.6rem;
   border-radius: 4px;
   font-size: 0.82rem;
@@ -273,9 +289,17 @@
 .game-championship-view__giro-voce--viola {
   color: #c084fc;
 }
-.game-championship-view__giro-voce--non-valido {
+
+.game-championship-view__giro-tempo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.game-championship-view__giro-penalita {
+  font-size: 0.68rem;
   color: var(--accent-red);
-  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .game-championship-view__istruzioni-controlli {

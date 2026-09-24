@@ -25,9 +25,21 @@ GIRI_PER_SESSIONE = {"qualifica": 1, "gara": 3}
 TEMPO_MINIMO_GIRO_SECONDI = 10.0
 
 # Tolleranza tra tempo_totale dichiarato e l'ultimo timestamp di telemetria
-# (in secondi): oltre questa soglia il tempo dichiarato non corrisponde
-# alla telemetria inviata, sospetto di manomissione lato client.
+# (in secondi). PIÙ BASSO del telemetria non è mai ammesso oltre questa
+# soglia (sospetto di manomissione: un tempo inventato più veloce di
+# quanto la telemetria mostri davvero). PIÙ ALTO è invece ammesso fino a
+# una penalità legittima per giro (taglio curva, vedi PENALITA_TAGLIO_CURVA_SECONDI):
+# il client aggiunge quella penalità al tempo_totale ma NON altera i
+# timestamp reali dei checkpoint, quindi un giro penalizzato ha
+# legittimamente un tempo_totale più alto di quanto la sola telemetria
+# implicherebbe.
 TOLLERANZA_COERENZA_TEMPO_SECONDI = 1.0
+
+# Stesso valore usato lato frontend (frontend/src/game/sessione.js,
+# PENALITA_TAGLIO_CURVA_SECONDI) — se cambia uno va cambiato anche
+# l'altro, o il controllo di coerenza qui sotto respingerà giri
+# legittimamente penalizzati.
+PENALITA_TAGLIO_CURVA_SECONDI = 5.0
 
 PUNTI_PER_POSIZIONE = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]  # posizioni 1-10, sistema F1 2019-oggi
 
@@ -61,9 +73,9 @@ def valida_tentativo(tipo_sessione, tempo_totale, checkpoint):
     2. numero di checkpoint coerente col numero di giri atteso
     3. sequenza giro/indice esattamente quella attesa, in ordine
     4. timestamp (t) strettamente crescenti checkpoint dopo checkpoint
-    5. tempo_totale coerente (con tolleranza) con l'ultimo timestamp —
-       altrimenti una telemetria valida potrebbe accompagnare un tempo
-       dichiarato più basso di quello realmente registrato
+    5. tempo_totale coerente con l'ultimo timestamp: mai più basso (oltre
+       tolleranza — sospetto di manomissione), può essere più alto fino a
+       una penalità legittima per taglio curva (vedi PENALITA_TAGLIO_CURVA_SECONDI)
     """
     giri_attesi = GIRI_PER_SESSIONE.get(tipo_sessione)
     if giri_attesi is None:
@@ -86,7 +98,11 @@ def valida_tentativo(tipo_sessione, tempo_totale, checkpoint):
             return False, "i timestamp dei checkpoint non sono strettamente crescenti"
 
     ultimo_timestamp_secondi = checkpoint[-1].t / 1000
-    if abs(ultimo_timestamp_secondi - tempo_totale) > TOLLERANZA_COERENZA_TEMPO_SECONDI:
-        return False, "tempo_totale non coerente con l'ultimo timestamp della telemetria inviata"
+    differenza = tempo_totale - ultimo_timestamp_secondi
+    if differenza < -TOLLERANZA_COERENZA_TEMPO_SECONDI:
+        return False, "tempo_totale inferiore a quanto risulta dalla telemetria inviata (probabile manomissione)"
+    penalita_massima_possibile = PENALITA_TAGLIO_CURVA_SECONDI * giri_attesi
+    if differenza > penalita_massima_possibile + TOLLERANZA_COERENZA_TEMPO_SECONDI:
+        return False, "tempo_totale troppo superiore a quanto risulta dalla telemetria inviata"
 
     return True, None
