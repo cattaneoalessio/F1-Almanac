@@ -439,7 +439,9 @@ def scheda_pilota(slug: str):
 @app.get("/circuiti", response_model=list[VoceCircuito])
 def elenco_circuiti():
     """Indice di tutti i circuiti presenti nel database, per la pagina
-    /circuiti del frontend (Fase D)."""
+    /circuiti del frontend (Fase D). Esclude i circuiti fittizi (es.
+    Brianza Speed Ring, il tracciato del gioco Time Attack): quelli non
+    sono mai esistiti davvero, non appartengono all'archivio storico."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -450,6 +452,7 @@ def elenco_circuiti():
                        ci.localita
                 FROM circuiti ci
                 LEFT JOIN nazioni n ON n.id = ci.nazione_id
+                WHERE ci.fittizio = false
                 ORDER BY ci.nome ASC
                 """
             )
@@ -475,7 +478,7 @@ def scheda_circuito(slug: str):
                        ci.indirizzo, ci.capienza, ci.google_maps_url, ci.storia
                 FROM circuiti ci
                 LEFT JOIN nazioni n ON n.id = ci.nazione_id
-                WHERE ci.codice_riferimento = %(slug)s
+                WHERE ci.codice_riferimento = %(slug)s AND ci.fittizio = false
                 """,
                 {"slug": slug},
             )

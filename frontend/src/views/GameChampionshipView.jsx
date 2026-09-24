@@ -5,101 +5,85 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import {
   getClassificaCampionato,
   getClassificaTempiCircuito,
-  getElencoCircuiti,
   getGrigliaPartenza,
   getMioRecord,
-  getSchedaCircuito,
   inviaTempoGioco,
 } from '../api/backend.js';
 import {
-  calcolaFattoreRettilineo,
-  distanzaDalCentro,
-  eSullErba,
-  generaCenterline,
-  generaCheckpoint,
+  calcolaSegmentiVisibili,
   LARGHEZZA_PISTA,
-  RAGGIO_CATTURA_CHECKPOINT,
-  RIDUZIONE_VELOCITA_ERBA,
-  TOLLERANZA_FUORI_PISTA_FRAZIONE,
-} from '../game/pista.js';
-import { avanzaFisica, controllaCatturaCheckpoint, statoIniziale, VELOCITA_MASSIMA_BASE } from '../game/fisica.js';
-import {
-  coloreGiro,
-  estraiCheckpointDelGiro,
-  PENALITA_TAGLIO_CURVA_SECONDI,
-  trovaMigliorGiroValido,
-} from '../game/sessione.js';
+  LUNGHEZZA_SEGMENTO,
+  proietta,
+  segmentoA,
+  controllaCatturaCheckpointSegmento,
+} from '../game/circuito3d.js';
+import { avanzaFisica, statoIniziale } from '../game/fisica3d.js';
+import { coloreGiro, estraiCheckpointDelGiro, trovaMigliorGiroValido } from '../game/sessione.js';
 import './GameChampionshipView.css';
 
-const LARGHEZZA_CANVAS = 900;
-const ALTEZZA_CANVAS = 600;
-const GIRI_GARA = 3; // solo la Gara ha un numero di giri fisso: Qualifica e Prove Libere no (vedi sotto)
-const ETICHETTA_SESSIONE = { prove_libere: 'Prove Libere', qualifica: 'Qualifica', gara: 'Gara' };
+// Circuito fisso, hardcoded: non più una scelta tra i circuiti reali
+// dell'archivio (Fase D) — quelli restano per la pagina /circuiti del
+// sito, ma il gioco ora gira solo sul suo tracciato pseudo-3D dedicato.
+// 'brianza-speed-ring' è una riga a sé nella tabella circuiti
+// (fittizio=true), invisibile all'archivio pubblico, vedi main.py.
+const CIRCUITO_SLUG = 'brianza-speed-ring';
+const CIRCUITO_NOME = 'Brianza Speed Ring';
 
-// Semaforo di partenza: 5 luci si accendono una alla volta, poi dopo
-// un'attesa in più (in totale un ritardo casuale di 3-5s dall'inizio
-// della sequenza) si spengono tutte insieme — è quello il momento in
-// cui il tempo parte davvero, per tutte e 3 le sessioni.
+const GIRI_GARA = 10; // richiesta esplicita dell'utente
+const LIMITE_TEMPO_QUALIFICA_SECONDI = 180;
+const ETICHETTA_SESSIONE = { prove_libere: 'Prove Libere', qualifica: 'Qualifica', gara: 'Gara' };
+const ETICHETTA_ZONA = { 'cordolo-una-ruota': 'CORDOLO', 'cordolo-due-ruote': 'CORDOLO', erba: "SULL'ERBA" };
+
+// Semaforo di partenza — stessa logica del vecchio motore 2D (confermata
+// esplicitamente dall'utente: "la logica del semaforo rimane").
 const NUMERO_LUCI = 5;
 const INTERVALLO_LUCE_MS = 400;
 const ATTESA_EXTRA_MIN_MS = 1000;
 const ATTESA_EXTRA_MAX_MS = 3000;
 const DURATA_FLASH_VIA_MS = 700;
 
-// Tempo limite di una sessione di Qualifica: puoi fare tutti i giri che
-// vuoi finché non scade, conta il migliore VALIDO. Prove Libere e Gara
-// non hanno questo limite (Gara si conclude dopo GIRI_GARA giri,
-// Prove Libere non si conclude mai da sola).
-const LIMITE_TEMPO_QUALIFICA_SECONDI = 180;
+// Rendering pseudo-3D
+const NUMERO_SEGMENTI_VISIBILI = 160;
+const ALTEZZA_OCCHI = 1.2; // metri sopra il piano stradale
+const CAMPO_VISIVO_GRADI = 100;
+const PROFONDITA_CAMERA = 1 / Math.tan((CAMPO_VISIVO_GRADI / 2) * (Math.PI / 180));
+const SEGMENTI_PER_STRISCIA_CORDOLO = 4;
+const SEMI_LARGHEZZA_PISTA = LARGHEZZA_PISTA / 2;
 
 /**
- * GameChampionshipView — Time Attack asincrono ("Monoposto Virtual Arena")
- * + Campionato Mondiale Virtuale.
+ * GameChampionshipView — Time Attack pseudo-3D in prima persona
+ * ("Brianza Speed Ring"), motore rifatto da zero rispetto alla prima
+ * versione top-down 2D (decisione esplicita dell'utente: "in 2d
+ * l'esperienza è pessima... sarà un primo rifacimento, poi metteremo
+ * altri dettagli").
  *
- * Flow: 'selezione' -> 'in-pista' (che al suo interno parte sempre con
- * la sequenza del semaforo, poi il tempo/i comandi si sbloccano al
- * verde) -> 'riepilogo' (torna a 'selezione', o resta in loop infinito
- * per le Prove Libere, che non hanno una fase 'riepilogo' automatica:
- * si esce quando si vuole con "Abbandona").
+ * Circuito fisso e hardcoded (non più una scelta tra i circuiti reali
+ * dell'archivio): liberamente ispirato a Monza, non una ricostruzione
+ * fedele (curve riordinate, lunghezza diversa — 4 km contro i 5,79 km
+ * reali — dislivelli che Monza reale non ha), deciso insieme all'utente
+ * dopo aver segnalato il conflitto con la policy del progetto contro le
+ * geometrie reali. Vedi game/circuito3d.js per la geometria.
  *
- * Login sempre facoltativo per GIOCARE (come ChronoQuiz), ma qui è
- * obbligatorio lato server per SALVARE un tempo ufficiale — un
- * campionato richiede un'identità persistente. Le Prove Libere non
- * chiamano mai il backend per salvare: girano solo qui, illimitate.
+ * Sistema fuori-pista (cordoli/erba/muri) alle specifiche esatte
+ * dell'utente — vedi game/fisica3d.js. Il sistema di PENALITÀ a tempo
+ * per taglio curva (quello della prima versione 2D) non è ancora
+ * riportato in questo motore: qui c'è solo il rallentamento fisico
+ * (cordoli/erba), non ancora la penalità di +5s né i colori
+ * verde/viola nella cronologia giri — rimandato a un giro successivo,
+ * come concordato ("poi metteremo altri dettagli").
  *
- * La pista è generica ("Monoposto Virtual Arena", 4 curve standard),
- * MAI la sagoma reale di un circuito: nessuna geometria di circuito è
- * salvata nel DB né disegnata qui, per decisione esplicita presa con
- * l'utente (policy anti-invenzione di questo progetto). Il circuito
- * reale selezionato influenza solo la lunghezza dei rettilinei
- * (calcolaFattoreRettilineo, da lunghezza_km) — mai la forma.
- *
- * QUALIFICA — come funziona con un tempo limite invece di un giro solo:
- * si possono fare quanti giri si vuole entro LIMITE_TEMPO_QUALIFICA_SECONDI,
- * ognuno segnato come valido o no (non valido se l'auto è uscita pista
- * anche solo un istante durante quel giro). Alla scadenza del tempo (o
- * comunque solo alla fine), il MIGLIOR giro valido viene inviato al
- * backend come se fosse l'unico giro di una sessione da 1 giro — stesso
- * formato già validato lato server (game.py: GIRI_PER_SESSIONE['qualifica']=1),
- * quindi non serve alcuna modifica al backend: i checkpoint di quel
- * giro vengono semplicemente ritemporizzati da 0, come se il giro
- * migliore fosse stato l'unico giocato.
+ * Login sempre facoltativo per giocare; Qualifica e Gara salvano un
+ * tempo ufficiale solo se loggato (stesso schema del vecchio motore).
+ * Prove Libere non chiamano mai il backend.
  */
 export default function GameChampionshipView() {
   const { utente, ottieniToken, apriLogin } = useAuth();
 
   const [fase, setFase] = useState('selezione'); // selezione | in-pista | riepilogo
-
-  const [circuiti, setCircuiti] = useState([]);
-  const [statoCircuiti, setStatoCircuiti] = useState('caricamento');
-  const [circuitoSlug, setCircuitoSlug] = useState('');
-  const [schedaCircuito, setSchedaCircuito] = useState(null);
-  const [statoScheda, setStatoScheda] = useState('inattivo');
-
   const [tipoSessione, setTipoSessione] = useState('qualifica');
 
-  const [risultatoFinale, setRisultatoFinale] = useState(null); // { tempoTotale } | null
-  const [statoInvio, setStatoInvio] = useState('inattivo'); // inattivo | invio | salvato | non-salvato | login-richiesto | errore | nessun-tempo
+  const [risultatoFinale, setRisultatoFinale] = useState(null);
+  const [statoInvio, setStatoInvio] = useState('inattivo');
   const [motivoRifiuto, setMotivoRifiuto] = useState(null);
   const [nuovoRecord, setNuovoRecord] = useState(false);
 
@@ -109,73 +93,38 @@ export default function GameChampionshipView() {
   const [campionato, setCampionato] = useState([]);
   const [statoCampionato, setStatoCampionato] = useState('caricamento');
 
-  const [hud, setHud] = useState({ tempoTrascorso: 0, giro: 1, suErba: false, velocitaKmh: 0 });
+  const [hud, setHud] = useState({ tempoTrascorso: 0, giro: 1, velocitaKmh: 0, zona: 'pista' });
 
-  // Semaforo di partenza.
   const [numeroLuciAccese, setNumeroLuciAccese] = useState(0);
   const [semaforoVia, setSemaforoVia] = useState(false);
   const [mostraVia, setMostraVia] = useState(false);
 
-  // Cronologia giri della sessione corrente (Qualifica/Prove Libere/Gara,
-  // per tutte e 3: "segnare i giri fatti" vale per tutte).
   const [giriCompletati, setGiriCompletati] = useState([]);
 
-  // Griglia di partenza (solo per la Gara).
   const [grigliaInfo, setGrigliaInfo] = useState(null);
   const [statoGriglia, setStatoGriglia] = useState('inattivo');
 
+  const [schermoIntero, setSchermoIntero] = useState(false);
+  const [orientamentoPortrait, setOrientamentoPortrait] = useState(false);
+  const [haTouch] = useState(() => typeof window !== 'undefined' && 'ontouchstart' in window);
+
+  const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const requestIdRef = useRef(null);
   const inputRef = useRef({ accelera: false, frena: false, sterzaSinistra: false, sterzaDestra: false });
-  const centerlineRef = useRef([]);
-  const checkpointRef = useRef([]);
-  const statoAutoRef = useRef(statoIniziale({ x: 0, y: 0 }));
+  const statoAutoRef = useRef(statoIniziale());
   const checkpointAttesoRef = useRef(0);
   const giroCorrenteRef = useRef(1);
   const telemetriaRef = useRef([]);
   const tempoInizioRef = useRef(0);
   const inizioGiroRef = useRef(0);
-  const giroPenalizzatoRef = useRef(false);
   const giriCompletatiRef = useRef([]);
   const viaRef = useRef(false);
   const mioRecordRef = useRef({ qualifica: null, gara: null });
   const ultimoAggiornamentoHudRef = useRef(0);
+  const angoloVolanteRef = useRef(0);
 
-  // Elenco circuiti per il selettore.
-  useEffect(() => {
-    getElencoCircuiti()
-      .then((dati) => {
-        setCircuiti(dati || []);
-        setStatoCircuiti('pronto');
-      })
-      .catch((errore) => {
-        console.error('Errore nel caricare l\u2019elenco circuiti:', errore);
-        setStatoCircuiti('errore');
-      });
-  }, []);
-
-  // Scheda del circuito selezionato: serve lunghezza_km per il
-  // modificatore dei rettilinei (nessun'altra geometria viene letta).
-  useEffect(() => {
-    if (!circuitoSlug) {
-      setSchedaCircuito(null);
-      setStatoScheda('inattivo');
-      return;
-    }
-    setStatoScheda('caricamento');
-    getSchedaCircuito(circuitoSlug)
-      .then((dati) => {
-        setSchedaCircuito(dati);
-        setStatoScheda(dati ? 'pronto' : 'errore');
-      })
-      .catch((errore) => {
-        console.error('Errore nel caricare la scheda del circuito:', errore);
-        setStatoScheda('errore');
-      });
-  }, [circuitoSlug]);
-
-  // Classifica generale del campionato, precaricata (visibile anche
-  // dalla schermata di selezione, non solo dopo aver giocato).
+  // Classifica generale del campionato, precaricata.
   useEffect(() => {
     getClassificaCampionato()
       .then((dati) => {
@@ -188,25 +137,16 @@ export default function GameChampionshipView() {
       });
   }, []);
 
-  // Input da tastiera (WASD + frecce), solo mentre si è in pista. Ascolta
-  // su window (non sul canvas) così non dipende dal focus dell'elemento.
-  // Attivo anche durante il semaforo: i tasti non fanno nulla finché
-  // viaRef non è true (vedi fotogramma), così non c'è un "falso
-  // partenza" possibile tenendo premuto in anticipo.
+  // Input da tastiera, solo mentre si è in pista. Attivo anche durante
+  // il semaforo: i tasti non fanno nulla finché viaRef non è true.
   useEffect(() => {
     if (fase !== 'in-pista') return undefined;
-
     const TASTI = {
-      ArrowUp: 'accelera',
-      KeyW: 'accelera',
-      ArrowDown: 'frena',
-      KeyS: 'frena',
-      ArrowLeft: 'sterzaSinistra',
-      KeyA: 'sterzaSinistra',
-      ArrowRight: 'sterzaDestra',
-      KeyD: 'sterzaDestra',
+      ArrowUp: 'accelera', KeyW: 'accelera',
+      ArrowDown: 'frena', KeyS: 'frena',
+      ArrowLeft: 'sterzaSinistra', KeyA: 'sterzaSinistra',
+      ArrowRight: 'sterzaDestra', KeyD: 'sterzaDestra',
     };
-
     function suKeyDown(evento) {
       const campo = TASTI[evento.code];
       if (!campo) return;
@@ -218,7 +158,6 @@ export default function GameChampionshipView() {
       if (!campo) return;
       inputRef.current[campo] = false;
     }
-
     window.addEventListener('keydown', suKeyDown);
     window.addEventListener('keyup', suKeyUp);
     return () => {
@@ -228,15 +167,67 @@ export default function GameChampionshipView() {
     };
   }, [fase]);
 
-  // Sequenza del semaforo: riparte ogni volta che si entra in pista
-  // (sia il primo "Vai in pista" sia un "Rigioca"). Il ritardo totale
-  // prima del verde è casuale tra 3 e 5 secondi (le prime NUMERO_LUCI *
-  // INTERVALLO_LUCE_MS accendono le luci una a una, il resto è
-  // un'attesa in più a tutte le luci accese) — comportamento identico
-  // per Qualifica, Prove Libere e Gara.
+  // Stato fullscreen: sul CONTENITORE del gioco, non su tutta la
+  // pagina — così la UI del sito (barra di navigazione, footer) sparisce
+  // da sola, senza doverla nascondere a mano. Su mobile, tenta anche il
+  // blocco dell'orientamento landscape (fallisce silenziosamente su
+  // iOS Safari, che non lo supporta — l'utente l'ha accettato).
+  useEffect(() => {
+    function suCambioFullscreen() {
+      const attivo = document.fullscreenElement === containerRef.current;
+      setSchermoIntero(attivo);
+      if (attivo && haTouch && typeof screen !== 'undefined' && screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {
+          // iOS Safari e altri: nessun blocco possibile, va bene così
+          // (mostriamo comunque l'invito a ruotare se serve, vedi sotto).
+        });
+      }
+    }
+    document.addEventListener('fullscreenchange', suCambioFullscreen);
+    return () => document.removeEventListener('fullscreenchange', suCambioFullscreen);
+  }, [haTouch]);
+
+  // Rileva l'orientamento del dispositivo, per l'invito a ruotare su
+  // iOS (dove non possiamo forzarlo via API).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const query = window.matchMedia('(orientation: portrait)');
+    function aggiorna() {
+      setOrientamentoPortrait(query.matches);
+    }
+    aggiorna();
+    query.addEventListener('change', aggiorna);
+    return () => query.removeEventListener('change', aggiorna);
+  }, []);
+
+  // Il canvas segue le dimensioni reali con cui è mostrato (responsive,
+  // cambia in fullscreen): il buffer di disegno deve combaciare o il
+  // rendering risulta sfocato o tagliato.
   useEffect(() => {
     if (fase !== 'in-pista') return undefined;
+    function ridimensiona() {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rapportoPixel = Math.min(window.devicePixelRatio || 1, 2);
+      const larghezzaCss = canvas.clientWidth;
+      const altezzaCss = canvas.clientHeight;
+      if (larghezzaCss === 0 || altezzaCss === 0) return;
+      canvas.width = Math.round(larghezzaCss * rapportoPixel);
+      canvas.height = Math.round(altezzaCss * rapportoPixel);
+    }
+    ridimensiona();
+    window.addEventListener('resize', ridimensiona);
+    const idTimeout = setTimeout(ridimensiona, 50); // dopo il cambio fullscreen, le dimensioni CSS si assestano con un frame di ritardo
+    return () => {
+      window.removeEventListener('resize', ridimensiona);
+      clearTimeout(idTimeout);
+    };
+  }, [fase, schermoIntero]);
 
+  // Sequenza del semaforo — stessa logica del vecchio motore 2D, non
+  // toccata (l'utente ha chiesto esplicitamente di mantenerla).
+  useEffect(() => {
+    if (fase !== 'in-pista') return undefined;
     setSemaforoVia(false);
     setMostraVia(false);
     setNumeroLuciAccese(0);
@@ -244,16 +235,10 @@ export default function GameChampionshipView() {
 
     const idTimeout = [];
     for (let i = 1; i <= NUMERO_LUCI; i++) {
-      idTimeout.push(
-        setTimeout(() => {
-          setNumeroLuciAccese(i);
-        }, i * INTERVALLO_LUCE_MS)
-      );
+      idTimeout.push(setTimeout(() => setNumeroLuciAccese(i), i * INTERVALLO_LUCE_MS));
     }
-
     const attesaExtra = ATTESA_EXTRA_MIN_MS + Math.random() * (ATTESA_EXTRA_MAX_MS - ATTESA_EXTRA_MIN_MS);
-    const ritardoTotaleMs = NUMERO_LUCI * INTERVALLO_LUCE_MS + attesaExtra; // totale: 3-5s
-
+    const ritardoTotaleMs = NUMERO_LUCI * INTERVALLO_LUCE_MS + attesaExtra;
     idTimeout.push(
       setTimeout(() => {
         const adesso = performance.now();
@@ -265,166 +250,224 @@ export default function GameChampionshipView() {
         idTimeout.push(setTimeout(() => setMostraVia(false), DURATA_FLASH_VIA_MS));
       }, ritardoTotaleMs)
     );
-
     return () => idTimeout.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
-  // Il game loop vero e proprio.
+  // Il game loop: fisica + rendering pseudo-3D.
   useEffect(() => {
     if (fase !== 'in-pista') return undefined;
     let ultimoTimestamp = null;
     let fermo = false;
 
+    function disegnaSfondo(ctx, larghezza, altezza) {
+      const orizzonte = altezza * 0.42;
+      const cielo = ctx.createLinearGradient(0, 0, 0, orizzonte);
+      cielo.addColorStop(0, '#0b0c10');
+      cielo.addColorStop(1, '#3a2e1a');
+      ctx.fillStyle = cielo;
+      ctx.fillRect(0, 0, larghezza, orizzonte);
+      ctx.fillStyle = '#16241a';
+      ctx.fillRect(0, orizzonte, larghezza, altezza - orizzonte);
+    }
+
+    function disegnaScenarioLato(ctx, xBase, yBase, scala, indiceSegmento, curva, lato) {
+      const dimensione = Math.max(3, 55 * scala);
+      if (dimensione < 3.5) return;
+      const x = xBase + lato * dimensione * 2.2;
+      if (Math.abs(curva) > 1.2) {
+        ctx.fillStyle = '#1d3a1f';
+        ctx.beginPath();
+        ctx.moveTo(x, yBase - dimensione * 1.7);
+        ctx.lineTo(x - dimensione * 0.55, yBase);
+        ctx.lineTo(x + dimensione * 0.55, yBase);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#5c3d24';
+        ctx.fillRect(x - dimensione * 0.08, yBase, dimensione * 0.16, dimensione * 0.3);
+      } else {
+        ctx.fillStyle = '#23262c';
+        ctx.fillRect(x - dimensione * 0.65, yBase - dimensione * 0.9, dimensione * 1.3, dimensione * 0.9);
+        if (indiceSegmento % 3 === 0) {
+          ctx.fillStyle = 'rgba(217,164,65,0.55)';
+          ctx.fillRect(x - dimensione * 0.65, yBase - dimensione * 0.9, dimensione * 1.3, dimensione * 0.22);
+        }
+      }
+    }
+
+    function disegnaCavalcavia(ctx, proiettati) {
+      // Punto in cui la pista è più alta (la curva in salita del tratto
+      // 4 in circuito3d.js): decorazione con piloni verticali, dà
+      // l'impressione di un cavalcavia senza richiedere un vero
+      // incrocio geometrico auto-intersecante del tracciato.
+      for (const p of proiettati) {
+        if (p.y_mondo > 6 && p.scala > 0.05) {
+          const semiLarghezza = p.larghezzaProiettata / 2;
+          ctx.strokeStyle = '#4a4d54';
+          ctx.lineWidth = Math.max(1, 4 * p.scala);
+          ctx.beginPath();
+          ctx.moveTo(p.x - semiLarghezza * 1.3, p.y);
+          ctx.lineTo(p.x - semiLarghezza * 1.3, p.y + 40 * p.scala);
+          ctx.moveTo(p.x + semiLarghezza * 1.3, p.y);
+          ctx.lineTo(p.x + semiLarghezza * 1.3, p.y + 40 * p.scala);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function disegnaAbitacolo(ctx, larghezza, altezza) {
+      const centroX = larghezza / 2;
+      const baseY = altezza;
+
+      ctx.fillStyle = '#14161a';
+      ctx.beginPath();
+      ctx.ellipse(centroX, baseY + altezza * 0.1, larghezza * 0.24, altezza * 0.22, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = '#3fd0ff';
+      ctx.lineWidth = Math.max(2, altezza * 0.008);
+      ctx.beginPath();
+      ctx.ellipse(centroX, baseY + altezza * 0.1, larghezza * 0.24, altezza * 0.22, 0, Math.PI * 1.12, Math.PI * 1.88);
+      ctx.stroke();
+
+      const raggioVolante = larghezza * 0.085;
+      ctx.save();
+      ctx.translate(centroX, baseY - altezza * 0.01);
+      ctx.rotate(angoloVolanteRef.current);
+      ctx.strokeStyle = '#0b0c10';
+      ctx.lineWidth = raggioVolante * 0.38;
+      ctx.beginPath();
+      ctx.arc(0, 0, raggioVolante, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#e8432e';
+      ctx.lineWidth = raggioVolante * 0.16;
+      ctx.beginPath();
+      ctx.moveTo(-raggioVolante * 0.9, 0);
+      ctx.lineTo(raggioVolante * 0.9, 0);
+      ctx.moveTo(0, -raggioVolante * 0.9);
+      ctx.lineTo(0, raggioVolante * 0.15);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     function disegna() {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+      if (W === 0 || H === 0) return;
+
+      disegnaSfondo(ctx, W, H);
+
       const auto = statoAutoRef.current;
-      const offsetX = canvas.width / 2 - auto.x;
-      const offsetY = canvas.height / 2 - auto.y;
+      const segmentoCorrente = segmentoA(Math.floor(auto.distanza / LUNGHEZZA_SEGMENTO));
+      const camera = {
+        distanza: auto.distanza,
+        mondoX: segmentoCorrente.mondoX + auto.x,
+        mondoY: segmentoCorrente.mondoY + ALTEZZA_OCCHI,
+      };
 
-      ctx.fillStyle = '#16241a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.save();
-      ctx.translate(offsetX, offsetY);
-
-      const cl = centerlineRef.current;
-      if (cl.length > 0) {
-        ctx.beginPath();
-        ctx.moveTo(cl[0].x, cl[0].y);
-        for (let i = 1; i < cl.length; i++) ctx.lineTo(cl[i].x, cl[i].y);
-        ctx.closePath();
-        ctx.strokeStyle = '#2a2d33';
-        ctx.lineWidth = LARGHEZZA_PISTA;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.moveTo(cl[0].x, cl[0].y - LARGHEZZA_PISTA / 2);
-        ctx.lineTo(cl[0].x, cl[0].y + LARGHEZZA_PISTA / 2);
-        ctx.stroke();
+      const segmenti = calcolaSegmentiVisibili(camera, NUMERO_SEGMENTI_VISIBILI);
+      const proiettati = [];
+      for (const s of segmenti) {
+        const p = proietta(s, PROFONDITA_CAMERA, W, H);
+        if (p) proiettati.push({ ...p, ...s, y_mondo: s.y });
       }
 
-      checkpointRef.current.forEach((cp, indice) => {
+      for (let i = proiettati.length - 1; i > 0; i--) {
+        const lontano = proiettati[i];
+        const vicino = proiettati[i - 1];
+        const semiL = lontano.larghezzaProiettata / 2;
+        const semiV = vicino.larghezzaProiettata / 2;
+        if (semiV < 0.5) continue;
+
+        disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, -1);
+        disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, 1);
+
+        ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2f4a2f' : '#28422c';
         ctx.beginPath();
-        ctx.arc(cp.x, cp.y, 12, 0, Math.PI * 2);
-        ctx.fillStyle = indice === checkpointAttesoRef.current ? '#3fd0ff' : 'rgba(217,164,65,0.35)';
+        ctx.moveTo(lontano.x - semiL * 1.6, lontano.y);
+        ctx.lineTo(lontano.x + semiL * 1.6, lontano.y);
+        ctx.lineTo(vicino.x + semiV * 1.6, vicino.y);
+        ctx.lineTo(vicino.x - semiV * 1.6, vicino.y);
+        ctx.closePath();
         ctx.fill();
-      });
 
-      ctx.save();
-      ctx.translate(auto.x, auto.y);
-      ctx.rotate(auto.angolo);
-      ctx.fillStyle = '#e8432e';
-      ctx.beginPath();
-      ctx.moveTo(16, 0);
-      ctx.lineTo(-10, -9);
-      ctx.lineTo(-10, 9);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+        const coloreCordolo = Math.floor(vicino.indiceSegmento / SEGMENTI_PER_STRISCIA_CORDOLO) % 2 === 0 ? '#c0392b' : '#e8e8e8';
+        ctx.fillStyle = coloreCordolo;
+        ctx.beginPath();
+        ctx.moveTo(lontano.x - semiL * 1.15, lontano.y);
+        ctx.lineTo(lontano.x + semiL * 1.15, lontano.y);
+        ctx.lineTo(vicino.x + semiV * 1.15, vicino.y);
+        ctx.lineTo(vicino.x - semiV * 1.15, vicino.y);
+        ctx.closePath();
+        ctx.fill();
 
-      ctx.restore();
+        ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2a2d33' : '#25282e';
+        ctx.beginPath();
+        ctx.moveTo(lontano.x - semiL, lontano.y);
+        ctx.lineTo(lontano.x + semiL, lontano.y);
+        ctx.lineTo(vicino.x + semiV, vicino.y);
+        ctx.lineTo(vicino.x - semiV, vicino.y);
+        ctx.closePath();
+        ctx.fill();
+
+        if (vicino.indiceSegmento % 6 < 3) {
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.beginPath();
+          ctx.moveTo(lontano.x - semiL * 0.02, lontano.y);
+          ctx.lineTo(lontano.x + semiL * 0.02, lontano.y);
+          ctx.lineTo(vicino.x + semiV * 0.02, vicino.y);
+          ctx.lineTo(vicino.x - semiV * 0.02, vicino.y);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      disegnaCavalcavia(ctx, proiettati);
+      disegnaAbitacolo(ctx, W, H);
     }
 
     function fotogramma(timestamp) {
       if (fermo) return;
       if (ultimoTimestamp === null) ultimoTimestamp = timestamp;
-      // dt limitato a 50ms: su una tab in background requestAnimationFrame
-      // può accumulare un intervallo enorme al ritorno in primo piano —
-      // senza questo limite la fisica farebbe un salto irrealistico.
       const dt = Math.min((timestamp - ultimoTimestamp) / 1000, 0.05);
       ultimoTimestamp = timestamp;
 
-      // Prima del verde: l'auto resta ferma alla partenza, si disegna
-      // comunque (per far vedere dove si parte) ma niente fisica/tempo.
       if (!viaRef.current) {
         disegna();
         requestIdRef.current = requestAnimationFrame(fotogramma);
         return;
       }
 
-      const { distanza } = distanzaDalCentro(statoAutoRef.current.x, statoAutoRef.current.y, centerlineRef.current);
-      const suErba = eSullErba(distanza);
-      if (suErba) giroPenalizzatoRef.current = true; // basta un istante sull'erba per penalizzare il giro
-      const velocitaMassima = VELOCITA_MASSIMA_BASE * (suErba ? RIDUZIONE_VELOCITA_ERBA : 1);
-      statoAutoRef.current = avanzaFisica(statoAutoRef.current, inputRef.current, dt, velocitaMassima);
+      const segmentoAttuale = segmentoA(Math.floor(statoAutoRef.current.distanza / LUNGHEZZA_SEGMENTO));
+      statoAutoRef.current = avanzaFisica(statoAutoRef.current, inputRef.current, dt, segmentoAttuale.curva, SEMI_LARGHEZZA_PISTA);
 
-      // Un solo timestamp per tutto il fotogramma (telemetria, durata
-      // giro, tempo limite di Qualifica): prima era ricalcolato dentro
-      // il blocco del checkpoint e quindi non esisteva più fuori da lì —
-      // bug vero, faceva crashare ogni sessione di Qualifica al primo
-      // fotogramma senza cattura di un checkpoint (trovato testando).
+      const angoloTarget = (inputRef.current.sterzaDestra ? 1 : 0) - (inputRef.current.sterzaSinistra ? 1 : 0);
+      angoloVolanteRef.current += (angoloTarget * 0.6 - angoloVolanteRef.current) * Math.min(1, dt * 8);
+
       const adesso = performance.now();
-
-      const nuovoAtteso = controllaCatturaCheckpoint(
-        statoAutoRef.current,
-        checkpointRef.current,
-        checkpointAttesoRef.current,
-        RAGGIO_CATTURA_CHECKPOINT
-      );
+      const segmentoAssolutoAttuale = Math.floor(statoAutoRef.current.distanza / LUNGHEZZA_SEGMENTO);
+      const nuovoAtteso = controllaCatturaCheckpointSegmento(segmentoAssolutoAttuale, giroCorrenteRef.current, checkpointAttesoRef.current);
       if (nuovoAtteso !== checkpointAttesoRef.current) {
         const tSessione = adesso - tempoInizioRef.current;
         telemetriaRef.current.push({ giro: giroCorrenteRef.current, indice: checkpointAttesoRef.current, t: tSessione });
 
         if (checkpointAttesoRef.current === 3) {
-          // Giro completato: si registra SEMPRE (Qualifica, Prove Libere
-          // e Gara) — è sempre "valido" in senso stretto (ha passato
-          // tutti i checkpoint, altrimenti non saremmo arrivati qui),
-          // ma può essere penalizzato (+5s) se è finito sull'erba anche
-          // solo per un istante durante il giro.
           const numeroGiroCompletato = giroCorrenteRef.current;
-          const tempoBaseSecondi = (adesso - inizioGiroRef.current) / 1000;
-          const penalizzato = giroPenalizzatoRef.current;
-          const tempoConPenalita = tempoBaseSecondi + (penalizzato ? PENALITA_TAGLIO_CURVA_SECONDI : 0);
-
-          // Checkpoint di QUESTO giro soltanto, ritemporizzati da 0: è il
-          // formato che serve per un'eventuale invio come "giro singolo"
-          // (Qualifica invia solo il suo giro migliore, non l'intera
-          // sessione — vedi commento in cima al file). NON includono la
-          // penalità: sono i timestamp reali dei checkpoint, la
-          // penalità si somma solo al tempo finale (vedi anche il
-          // backend, game.py, che ammette questa differenza).
+          const tempoGiroSecondi = (adesso - inizioGiroRef.current) / 1000;
           const inizioGiroRelativoASessione = inizioGiroRef.current - tempoInizioRef.current;
-          const checkpointDiQuestoGiro = estraiCheckpointDelGiro(
-            telemetriaRef.current,
-            numeroGiroCompletato,
-            inizioGiroRelativoASessione
-          );
+          const checkpointDiQuestoGiro = estraiCheckpointDelGiro(telemetriaRef.current, numeroGiroCompletato, inizioGiroRelativoASessione);
 
           giriCompletatiRef.current = [
             ...giriCompletatiRef.current,
-            {
-              numero: numeroGiroCompletato,
-              tempo: tempoConPenalita,
-              penalizzato,
-              valido: true,
-              checkpoint: checkpointDiQuestoGiro,
-            },
+            { numero: numeroGiroCompletato, tempo: tempoGiroSecondi, valido: true, checkpoint: checkpointDiQuestoGiro },
           ];
           setGiriCompletati(giriCompletatiRef.current);
-
-          giroPenalizzatoRef.current = false; // si riparte "puliti" dal prossimo giro
           inizioGiroRef.current = adesso;
 
           if (tipoSessione === 'gara' && giroCorrenteRef.current >= GIRI_GARA) {
             fermo = true;
-            // Il tempo totale di Gara somma anche le penalità di TUTTI i
-            // giri appena registrati (incluso quest'ultimo): tSessione è
-            // il tempo "grezzo" di guida, senza penalità.
-            const penalitaTotali = giriCompletatiRef.current.reduce(
-              (totale, g) => totale + (g.penalizzato ? PENALITA_TAGLIO_CURVA_SECONDI : 0),
-              0
-            );
-            concludiGara(tSessione / 1000 + penalitaTotali);
+            concludiGara(tSessione / 1000);
             return;
           }
           giroCorrenteRef.current += 1;
@@ -432,9 +475,6 @@ export default function GameChampionshipView() {
         checkpointAttesoRef.current = nuovoAtteso;
       }
 
-      // Tempo limite di Qualifica: controllato a ogni fotogramma, non
-      // solo al giro completato — scade anche a metà di un giro (che
-      // in quel caso va semplicemente perso, non viene registrato).
       if (tipoSessione === 'qualifica') {
         const trascorsiSecondi = (adesso - tempoInizioRef.current) / 1000;
         if (trascorsiSecondi >= LIMITE_TEMPO_QUALIFICA_SECONDI) {
@@ -451,11 +491,8 @@ export default function GameChampionshipView() {
         setHud({
           tempoTrascorso: (performance.now() - tempoInizioRef.current) / 1000,
           giro: giroCorrenteRef.current,
-          suErba,
-          // Fattore di conversione arbitrario px/s -> km/h, solo per dare
-          // un numero "leggibile" in HUD: non corrisponde a una vera
-          // scala fisica del tracciato (che non esiste, è generico).
-          velocitaKmh: Math.round((Math.abs(statoAutoRef.current.velocita) / VELOCITA_MASSIMA_BASE) * 320),
+          velocitaKmh: Math.round(statoAutoRef.current.velocita * 3.6),
+          zona: statoAutoRef.current.zona,
         });
       }
 
@@ -468,25 +505,16 @@ export default function GameChampionshipView() {
       if (requestIdRef.current) cancelAnimationFrame(requestIdRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fase]);
+  }, [fase, tipoSessione]);
 
   function iniziaSessione(tipo) {
-    if (!schedaCircuito) return;
-    const fattore = calcolaFattoreRettilineo(schedaCircuito.lunghezza_km);
-    const centerline = generaCenterline(fattore);
-    const checkpoint = generaCheckpoint(centerline);
-
-    centerlineRef.current = centerline;
-    checkpointRef.current = checkpoint;
-    statoAutoRef.current = statoIniziale(centerline[0]);
+    statoAutoRef.current = statoIniziale();
     checkpointAttesoRef.current = 0;
     giroCorrenteRef.current = 1;
     telemetriaRef.current = [];
     giriCompletatiRef.current = [];
-    giroPenalizzatoRef.current = false;
     ultimoAggiornamentoHudRef.current = 0;
-    // tempoInizioRef/inizioGiroRef vengono impostati quando scatta il
-    // verde (vedi l'effetto della sequenza semaforo), non qui.
+    angoloVolanteRef.current = 0;
 
     setTipoSessione(tipo);
     setStatoInvio('inattivo');
@@ -494,15 +522,11 @@ export default function GameChampionshipView() {
     setNuovoRecord(false);
     setRisultatoFinale(null);
     setGiriCompletati([]);
-    setHud({ tempoTrascorso: 0, giro: 1, suErba: false, velocitaKmh: 0 });
+    setHud({ tempoTrascorso: 0, giro: 1, velocitaKmh: 0, zona: 'pista' });
 
-    // Il mio record personale su questo circuito, per colorare di viola
-    // un giro che lo batte (non blocca l'avvio: se non è ancora
-    // arrivato quando parte il primo giro, semplicemente quel giro non
-    // viene evidenziato in viola finché la risposta non arriva).
     mioRecordRef.current = { qualifica: null, gara: null };
     ottieniToken()
-      .then((token) => getMioRecord(circuitoSlug, token))
+      .then((token) => getMioRecord(CIRCUITO_SLUG, token))
       .then((dati) => {
         mioRecordRef.current = dati;
       })
@@ -511,7 +535,7 @@ export default function GameChampionshipView() {
     if (tipo === 'gara') {
       setStatoGriglia('caricamento');
       ottieniToken()
-        .then((token) => getGrigliaPartenza(circuitoSlug, token))
+        .then((token) => getGrigliaPartenza(CIRCUITO_SLUG, token))
         .then((dati) => {
           setGrigliaInfo(dati);
           setStatoGriglia('pronto');
@@ -529,18 +553,24 @@ export default function GameChampionshipView() {
   }
 
   function abbandonaSessione() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
     setFase('selezione');
   }
 
-  /**
-   * Collega un pulsante su schermo allo stesso inputRef già usato dalla
-   * tastiera: stesso "campo" (accelera/frena/sterzaSinistra/sterzaDestra),
-   * quindi la fisica non sa né le importa da dove arriva l'input. Gestisce
-   * sia touch che mouse (comodo anche su desktop, e utile per testare):
-   * preventDefault evita che il touch generi anche un click sintetico
-   * dopo, che raddoppierebbe l'input, e blocca lo scroll/zoom della pagina
-   * mentre si tocca il pulsante.
-   */
+  function attivaSchermoIntero() {
+    const elemento = containerRef.current;
+    if (elemento && elemento.requestFullscreen) {
+      elemento.requestFullscreen().catch((errore) => console.error('Errore entrando in fullscreen:', errore));
+    }
+  }
+  function disattivaSchermoIntero() {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
   function gestoriPulsanteControllo(campo) {
     const imposta = (valore) => (evento) => {
       evento.preventDefault();
@@ -556,8 +586,6 @@ export default function GameChampionshipView() {
     };
   }
 
-  // Gara: comportamento invariato da prima — esattamente GIRI_GARA giri,
-  // tempo totale = somma di tutti, sempre inviato (se loggato).
   function concludiGara(tempoTotaleSecondi) {
     const telemetria = [...telemetriaRef.current];
     setRisultatoFinale({ tempoTotale: tempoTotaleSecondi });
@@ -565,20 +593,13 @@ export default function GameChampionshipView() {
     inviaERicaricaClassifica(tempoTotaleSecondi, telemetria);
   }
 
-  // Qualifica: il tempo limite è scaduto (o si può chiamare comunque a
-  // fine sessione). Prende il MIGLIOR giro valido tra quelli fatti e lo
-  // invia come se fosse l'unico giro della sessione — se non c'è
-  // nessun giro valido, non c'è nulla da inviare (esito "nessun-tempo",
-  // non un errore: è normale se non si completa nemmeno un giro pulito
-  // entro il tempo limite).
   function concludiQualifica() {
     const migliore = trovaMigliorGiroValido(giriCompletatiRef.current);
-
     setFase('riepilogo');
     if (migliore === null) {
       setRisultatoFinale({ tempoTotale: null });
       setStatoInvio('nessun-tempo');
-      caricaClassificaCircuito(); // niente da inviare, ma la classifica va comunque mostrata
+      caricaClassificaCircuito();
       return;
     }
     setRisultatoFinale({ tempoTotale: migliore.tempo });
@@ -586,12 +607,12 @@ export default function GameChampionshipView() {
   }
 
   async function inviaERicaricaClassifica(tempoTotaleSecondi, checkpoint) {
-    if (tipoSessione === 'prove_libere') return; // mai inviato, per scelta
+    if (tipoSessione === 'prove_libere') return;
 
     setStatoInvio('invio');
     try {
       const token = await ottieniToken();
-      const risposta = await inviaTempoGioco(circuitoSlug, tipoSessione, tempoTotaleSecondi, checkpoint, token);
+      const risposta = await inviaTempoGioco(CIRCUITO_SLUG, tipoSessione, tempoTotaleSecondi, checkpoint, token);
       if (risposta.motivo_rifiuto === 'login_richiesto') {
         setStatoInvio('login-richiesto');
       } else {
@@ -608,13 +629,13 @@ export default function GameChampionshipView() {
 
   function caricaClassificaCircuito() {
     setStatoClassificaCircuito('caricamento');
-    getClassificaTempiCircuito(circuitoSlug, 10)
+    getClassificaTempiCircuito(CIRCUITO_SLUG, 10)
       .then((dati) => {
         setClassificaCircuito(dati);
         setStatoClassificaCircuito(dati ? 'pronto' : 'errore');
       })
       .catch((errore) => {
-        console.error('Errore nel caricare la classifica del circuito:', errore);
+        console.error('Errore nel caricare la classifica:', errore);
         setStatoClassificaCircuito('errore');
       });
   }
@@ -631,81 +652,72 @@ export default function GameChampionshipView() {
   function renderContenuto() {
     if (fase === 'in-pista') {
       const tempoRimastoQualifica = Math.max(0, LIMITE_TEMPO_QUALIFICA_SECONDI - hud.tempoTrascorso);
+      const desktopFullscreenImmersivo = schermoIntero && !haTouch;
+
       return (
-        <div className="game-championship-view__in-pista">
-          <div className="game-championship-view__hud">
-            <span>{schedaCircuito?.nome} &mdash; {ETICHETTA_SESSIONE[tipoSessione]}</span>
-            {tipoSessione === 'qualifica' ? (
-              <span className="tab-num">Tempo rimasto: {formattaTempo(tempoRimastoQualifica)}</span>
-            ) : (
-              <span className="tab-num">{formattaTempo(hud.tempoTrascorso)}</span>
-            )}
-            <span className="tab-num">{tipoSessione === 'gara' ? `Giro ${hud.giro}/${GIRI_GARA}` : `Giro ${hud.giro}`}</span>
-            <span className="tab-num">{hud.velocitaKmh} km/h</span>
-            <span className={hud.suErba ? 'game-championship-view__su-erba' : ''}>
-              {hud.suErba ? 'SULL\u2019ERBA' : ''}
-            </span>
-          </div>
+        <div
+          ref={containerRef}
+          className={`game-championship-view__pov-container ${schermoIntero ? 'game-championship-view__pov-container--schermo-intero' : ''}`}
+        >
+          <canvas ref={canvasRef} className="game-championship-view__canvas-3d" />
 
-          <div className="game-championship-view__area-pista">
-            <canvas
-              ref={canvasRef}
-              width={LARGHEZZA_CANVAS}
-              height={ALTEZZA_CANVAS}
-              className="game-championship-view__canvas"
-            />
+          {!desktopFullscreenImmersivo && (
+            <div className="game-championship-view__hud-pov">
+              <span>{CIRCUITO_NOME} &mdash; {ETICHETTA_SESSIONE[tipoSessione]}</span>
+              {tipoSessione === 'qualifica' ? (
+                <span className="tab-num">Tempo rimasto: {formattaTempo(tempoRimastoQualifica)}</span>
+              ) : (
+                <span className="tab-num">{formattaTempo(hud.tempoTrascorso)}</span>
+              )}
+              <span className="tab-num">{tipoSessione === 'gara' ? `Giro ${hud.giro}/${GIRI_GARA}` : `Giro ${hud.giro}`}</span>
+              <span className="tab-num">{hud.velocitaKmh} km/h</span>
+              {hud.zona !== 'pista' && (
+                <span className="game-championship-view__zona-avviso">{ETICHETTA_ZONA[hud.zona]}</span>
+              )}
+            </div>
+          )}
 
-            {!semaforoVia && (
-              <div className="game-championship-view__semaforo-overlay">
-                <div className="game-championship-view__semaforo">
-                  {Array.from({ length: NUMERO_LUCI }, (_, indice) => indice + 1).map((n) => (
-                    <span
-                      key={n}
-                      className={`game-championship-view__luce ${n <= numeroLuciAccese ? 'game-championship-view__luce--accesa' : ''}`}
-                    />
-                  ))}
-                </div>
-                {tipoSessione === 'gara' && (
-                  <p className="game-championship-view__griglia-info">
-                    {statoGriglia === 'caricamento' && 'Carico la griglia di partenza...'}
-                    {statoGriglia === 'pronto' && grigliaInfo && (
-                      grigliaInfo.posizione
-                        ? `Griglia: P${grigliaInfo.posizione} di ${grigliaInfo.piloti_totali}`
-                        : 'Nessun tempo di qualifica qui: parti dal fondo dello schieramento'
-                    )}
-                    {' \u2014 '}
-                    {GIRI_GARA} giri da percorrere
-                  </p>
-                )}
-                {tipoSessione === 'qualifica' && (
-                  <p className="game-championship-view__griglia-info">
-                    Hai {Math.round(LIMITE_TEMPO_QUALIFICA_SECONDI / 60)} minuti per il tuo giro migliore
-                  </p>
-                )}
+          {!semaforoVia && (
+            <div className="game-championship-view__semaforo-overlay-pov">
+              <div className="game-championship-view__semaforo-pov">
+                {Array.from({ length: NUMERO_LUCI }, (_, i) => i + 1).map((n) => (
+                  <span
+                    key={n}
+                    className={`game-championship-view__luce-pov ${n <= numeroLuciAccese ? 'game-championship-view__luce-pov--accesa' : ''}`}
+                  />
+                ))}
               </div>
-            )}
+              {tipoSessione === 'gara' && (
+                <p className="game-championship-view__griglia-info-pov">
+                  {statoGriglia === 'pronto' && grigliaInfo && (
+                    grigliaInfo.posizione
+                      ? `Griglia: P${grigliaInfo.posizione} di ${grigliaInfo.piloti_totali}`
+                      : 'Nessun tempo di qualifica: parti dal fondo dello schieramento'
+                  )}
+                  {' \u2014 '}{GIRI_GARA} giri
+                </p>
+              )}
+              {tipoSessione === 'qualifica' && (
+                <p className="game-championship-view__griglia-info-pov">
+                  Hai {formattaTempo(LIMITE_TEMPO_QUALIFICA_SECONDI)} per il tuo giro migliore
+                </p>
+              )}
+            </div>
+          )}
+          {mostraVia && <div className="game-championship-view__via-flash-pov">VIA!</div>}
 
-            {mostraVia && <div className="game-championship-view__via-flash">VIA!</div>}
-          </div>
-
-          {giriCompletati.length > 0 && (
-            <div className="game-championship-view__giri-lista-contenitore">
-              <p className="game-championship-view__giri-lista-titolo">Giri</p>
-              <ol className="game-championship-view__giri-lista">
-                {giriCompletati.map((giro) => {
+          {!desktopFullscreenImmersivo && giriCompletati.length > 0 && (
+            <div className="game-championship-view__giri-lista-pov-contenitore">
+              <ol className="game-championship-view__giri-lista-pov">
+                {giriCompletati.slice(-5).map((giro) => {
                   const colore = coloreGiro(giro, giriCompletati, mioRecordRef.current?.[tipoSessione]);
                   return (
                     <li
                       key={giro.numero}
-                      className={`game-championship-view__giro-voce ${colore ? `game-championship-view__giro-voce--${colore}` : ''}`}
+                      className={`game-championship-view__giro-voce-pov ${colore ? `game-championship-view__giro-voce-pov--${colore}` : ''}`}
                     >
-                      <span className="tab-num">Giro {giro.numero}</span>
-                      <span className="game-championship-view__giro-tempo">
-                        <span className="tab-num">{formattaTempo(giro.tempo)}</span>
-                        {giro.penalizzato && (
-                          <span className="game-championship-view__giro-penalita">+{PENALITA_TAGLIO_CURVA_SECONDI}s taglio curva</span>
-                        )}
-                      </span>
+                      <span className="tab-num">G{giro.numero}</span>
+                      <span className="tab-num">{formattaTempo(giro.tempo)}</span>
                     </li>
                   );
                 })}
@@ -713,68 +725,40 @@ export default function GameChampionshipView() {
             </div>
           )}
 
-          <div className="game-championship-view__istruzioni-controlli">
-            <p className="game-championship-view__istruzioni-titolo">Comandi da tastiera</p>
-            <ul className="game-championship-view__istruzioni-lista">
-              <li>
-                <kbd>&uarr;</kbd> <kbd>W</kbd> <span>Accelera</span>
-              </li>
-              <li>
-                <kbd>&darr;</kbd> <kbd>S</kbd> <span>Frena (retromarcia se sei già fermo)</span>
-              </li>
-              <li>
-                <kbd>&larr;</kbd> <kbd>A</kbd> <span>Sterza a sinistra</span>
-              </li>
-              <li>
-                <kbd>&rarr;</kbd> <kbd>D</kbd> <span>Sterza a destra</span>
-              </li>
-            </ul>
-            <p className="game-championship-view__istruzioni-touch-nota">
-              Da mobile o tablet: usa i pulsanti qui sotto al posto della tastiera.
-            </p>
-          </div>
+          {haTouch && (
+            <div className="game-championship-view__touch-pov">
+              <div className="game-championship-view__touch-pov-dpad">
+                <button type="button" className="game-championship-view__pulsante-pov" aria-label="Sterza a sinistra" {...gestoriPulsanteControllo('sterzaSinistra')}>&larr;</button>
+                <button type="button" className="game-championship-view__pulsante-pov" aria-label="Sterza a destra" {...gestoriPulsanteControllo('sterzaDestra')}>&rarr;</button>
+              </div>
+              <div className="game-championship-view__touch-pov-pedali">
+                <button type="button" className="game-championship-view__pulsante-pov game-championship-view__pulsante-pov--freno" aria-label="Freno" {...gestoriPulsanteControllo('frena')}>&darr;</button>
+                <button type="button" className="game-championship-view__pulsante-pov game-championship-view__pulsante-pov--gas" aria-label="Accelera" {...gestoriPulsanteControllo('accelera')}>&uarr;</button>
+              </div>
+            </div>
+          )}
 
-          <div className="game-championship-view__controlli-touch">
-            <div className="game-championship-view__controlli-touch-gruppo">
-              <button
-                type="button"
-                className="game-championship-view__pulsante-touch"
-                aria-label="Sterza a sinistra"
-                {...gestoriPulsanteControllo('sterzaSinistra')}
-              >
-                &larr;
-              </button>
-              <button
-                type="button"
-                className="game-championship-view__pulsante-touch"
-                aria-label="Sterza a destra"
-                {...gestoriPulsanteControllo('sterzaDestra')}
-              >
-                &rarr;
+          {!desktopFullscreenImmersivo && (
+            <div className="game-championship-view__controlli-pov">
+              {!schermoIntero && (
+                <button type="button" className="game-championship-view__bottone-fullscreen" onClick={attivaSchermoIntero}>
+                  Schermo intero
+                </button>
+              )}
+              {schermoIntero && haTouch && (
+                <button type="button" className="game-championship-view__bottone-fullscreen" onClick={disattivaSchermoIntero}>
+                  Esci da schermo intero
+                </button>
+              )}
+              <button type="button" className="game-championship-view__abbandona" onClick={abbandonaSessione}>
+                Abbandona
               </button>
             </div>
-            <div className="game-championship-view__controlli-touch-gruppo">
-              <button
-                type="button"
-                className="game-championship-view__pulsante-touch game-championship-view__pulsante-touch--freno"
-                aria-label="Frena o retromarcia"
-                {...gestoriPulsanteControllo('frena')}
-              >
-                &darr;
-              </button>
-              <button
-                type="button"
-                className="game-championship-view__pulsante-touch game-championship-view__pulsante-touch--gas"
-                aria-label="Accelera"
-                {...gestoriPulsanteControllo('accelera')}
-              >
-                &uarr;
-              </button>
-            </div>
-          </div>
-          <button type="button" className="game-championship-view__abbandona" onClick={abbandonaSessione}>
-            Abbandona
-          </button>
+          )}
+
+          {schermoIntero && haTouch && orientamentoPortrait && (
+            <div className="game-championship-view__invito-ruotare">Ruota il telefono in orizzontale per giocare</div>
+          )}
         </div>
       );
     }
@@ -785,7 +769,7 @@ export default function GameChampionshipView() {
           <GlassPanel className="game-championship-view__panel game-championship-view__riepilogo">
             {nuovoRecord && <span className="badge game-championship-view__badge-record">Nuovo record personale!</span>}
             <span className="game-championship-view__riepilogo-etichetta">
-              {ETICHETTA_SESSIONE[tipoSessione]} &mdash; {schedaCircuito?.nome}
+              {ETICHETTA_SESSIONE[tipoSessione]} &mdash; {CIRCUITO_NOME}
             </span>
             <span className="game-championship-view__riepilogo-tempo tab-num">
               {formattaTempo(risultatoFinale?.tempoTotale)}
@@ -795,9 +779,7 @@ export default function GameChampionshipView() {
               <p className="game-championship-view__esito">Prove Libere: nessun tempo salvato, solo allenamento.</p>
             )}
             {statoInvio === 'nessun-tempo' && (
-              <p className="game-championship-view__esito">
-                Nessun giro valido entro il tempo limite &mdash; riprova, magari con più calma sui cordoli.
-              </p>
+              <p className="game-championship-view__esito">Nessun giro completato entro il tempo limite &mdash; riprova.</p>
             )}
             {statoInvio === 'salvato' && <p className="game-championship-view__esito game-championship-view__esito--ok">Tempo salvato ufficialmente.</p>}
             {statoInvio === 'non-salvato' && (
@@ -822,14 +804,14 @@ export default function GameChampionshipView() {
                 Rigioca
               </button>
               <button type="button" className="game-championship-view__torna-selezione" onClick={() => setFase('selezione')}>
-                &larr; Cambia circuito o sessione
+                &larr; Cambia sessione
               </button>
             </div>
           </GlassPanel>
 
           {tipoSessione !== 'prove_libere' && (
             <GlassPanel className="game-championship-view__panel game-championship-view__classifica">
-              <h3 className="game-championship-view__classifica-titolo">Classifica &mdash; {schedaCircuito?.nome}</h3>
+              <h3 className="game-championship-view__classifica-titolo">Classifica &mdash; {CIRCUITO_NOME}</h3>
               {statoClassificaCircuito === 'caricamento' && <p className="game-championship-view__classifica-stato">Carico la classifica...</p>}
               {statoClassificaCircuito === 'errore' && <p className="game-championship-view__classifica-stato">Non riesco a mostrare la classifica ora.</p>}
               {statoClassificaCircuito === 'pronto' && classificaCircuito && (
@@ -857,47 +839,20 @@ export default function GameChampionshipView() {
       <>
         <header className="game-championship-view__header">
           <h1 className="game-championship-view__titolo">
-            MONOPOSTO <span className="game-championship-view__titolo-accento">TIME ATTACK</span>
+            <span className="game-championship-view__titolo-accento">BRIANZA SPEED RING</span> TIME ATTACK
           </h1>
           <p className="game-championship-view__sottotitolo">
-            Un giro cronometrato sulla Monoposto Virtual Arena. Scegli un circuito reale dal nostro archivio (ne
-            influenza solo la lunghezza dei rettilinei, non la forma) e mettiti alla prova.
+            Un giro in prima persona sul Brianza Speed Ring, liberamente ispirato a Monza (non una ricostruzione
+            fedele). Consigliato lo schermo intero, soprattutto da mobile.
           </p>
           <p className="game-championship-view__nota-login">
             {utente
               ? 'Sei connesso: i tempi di Qualifica e Gara verranno salvati e conteranno per il Campionato.'
-              : 'Puoi giocare senza account (anche le Prove Libere sono sempre gratuite): accedi dalla barra in alto per salvare tempi ufficiali.'}
+              : 'Puoi giocare senza account (le Prove Libere sono sempre gratuite): accedi dalla barra in alto per salvare tempi ufficiali.'}
           </p>
         </header>
 
         <GlassPanel className="game-championship-view__panel game-championship-view__selezione">
-          <label className="game-championship-view__campo">
-            <span>Circuito</span>
-            {statoCircuiti === 'caricamento' && <p className="game-championship-view__classifica-stato">Carico i circuiti...</p>}
-            {statoCircuiti === 'errore' && <p className="game-championship-view__classifica-stato">Non riesco a caricare l&rsquo;elenco dei circuiti.</p>}
-            {statoCircuiti === 'pronto' && (
-              <select
-                className="game-championship-view__select"
-                value={circuitoSlug}
-                onChange={(evento) => setCircuitoSlug(evento.target.value)}
-              >
-                <option value="">Scegli un circuito&hellip;</option>
-                {circuiti.map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
-            )}
-          </label>
-
-          {statoScheda === 'pronto' && schedaCircuito?.lunghezza_km && (
-            <p className="game-championship-view__nota-circuito">
-              {schedaCircuito.nome} &mdash; {schedaCircuito.lunghezza_km} km nella realtà: rettilinei più lunghi del
-              solito su questa pista.
-            </p>
-          )}
-
           <div className="game-championship-view__campo">
             <span>Sessione</span>
             <div className="game-championship-view__sessioni">
@@ -915,27 +870,21 @@ export default function GameChampionshipView() {
           </div>
 
           <ul className="game-championship-view__regole-lista">
-            <li>
-              Puoi uscire di pista fino al {Math.round(TOLLERANZA_FUORI_PISTA_FRAZIONE * 100)}% della larghezza
-              della strada senza conseguenze.
-            </li>
-            <li>Oltre quel margine sei sull&rsquo;erba: velocità massima ridotta dell&rsquo;{Math.round((1 - RIDUZIONE_VELOCITA_ERBA) * 100)}%.</li>
-            <li>
-              Un giro è valido se passi tutti i checkpoint; se durante il giro finisci sull&rsquo;erba (taglio di
-              curva), quel giro riceve una penalità di +{PENALITA_TAGLIO_CURVA_SECONDI}s.
-            </li>
+            <li>Un cordolo sotto una ruota rallenta del 10%, sotto due ruote del 25%.</li>
+            <li>Oltre i cordoli con più di due ruote sei sull&rsquo;erba: -80% di velocità.</li>
+            <li>Muri di contenimento oltre l&rsquo;erba: l&rsquo;auto non può uscirne. Niente retromarcia.</li>
             {tipoSessione === 'qualifica' && (
               <li>
-                Qualifica: hai <strong>{formattaTempo(LIMITE_TEMPO_QUALIFICA_SECONDI)}</strong> a partire dal semaforo
-                verde per fare tutti i giri che vuoi — conta solo il migliore (tempo di penalità incluso).
+                Qualifica: hai <strong>{formattaTempo(LIMITE_TEMPO_QUALIFICA_SECONDI)}</strong> dal semaforo verde per
+                il tuo giro migliore.
               </li>
             )}
+            {tipoSessione === 'gara' && <li>Gara: {GIRI_GARA} giri, si parte in griglia secondo il tempo di Qualifica.</li>}
           </ul>
 
           <button
             type="button"
             className="game-championship-view__bottone-primario"
-            disabled={!schedaCircuito}
             onClick={() => iniziaSessione(tipoSessione)}
           >
             Vai in pista

@@ -108,7 +108,13 @@ CREATE TABLE circuiti (
     google_maps_url     TEXT,
     storia              TEXT,                          -- testo libero, oggi scritto a mano solo per i 7 circuiti del 1950
     url_wikipedia       TEXT,
-    creato_il           TIMESTAMPTZ NOT NULL DEFAULT now()
+    creato_il           TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- true per un tracciato inventato usato solo dal gioco Time Attack
+    -- (es. Brianza Speed Ring, liberamente ispirato a Monza ma non una
+    -- ricostruzione fedele) — mai esistito davvero, escluso di proposito
+    -- dall'archivio storico pubblico (/circuiti, /circuiti/:slug), non
+    -- dagli endpoint del gioco stesso, che devono continuare a vederlo.
+    fittizio            BOOLEAN NOT NULL DEFAULT false
 );
 CREATE INDEX idx_circuiti_nome ON circuiti (nome);
 

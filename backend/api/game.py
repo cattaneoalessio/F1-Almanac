@@ -15,7 +15,7 @@ duplicare la fisica del gioco lato server (fuori scope qui).
 """
 
 CHECKPOINT_PER_GIRO = 4  # 3 intermedi (indice 0,1,2) + 1 traguardo (indice 3)
-GIRI_PER_SESSIONE = {"qualifica": 1, "gara": 3}
+GIRI_PER_SESSIONE = {"qualifica": 1, "gara": 10}  # Gara: 10 giri fissi, richiesta esplicita dell'utente
 
 # Soglia fisica minima per un singolo giro sulla pista generica. Valore di
 # partenza ragionevole (la pista base è breve), non calibrato su un vero

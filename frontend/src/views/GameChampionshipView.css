@@ -128,271 +128,177 @@
   font-family: var(--font-display);
 }
 
-/* --- In pista --- */
+/* --- In pista: motore pseudo-3D --- */
 
-.game-championship-view__in-pista {
-  max-width: 940px;
+.game-championship-view__pov-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-width: 1100px;
   margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b0c10;
+  border: 1px solid var(--line);
+}
+.game-championship-view__pov-container--schermo-intero {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  aspect-ratio: auto;
+  border-radius: 0;
+  border: none;
 }
 
-.game-championship-view__hud {
+.game-championship-view__canvas-3d {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.game-championship-view__hud-pov {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  right: 0.6rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 1.2rem;
-  align-items: baseline;
+  gap: 1rem;
   font-family: var(--font-display);
   font-size: 0.85rem;
-  color: var(--text-gray);
+  color: var(--text-primary);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
 }
-.game-championship-view__hud .tab-num {
+.game-championship-view__hud-pov .tab-num {
   color: var(--accent-gold);
-  font-size: 1rem;
 }
-.game-championship-view__su-erba {
+.game-championship-view__zona-avviso {
   color: var(--accent-red);
   font-weight: 800;
 }
 
-.game-championship-view__canvas {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 3 / 2;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #16241a;
-  display: block;
-}
-
-/* Wrapper posizionato: serve solo da ancora per il semaforo/flash "VIA!"
-   sovrapposti al canvas, senza toccarne le dimensioni. */
-.game-championship-view__area-pista {
-  position: relative;
-}
-
-/* --- Semaforo di partenza --- */
-
-.game-championship-view__semaforo-overlay {
+/* --- Semaforo: piccolo, in alto al centro, non copre mai la pista sotto
+   (lascia libera la fascia centrale/bassa) né l'abitacolo in fondo. --- */
+.game-championship-view__semaforo-overlay-pov {
   position: absolute;
-  inset: 0;
+  top: 0.8rem;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  background: rgba(11, 12, 16, 0.55);
-  border-radius: 8px;
+  gap: 0.4rem;
+  pointer-events: none;
 }
-
-.game-championship-view__semaforo {
+.game-championship-view__semaforo-pov {
   display: flex;
-  gap: 0.8rem;
-  padding: 0.8rem 1.4rem;
-  background: #0b0c10;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  background: rgba(11, 12, 16, 0.7);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
 }
-
-.game-championship-view__luce {
-  width: 28px;
-  height: 28px;
+.game-championship-view__luce-pov {
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: rgba(232, 67, 46, 0.15);
   border: 1px solid rgba(232, 67, 46, 0.4);
-  transition: background 0.1s ease;
 }
-.game-championship-view__luce--accesa {
+.game-championship-view__luce-pov--accesa {
   background: var(--accent-red);
-  box-shadow: 0 0 12px rgba(232, 67, 46, 0.7);
+  box-shadow: 0 0 8px rgba(232, 67, 46, 0.7);
 }
-
-.game-championship-view__griglia-info {
+.game-championship-view__griglia-info-pov {
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--text-primary);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
   text-align: center;
-  padding: 0 1rem;
+  margin: 0;
+  padding: 0 0.6rem;
 }
 
-.game-championship-view__via-flash {
+.game-championship-view__via-flash-pov {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
-  font-size: clamp(2.5rem, 8vw, 4rem);
+  font-size: clamp(2rem, 7vw, 3.5rem);
   font-weight: 900;
   color: var(--accent-cyan);
   text-shadow: 0 0 20px rgba(63, 208, 255, 0.6);
   pointer-events: none;
-  animation: game-championship-view-via-dissolvenza 0.7s ease-out forwards;
+  animation: game-championship-view-via-dissolvenza-pov 0.7s ease-out forwards;
 }
-@keyframes game-championship-view-via-dissolvenza {
-  0% {
-    opacity: 1;
-    transform: scale(0.9);
-  }
-  20% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.1);
-  }
+@keyframes game-championship-view-via-dissolvenza-pov {
+  0% { opacity: 1; transform: scale(0.9); }
+  20% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.1); }
 }
 
-/* --- Cronologia giri: verde/viola non fanno parte della palette
-   rosso/oro/ciano del resto del sito — aggiunti apposta qui, sono la
-   convenzione F1 per i tempi sul giro (viola = record assoluto, verde =
-   migliore della sessione) e non hanno un sostituto ragionevole tra i
-   colori già esistenti senza perdere la distinzione tra i due. */
-.game-championship-view__giri-lista-contenitore {
-  max-width: 420px;
-  margin: 0 auto;
+/* --- Cronologia giri: solo gli ultimi 5, compatta, angolo in alto a
+   destra (non copre né la pista né l'abitacolo). --- */
+.game-championship-view__giri-lista-pov-contenitore {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  pointer-events: none;
 }
-
-.game-championship-view__giri-lista-titolo {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-gray);
-  margin-bottom: 0.4rem;
-}
-
-.game-championship-view__giri-lista {
+.game-championship-view__giri-lista-pov {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  max-height: 160px;
-  overflow-y: auto;
+  gap: 0.1rem;
+  align-items: flex-end;
 }
-
-.game-championship-view__giro-voce {
+.game-championship-view__giro-voce-pov {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 0.3rem 0.6rem;
-  border-radius: 4px;
-  font-size: 0.82rem;
+  gap: 0.5rem;
+  font-size: 0.72rem;
   color: var(--text-primary);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
-.game-championship-view__giro-voce--verde {
+.game-championship-view__giro-voce-pov--verde {
   color: #4ade80;
 }
-.game-championship-view__giro-voce--viola {
+.game-championship-view__giro-voce-pov--viola {
   color: #c084fc;
 }
 
-.game-championship-view__giro-tempo {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-.game-championship-view__giro-penalita {
-  font-size: 0.68rem;
-  color: var(--accent-red);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.game-championship-view__istruzioni-controlli {
-  max-width: 420px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.game-championship-view__istruzioni-titolo {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-gray);
-  margin-bottom: 0.5rem;
-}
-
-.game-championship-view__istruzioni-lista {
-  list-style: none;
-  margin: 0 0 0.6rem;
-  padding: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem 1rem;
-  font-size: 0.8rem;
-  color: var(--text-primary);
-}
-.game-championship-view__istruzioni-lista li {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-@media (max-width: 480px) {
-  .game-championship-view__istruzioni-lista {
-    grid-template-columns: 1fr;
-  }
-}
-
-.game-championship-view__istruzioni-lista kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.4rem;
-  height: 1.4rem;
-  padding: 0 0.3rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg-card);
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  color: var(--accent-cyan);
-}
-
-.game-championship-view__istruzioni-touch-nota {
-  font-size: 0.72rem;
-  color: var(--text-gray);
-  margin: 0;
-}
-
-/* --- Pulsanti touch: sterzo a sinistra, gas/freno a destra (schema
-   classico dei giochi di guida mobile). Visibili di default — mostrarli
-   solo su una media query "è per forza un touch" rischierebbe di
-   lasciare qualche dispositivo scoperto; li nascondiamo invece nel
-   caso opposto, quando c'è di sicuro un mouse col hover, l'unico caso
-   in cui sappiamo con certezza che non servono. */
-.game-championship-view__controlli-touch {
+/* --- Controlli touch: D-pad a sinistra, pedali a destra, overlay
+   trasparente sul canvas — schema richiesto esplicitamente. --- */
+.game-championship-view__touch-pov {
+  position: absolute;
+  bottom: 0.8rem;
+  left: 0.8rem;
+  right: 0.8rem;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  max-width: 940px;
-  margin: 0 auto;
+  align-items: flex-end;
+  pointer-events: none;
 }
-@media (pointer: fine) and (hover: hover) {
-  .game-championship-view__controlli-touch {
-    display: none;
-  }
-}
-
-.game-championship-view__controlli-touch-gruppo {
+.game-championship-view__touch-pov-dpad,
+.game-championship-view__touch-pov-pedali {
   display: flex;
-  gap: 0.7rem;
+  gap: 0.6rem;
+  pointer-events: auto;
 }
 
-.game-championship-view__pulsante-touch {
-  width: 64px;
-  height: 64px;
-  flex-shrink: 0;
+.game-championship-view__pulsante-pov {
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(11, 12, 16, 0.55);
   color: var(--text-primary);
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -403,20 +309,66 @@
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.game-championship-view__pulsante-touch:active {
+.game-championship-view__pulsante-pov:active {
   background: var(--accent-gold);
   border-color: var(--accent-gold);
   color: #2a1f04;
 }
-.game-championship-view__pulsante-touch--gas:active {
+.game-championship-view__pulsante-pov--gas:active {
   background: var(--accent-cyan);
   border-color: var(--accent-cyan);
   color: #04131a;
 }
-.game-championship-view__pulsante-touch--freno:active {
+.game-championship-view__pulsante-pov--freno:active {
   background: var(--accent-red);
   border-color: var(--accent-red);
   color: #fff;
+}
+
+/* --- Controlli (fullscreen/abbandona): nascosti del tutto in
+   fullscreen desktop (solo tastiera, come richiesto esplicitamente),
+   sempre visibili altrove. --- */
+.game-championship-view__controlli-pov {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  gap: 0.5rem;
+}
+.game-championship-view__pov-container--schermo-intero .game-championship-view__controlli-pov {
+  top: auto;
+  bottom: 0.8rem;
+  right: 50%;
+  transform: translateX(50%);
+}
+
+.game-championship-view__bottone-fullscreen {
+  background: rgba(11, 12, 16, 0.6);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text-gray);
+  font-size: 0.72rem;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+.game-championship-view__bottone-fullscreen:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.game-championship-view__invito-ruotare {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  background: rgba(11, 12, 16, 0.92);
+  z-index: 5;
 }
 
 .game-championship-view__abbandona {
