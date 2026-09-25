@@ -192,6 +192,90 @@ export function indiciCheckpoint() {
 }
 
 /**
+ * Forma del circuito vista dall'alto, per la minimappa — non è la
+ * stessa proiezione usata per il rendering in pista (quella è
+ * pseudo-3D: "curva" vi rappresenta una deriva laterale per il
+ * disegno, non un vero angolo di svolta dall'alto). Presa alla
+ * lettera come angolo vero, la sequenza di curvature di questo
+ * tracciato produce una forma che si autointerseca (verificato con
+ * più fattori di scala: non è un problema di taratura ma di
+ * sequenza — l'angolo cumulativo oscilla avanti e indietro invece di
+ * girare in un verso solo). Una forma dall'alto semplice e chiusa
+ * richiede che l'angolo cumulativo percorra esattamente un giro
+ * completo (360°) in un verso coerente: qui gli angoli di svolta sono
+ * scelti apposta per la minimappa (non derivati dalla curvatura),
+ * proporzionali alla lunghezza reale di ciascuna curva così che il
+ * "peso" visivo di ognuna resti coerente con quanto dura in pista.
+ * Le LUNGHEZZE dei tratti restano invece identiche a
+ * costruisciBrianzaSpeedRing, cruciale perché un indice di segmento
+ * indichi lo stesso punto del giro in entrambe le rappresentazioni
+ * (checkpoint, posizione auto). Normalizzata in un quadrato 0..1 (il
+ * lato più lungo tocca 0 e 1), un punto per segmento.
+ */
+function calcolaFormaMinimappa(segmenti) {
+  // Stessa somma delle coppie di tratti curvi in
+  // costruisciBrianzaSpeedRing: [45+18, 35+20, 15+12, 40+22, 32, 38].
+  const LUNGHEZZE_CURVE = [63, 55, 27, 62, 32, 38];
+  const sommaLunghezzeCurve = LUNGHEZZE_CURVE.reduce((a, b) => a + b, 0);
+  const angoliCurve = LUNGHEZZE_CURVE.map((l) => (360 * l) / sommaLunghezzeCurve);
+
+  const tratti = [
+    { lunghezza: 65, angolo: 0 }, // rettilineo partenza/traguardo
+    { lunghezza: LUNGHEZZE_CURVE[0], angolo: angoliCurve[0] },
+    { lunghezza: 25, angolo: 0 },
+    { lunghezza: LUNGHEZZE_CURVE[1], angolo: angoliCurve[1] },
+    { lunghezza: 30, angolo: 0 },
+    { lunghezza: 70, angolo: 0 }, // secondo rettilineo
+    { lunghezza: LUNGHEZZE_CURVE[2], angolo: angoliCurve[2] }, // chicane, trattata come un'unica curva qui
+    { lunghezza: LUNGHEZZE_CURVE[3], angolo: angoliCurve[3] },
+    { lunghezza: 28, angolo: 0 },
+    { lunghezza: LUNGHEZZE_CURVE[4], angolo: angoliCurve[4] },
+    { lunghezza: 55, angolo: 0 },
+    { lunghezza: LUNGHEZZE_CURVE[5], angolo: angoliCurve[5] }, // ultima curva
+    { lunghezza: 25, angolo: 0 }, // rientro
+  ];
+
+  let angolo = 0;
+  let x = 0;
+  let y = 0;
+  const punti = [{ x, y }];
+  for (const tratto of tratti) {
+    const angoloRadTotale = (tratto.angolo * Math.PI) / 180;
+    for (let i = 0; i < tratto.lunghezza; i++) {
+      angolo += angoloRadTotale / tratto.lunghezza;
+      x += Math.cos(angolo);
+      y += Math.sin(angolo);
+      punti.push({ x, y });
+    }
+  }
+  punti.pop(); // l'ultimo torna a coincidere (quasi esattamente: un giro pieno) col primo — un punto per segmento, non uno in più
+
+  const puntoIniziale = punti[0];
+  const puntoFinale = punti[punti.length - 1];
+  // Piccola correzione residua (l'angolo torna esatto a 360°, ma un
+  // minimo scarto di posizione resta per via degli arrotondamenti):
+  // stessa tecnica di chiudiIlGiroInPosizione, distribuita lungo tutto
+  // il giro invece che un salto netto al traguardo.
+  const deltaX = puntoFinale.x - puntoIniziale.x;
+  const deltaY = puntoFinale.y - puntoIniziale.y;
+  const puntiChiusi = [];
+  for (let i = 0; i < segmenti.length; i++) {
+    const t = i / segmenti.length;
+    puntiChiusi.push({ x: punti[i].x - deltaX * t, y: punti[i].y - deltaY * t });
+  }
+  const xs = puntiChiusi.map((p) => p.x);
+  const ys = puntiChiusi.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const scala = Math.max(maxX - minX, maxY - minY) || 1;
+  return puntiChiusi.map((p) => ({ x: (p.x - minX) / scala, y: (p.y - minY) / scala }));
+}
+
+export const FORMA_MINIMAPPA = calcolaFormaMinimappa(BRIANZA_SPEED_RING);
+
+/**
  * Il segmento ASSOLUTO (mai wrapped, cresce a ogni giro) a cui si trova
  * il checkpoint `indiceCheckpoint` (0-2 = intermedi, 3 = traguardo) del
  * giro `numeroGiro` (1-based). Il traguardo è un caso a parte: non è

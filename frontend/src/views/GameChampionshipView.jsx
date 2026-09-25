@@ -12,8 +12,11 @@ import {
 import {
   calcolaSegmentiVisibili,
   CARTELLI_CURVA,
+  FORMA_MINIMAPPA,
+  indiciCheckpoint,
   LARGHEZZA_PISTA,
   LUNGHEZZA_SEGMENTO,
+  NUMERO_SEGMENTI_TOTALE,
   proietta,
   segmentoA,
   controllaCatturaCheckpointSegmento,
@@ -135,6 +138,7 @@ export default function GameChampionshipView() {
 
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
+  const minimappaRef = useRef(null);
   const requestIdRef = useRef(null);
   const inputRef = useRef({ accelera: false, frena: false, sterzaSinistra: false, sterzaDestra: false });
   const statoAutoRef = useRef(statoIniziale());
@@ -148,6 +152,11 @@ export default function GameChampionshipView() {
   const mioRecordRef = useRef({ qualifica: null, gara: null });
   const ultimoAggiornamentoHudRef = useRef(0);
   const angoloVolanteRef = useRef(0);
+  // Tempi intermedi (S1/S2/S3) del giro IN CORSO, per la minimappa —
+  // aggiornati solo quando un checkpoint viene catturato, non ad ogni
+  // fotogramma (vedi il punto in cui telemetriaRef viene aggiornato).
+  const tempiIntermediGiroRef = useRef([null, null, null]);
+  const [tempiIntermedi, setTempiIntermedi] = useState([null, null, null]);
   // Scuotimento smorzato: un nuovo bersaglio casuale solo ogni ~70ms,
   // interpolato morbidamente fotogramma per fotogramma — un valore
   // casuale puro a OGNI fotogramma (versione precedente) sembrava uno
@@ -274,6 +283,12 @@ export default function GameChampionshipView() {
       if (larghezzaCss === 0 || altezzaCss === 0) return;
       canvas.width = Math.round(larghezzaCss * rapportoPixel);
       canvas.height = Math.round(altezzaCss * rapportoPixel);
+
+      const minimappa = minimappaRef.current;
+      if (minimappa && minimappa.clientWidth > 0 && minimappa.clientHeight > 0) {
+        minimappa.width = Math.round(minimappa.clientWidth * rapportoPixel);
+        minimappa.height = Math.round(minimappa.clientHeight * rapportoPixel);
+      }
     }
     ridimensiona();
     window.addEventListener('resize', ridimensiona);
@@ -385,6 +400,71 @@ export default function GameChampionshipView() {
       ctx.fillStyle = '#d9a441';
       ctx.font = `600 ${Math.round(altezzaBox * 0.3)}px monospace`;
       ctx.fillText(`${Math.round(velocitaKmh)} km/h`, x + larghezzaBox * 0.65, y + altezzaBox * 0.52);
+    }
+
+    /**
+     * Minimappa: sagoma del circuito (FORMA_MINIMAPPA, vista dall'alto
+     * stilizzata), partenza/traguardo, i 3 checkpoint intermedi e la
+     * posizione live dell'auto — su un canvas SEPARATO dal 3D
+     * principale (più semplice: niente da mescolare con la
+     * prospettiva/scuotimento del gioco).
+     */
+    function disegnaMinimappa(ctx, larghezza, altezza, segmentoAutoFrazionale) {
+      ctx.clearRect(0, 0, larghezza, altezza);
+      const pad = larghezza * 0.14;
+      const scalaX = larghezza - pad * 2;
+      const scalaY = altezza - pad * 2;
+      const puntoSchermo = (p) => ({ x: pad + p.x * scalaX, y: pad + p.y * scalaY });
+
+      ctx.fillStyle = 'rgba(8,10,14,0.6)';
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(0, 0, larghezza, altezza, larghezza * 0.12);
+        ctx.fill();
+      } else {
+        ctx.fillRect(0, 0, larghezza, altezza);
+      }
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = Math.max(1.5, larghezza * 0.022);
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      FORMA_MINIMAPPA.forEach((p, i) => {
+        const s = puntoSchermo(p);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+
+      const checkpoints = indiciCheckpoint();
+      ctx.fillStyle = '#d9a441';
+      for (let i = 0; i < 3; i++) {
+        const s = puntoSchermo(FORMA_MINIMAPPA[checkpoints[i]]);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, Math.max(2, larghezza * 0.03), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const sPartenza = puntoSchermo(FORMA_MINIMAPPA[0]);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sPartenza.x, sPartenza.y, Math.max(2.5, larghezza * 0.034), 0, Math.PI * 2);
+      ctx.fill();
+
+      const i0 = Math.floor(segmentoAutoFrazionale) % NUMERO_SEGMENTI_TOTALE;
+      const i1 = (i0 + 1) % NUMERO_SEGMENTI_TOTALE;
+      const frazione = segmentoAutoFrazionale - Math.floor(segmentoAutoFrazionale);
+      const p0 = FORMA_MINIMAPPA[i0];
+      const p1 = FORMA_MINIMAPPA[i1];
+      const sAuto = puntoSchermo({ x: p0.x + (p1.x - p0.x) * frazione, y: p0.y + (p1.y - p0.y) * frazione });
+      ctx.fillStyle = '#ff3b30';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, larghezza * 0.012);
+      ctx.beginPath();
+      ctx.arc(sAuto.x, sAuto.y, Math.max(3, larghezza * 0.045), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
 
     /** Linee del vento: oltre 200 km/h virtuali, segmenti bianchi
@@ -618,6 +698,13 @@ export default function GameChampionshipView() {
       disegnaLedCambio(ctx, W, frazioneVelocitaHud, performance.now());
       disegnaDisplay(ctx, W, velocitaKmhHud, frazioneVelocitaHud);
 
+      const minimappa = minimappaRef.current;
+      if (minimappa && minimappa.width > 0 && minimappa.height > 0) {
+        const ctxMinimappa = minimappa.getContext('2d');
+        const segmentoAutoFrazionale = auto.distanza / LUNGHEZZA_SEGMENTO;
+        disegnaMinimappa(ctxMinimappa, minimappa.width, minimappa.height, segmentoAutoFrazionale);
+      }
+
       const segmentoAuto = segmentoA(Math.floor(auto.distanza / LUNGHEZZA_SEGMENTO));
       const distanzaCamera = auto.distanza - DISTANZA_CAMERA_DIETRO;
       const segmentoCamera = segmentoA(Math.floor(distanzaCamera / LUNGHEZZA_SEGMENTO));
@@ -642,7 +729,7 @@ export default function GameChampionshipView() {
       // morbidamente) invece di un valore casuale puro a ogni
       // fotogramma, che sembrava uno sfarfallio/salto d'immagine più
       // che una vibrazione — specie evidente in curva.
-      const suSuperficieIrregolare = Boolean(auto.zona) && auto.zona !== 'pista';
+      const suSuperficieIrregolare = auto.zona === 'erba'; // niente vibrazione sul cordolo (richiesta esplicita dell'utente), resta solo sull'erba
       const velocitaAlta = frazioneVelocitaHud > 0.85;
       const intensitaScuotimento = (suSuperficieIrregolare ? 3 : 0) + (velocitaAlta ? 2.2 : 0);
       const adessoScuotimento = performance.now();
@@ -783,6 +870,16 @@ export default function GameChampionshipView() {
         const tSessione = adesso - tempoInizioRef.current;
         telemetriaRef.current.push({ giro: giroCorrenteRef.current, indice: checkpointAttesoRef.current, t: tSessione });
 
+        if (checkpointAttesoRef.current < 3) {
+          // S1/S2/S3 di QUESTO giro (indice 3 è il traguardo, gestito
+          // sotto come fine giro, non come intermedio): tempo dal via
+          // di questo giro, per il riquadro accanto alla minimappa.
+          const inizioGiroRelativoASessione = inizioGiroRef.current - tempoInizioRef.current;
+          tempiIntermediGiroRef.current = [...tempiIntermediGiroRef.current];
+          tempiIntermediGiroRef.current[checkpointAttesoRef.current] = (tSessione - inizioGiroRelativoASessione) / 1000;
+          setTempiIntermedi(tempiIntermediGiroRef.current);
+        }
+
         if (checkpointAttesoRef.current === 3) {
           const numeroGiroCompletato = giroCorrenteRef.current;
           const tempoGiroSecondi = (adesso - inizioGiroRef.current) / 1000;
@@ -795,6 +892,8 @@ export default function GameChampionshipView() {
           ];
           setGiriCompletati(giriCompletatiRef.current);
           inizioGiroRef.current = adesso;
+          tempiIntermediGiroRef.current = [null, null, null]; // nuovo giro, nuovi intermedi
+          setTempiIntermedi(tempiIntermediGiroRef.current);
 
           if (tipoSessione === 'gara' && giroCorrenteRef.current >= GIRI_GARA) {
             fermo = true;
@@ -956,7 +1055,21 @@ export default function GameChampionshipView() {
       setPulsantiPremuti((precedente) => ({ ...precedente, [campo]: valore }));
     };
     return {
-      onPointerDown: imposta(true),
+      onPointerDown: (evento) => {
+        // Aggancia il tocco al pulsante: senza, se il dito si sposta
+        // anche di poco durante la pressione (normale tenendo premuto
+        // a lungo), alcuni browser possono considerare il tocco
+        // "uscito" dal pulsante e non registrare più l'input come
+        // attivo, dando la sensazione di dover premere e rilasciare
+        // in continuazione (segnalato dall'utente).
+        try {
+          evento.currentTarget.setPointerCapture(evento.pointerId);
+        } catch {
+          // Non disponibile in questo contesto: nessun problema, il
+          // comportamento resta quello precedente (senza cattura).
+        }
+        imposta(true)(evento);
+      },
       onPointerUp: imposta(false),
       onPointerCancel: imposta(false),
     };
@@ -1036,6 +1149,17 @@ export default function GameChampionshipView() {
           className={`game-championship-view__pov-container ${schermoIntero ? 'game-championship-view__pov-container--schermo-intero' : ''}`}
         >
           <canvas ref={canvasRef} className="game-championship-view__canvas-3d" />
+
+          <div className="game-championship-view__minimappa-riquadro">
+            <canvas ref={minimappaRef} className="game-championship-view__minimappa" />
+            <div className="game-championship-view__tempi-intermedi">
+              {['S1', 'S2', 'S3'].map((etichetta, i) => (
+                <span key={etichetta}>
+                  {etichetta} {tempiIntermedi[i] !== null ? tempiIntermedi[i].toFixed(1) : '--.-'}
+                </span>
+              ))}
+            </div>
+          </div>
 
           {!desktopFullscreenImmersivo && (
             <div className="game-championship-view__hud-pov">
