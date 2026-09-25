@@ -43,7 +43,7 @@ const ATTESA_EXTRA_MAX_MS = 3000;
 const DURATA_FLASH_VIA_MS = 700;
 
 // Rendering pseudo-3D
-const NUMERO_SEGMENTI_VISIBILI = 160;
+const NUMERO_SEGMENTI_VISIBILI = 300; // ~2100m di pista visibile (7m/segmento) — prima 160 (~1120m) lasciava un vuoto visibile in lontananza, specie con la prospettiva alzata
 // Telecamera in terza persona, dietro e sopra l'auto (cambio deciso
 // insieme all'utente dopo aver visto un riferimento fotografico: non
 // più la vista "dentro l'abitacolo" della prima stesura).
@@ -556,15 +556,26 @@ export default function GameChampionshipView() {
       for (let i = proiettati.length - 1; i > 0; i--) {
         const lontano = proiettati[i];
         const vicino = proiettati[i - 1];
-        const semiL = lontano.larghezzaProiettata / 2;
-        const semiV = vicino.larghezzaProiettata / 2;
-        if (semiV < 0.5) continue;
+        // Larghezza minima garantita: senza questo, un segmento molto
+        // lontano diventa sub-pixel e la pista sparisce visivamente
+        // nel verde ai lati (segnalato dall'utente: "si vede poco in
+        // lontananza") — con il minimo, resta sempre tracciabile fino
+        // al punto di fuga.
+        const semiL = Math.max(lontano.larghezzaProiettata / 2, 1.5);
+        const semiV = Math.max(vicino.larghezzaProiettata / 2, 1.5);
         const LIMITE_SEMI_LARGHEZZA = W * 1.3;
         const semiLDisegno = Math.min(semiL, LIMITE_SEMI_LARGHEZZA);
         const semiVDisegno = Math.min(semiV, LIMITE_SEMI_LARGHEZZA);
 
-        disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, -1);
-        disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, 1);
+        if (vicino.z < 900) {
+          // Oltre una certa distanza lo scenario laterale (alberi,
+          // gradinate) non aggiunge quasi nulla visivamente (diventa
+          // minuscolo) ma costa comunque due disegni extra a segmento —
+          // con la distanza di rendering ora molto più lunga, tagliarlo
+          // presto aiuta le prestazioni senza perdita percepibile.
+          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, -1);
+          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, 1);
+        }
 
         ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2f4a2f' : '#28422c';
         ctx.beginPath();
@@ -764,77 +775,46 @@ export default function GameChampionshipView() {
     setFase('selezione');
   }
 
-  function attivaFallbackPaginaIntera() {
+  /**
+   * Fullscreen sull'INTERA pagina (non più sul solo contenitore del
+   * gioco): un tentativo sul solo contenitore, seguito da un eventuale
+   * fallback async, si è rivelato inaffidabile su mobile — molti
+   * browser (soprattutto Safari) concedono il fullscreen SOLO se la
+   * richiesta avviene in modo sincrono, nello stesso "giro" del click
+   * dell'utente. Un fallback dentro un .catch() o un setTimeout arriva
+   * fuori da quella finestra e viene rifiutato in silenzio: era
+   * probabilmente proprio questo a far fallire il fallback. Un solo
+   * tentativo sincrono, sempre sullo stesso bersaglio (l'intera
+   * pagina, il più universalmente supportato), evita il problema alla
+   * radice. Menu e footer del sito vengono nascosti a mano via classe
+   * CSS (vivono fuori dall'albero di questo componente).
+   */
+  function attivaSchermoIntero() {
     const richiedi =
       document.documentElement.requestFullscreen ||
       document.documentElement.webkitRequestFullscreen ||
       document.documentElement.mozRequestFullScreen ||
       document.documentElement.msRequestFullscreen;
-    if (!richiedi) return; // fullscreen davvero non supportato su questo browser
-    modoFullscreenPaginaInteraRef.current = true;
-    document.body.classList.add('gioco-fullscreen-pagina-intera');
-    const risultato = richiedi.call(document.documentElement);
-    if (risultato && risultato.catch) {
-      risultato.catch((errore) => {
-        console.error('Errore entrando in fullscreen (fallback pagina intera):', errore);
-        document.body.classList.remove('gioco-fullscreen-pagina-intera');
-        modoFullscreenPaginaInteraRef.current = false;
-      });
-    }
-  }
-
-  /**
-   * Prova prima il fullscreen sul solo contenitore del gioco (più
-   * pulito: nasconde la UI del sito da sé). Se il metodo non esiste
-   * proprio su quell'elemento, o la richiesta fallisce (capita su
-   * alcuni browser mobile che supportano il fullscreen solo
-   * sull'intera pagina, non su un div qualsiasi — segnalato
-   * dall'utente), passa al fallback su tutta la pagina, nascondendo
-   * manualmente menu e footer del sito via classe CSS.
-   */
-  function attivaSchermoIntero() {
-    const elemento = containerRef.current;
-    if (!elemento) {
-      attivaFallbackPaginaIntera();
-      return;
-    }
-    const richiedi =
-      elemento.requestFullscreen ||
-      elemento.webkitRequestFullscreen ||
-      elemento.mozRequestFullScreen ||
-      elemento.msRequestFullscreen;
     if (!richiedi) {
-      attivaFallbackPaginaIntera();
+      console.error('Fullscreen non supportato su questo browser.');
       return;
     }
+    document.body.classList.add('gioco-fullscreen-pagina-intera');
+    modoFullscreenPaginaInteraRef.current = true;
     try {
-      const risultato = richiedi.call(elemento);
+      const risultato = richiedi.call(document.documentElement);
       if (risultato && risultato.catch) {
         risultato.catch((errore) => {
-          console.error('Errore entrando in fullscreen sul contenitore, provo il fallback:', errore);
-          attivaFallbackPaginaIntera();
+          console.error('Errore entrando in fullscreen:', errore);
+          document.body.classList.remove('gioco-fullscreen-pagina-intera');
+          modoFullscreenPaginaInteraRef.current = false;
         });
       }
     } catch (errore) {
-      console.error('Errore chiamando requestFullscreen sul contenitore:', errore);
-      attivaFallbackPaginaIntera();
-      return;
+      console.error('Errore chiamando requestFullscreen:', errore);
+      document.body.classList.remove('gioco-fullscreen-pagina-intera');
+      modoFullscreenPaginaInteraRef.current = false;
     }
-    // Alcune API con prefisso vendor non restituiscono una Promise e
-    // non generano errori anche quando in realtà non hanno attivato
-    // nulla (capita su alcuni browser mobile, causa probabile del
-    // "non funziona" segnalato): verifico dopo un breve istante se il
-    // fullscreen è davvero scattato, altrimenti passo al fallback.
-    setTimeout(() => {
-      const attuale =
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement;
-      if (attuale !== elemento && !modoFullscreenPaginaInteraRef.current) {
-        attivaFallbackPaginaIntera();
-      }
-    }, 400);
   }
 
   function disattivaSchermoIntero() {
