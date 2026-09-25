@@ -56,7 +56,7 @@ const PROFONDITA_CAMERA = 1 / Math.tan((CAMPO_VISIVO_GRADI / 2) * (Math.PI / 180
 // Inclinazione della visuale verso l'orizzonte: alza la prospettiva
 // per vedere le curve in anticipo (richiesta esplicita dell'utente,
 // verificata col segno giusto tramite screenshot prima di integrarla).
-const INCLINAZIONE_CAMERA_GRADI = 15;
+const INCLINAZIONE_CAMERA_GRADI = 30; // richiesto ancora 15 gradi in piu' oltre ai 15 precedenti
 const INCLINAZIONE_CAMERA_RADIANTI = (INCLINAZIONE_CAMERA_GRADI * Math.PI) / 180;
 const SEGMENTI_PER_STRISCIA_CORDOLO = 4;
 const SEMI_LARGHEZZA_PISTA = LARGHEZZA_PISTA / 2;
@@ -118,11 +118,12 @@ export default function GameChampionshipView() {
   const [schermoIntero, setSchermoIntero] = useState(false);
   const [orientamentoPortrait, setOrientamentoPortrait] = useState(false);
   const [haTouch] = useState(() => typeof window !== 'undefined' && 'ontouchstart' in window);
-  const [supportaFullscreen] = useState(() => {
-    if (typeof document === 'undefined') return false;
-    const el = document.documentElement;
-    return Boolean(el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen);
-  });
+  // L'icona ora si mostra sempre (un pre-controllo di supporto si è
+  // rivelato inaffidabile su mobile — segnalato dall'utente): il
+  // tentativo vero al click decide, con un fallback su tutta la
+  // pagina se il contenitore da solo non funziona (vedi
+  // attivaSchermoIntero).
+  const modoFullscreenPaginaInteraRef = useRef(false);
 
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -139,6 +140,14 @@ export default function GameChampionshipView() {
   const mioRecordRef = useRef({ qualifica: null, gara: null });
   const ultimoAggiornamentoHudRef = useRef(0);
   const angoloVolanteRef = useRef(0);
+
+  // Sicurezza: se si naviga via mentre si è nel fallback fullscreen su
+  // tutta la pagina, la classe sul body non deve restare appiccicata.
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('gioco-fullscreen-pagina-intera');
+    };
+  }, []);
 
   // Classifica generale del campionato, precaricata.
   useEffect(() => {
@@ -199,8 +208,16 @@ export default function GameChampionshipView() {
       );
     }
     function suCambioFullscreen() {
-      const attivo = elementoFullscreenCorrente() === containerRef.current;
+      const elementoAttuale = elementoFullscreenCorrente();
+      const attivo = elementoAttuale === containerRef.current || elementoAttuale === document.documentElement;
       setSchermoIntero(attivo);
+      if (!attivo) {
+        // Uscita da fullscreen per qualunque via (icona, tasto ESC,
+        // gesto di sistema su mobile): ripulisco sempre la classe di
+        // fallback, non solo quando si esce dal pulsante dedicato.
+        document.body.classList.remove('gioco-fullscreen-pagina-intera');
+        modoFullscreenPaginaInteraRef.current = false;
+      }
       if (attivo && haTouch && typeof screen !== 'undefined' && screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape').catch(() => {
           // iOS Safari e altri: nessun blocco possibile, va bene così
@@ -747,31 +764,93 @@ export default function GameChampionshipView() {
     setFase('selezione');
   }
 
+  function attivaFallbackPaginaIntera() {
+    const richiedi =
+      document.documentElement.requestFullscreen ||
+      document.documentElement.webkitRequestFullscreen ||
+      document.documentElement.mozRequestFullScreen ||
+      document.documentElement.msRequestFullscreen;
+    if (!richiedi) return; // fullscreen davvero non supportato su questo browser
+    modoFullscreenPaginaInteraRef.current = true;
+    document.body.classList.add('gioco-fullscreen-pagina-intera');
+    const risultato = richiedi.call(document.documentElement);
+    if (risultato && risultato.catch) {
+      risultato.catch((errore) => {
+        console.error('Errore entrando in fullscreen (fallback pagina intera):', errore);
+        document.body.classList.remove('gioco-fullscreen-pagina-intera');
+        modoFullscreenPaginaInteraRef.current = false;
+      });
+    }
+  }
+
+  /**
+   * Prova prima il fullscreen sul solo contenitore del gioco (più
+   * pulito: nasconde la UI del sito da sé). Se il metodo non esiste
+   * proprio su quell'elemento, o la richiesta fallisce (capita su
+   * alcuni browser mobile che supportano il fullscreen solo
+   * sull'intera pagina, non su un div qualsiasi — segnalato
+   * dall'utente), passa al fallback su tutta la pagina, nascondendo
+   * manualmente menu e footer del sito via classe CSS.
+   */
   function attivaSchermoIntero() {
     const elemento = containerRef.current;
-    if (!elemento) return;
+    if (!elemento) {
+      attivaFallbackPaginaIntera();
+      return;
+    }
     const richiedi =
       elemento.requestFullscreen ||
       elemento.webkitRequestFullscreen ||
       elemento.mozRequestFullScreen ||
       elemento.msRequestFullscreen;
-    if (!richiedi) return; // fullscreen non supportato su questo browser, niente da fare
-    const risultato = richiedi.call(elemento);
-    if (risultato && risultato.catch) {
-      risultato.catch((errore) => console.error('Errore entrando in fullscreen:', errore));
+    if (!richiedi) {
+      attivaFallbackPaginaIntera();
+      return;
     }
+    try {
+      const risultato = richiedi.call(elemento);
+      if (risultato && risultato.catch) {
+        risultato.catch((errore) => {
+          console.error('Errore entrando in fullscreen sul contenitore, provo il fallback:', errore);
+          attivaFallbackPaginaIntera();
+        });
+      }
+    } catch (errore) {
+      console.error('Errore chiamando requestFullscreen sul contenitore:', errore);
+      attivaFallbackPaginaIntera();
+      return;
+    }
+    // Alcune API con prefisso vendor non restituiscono una Promise e
+    // non generano errori anche quando in realtà non hanno attivato
+    // nulla (capita su alcuni browser mobile, causa probabile del
+    // "non funziona" segnalato): verifico dopo un breve istante se il
+    // fullscreen è davvero scattato, altrimenti passo al fallback.
+    setTimeout(() => {
+      const attuale =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      if (attuale !== elemento && !modoFullscreenPaginaInteraRef.current) {
+        attivaFallbackPaginaIntera();
+      }
+    }, 400);
   }
+
   function disattivaSchermoIntero() {
     const esci =
       document.exitFullscreen ||
       document.webkitExitFullscreen ||
       document.mozCancelFullScreen ||
       document.msExitFullscreen;
-    if (!esci) return;
-    const risultato = esci.call(document);
-    if (risultato && risultato.catch) {
-      risultato.catch(() => {});
+    if (esci) {
+      const risultato = esci.call(document);
+      if (risultato && risultato.catch) {
+        risultato.catch(() => {});
+      }
     }
+    document.body.classList.remove('gioco-fullscreen-pagina-intera');
+    modoFullscreenPaginaInteraRef.current = false;
   }
 
   function gestoriPulsanteControllo(campo) {
@@ -940,7 +1019,7 @@ export default function GameChampionshipView() {
 
           {!desktopFullscreenImmersivo && (
             <div className="game-championship-view__controlli-pov">
-              {supportaFullscreen && !schermoIntero && (
+              {!schermoIntero && (
                 <button
                   type="button"
                   className="game-championship-view__icona-controllo"
@@ -951,23 +1030,12 @@ export default function GameChampionshipView() {
                   &#x26F6;
                 </button>
               )}
-              {supportaFullscreen && schermoIntero && haTouch && (
-                <button
-                  type="button"
-                  className="game-championship-view__icona-controllo"
-                  onClick={disattivaSchermoIntero}
-                  aria-label="Esci da schermo intero"
-                  title="Esci da schermo intero"
-                >
-                  &#x26F6;
-                </button>
-              )}
               <button
                 type="button"
                 className="game-championship-view__icona-controllo game-championship-view__icona-controllo--abbandona"
-                onClick={abbandonaSessione}
-                aria-label="Abbandona la sessione"
-                title="Abbandona"
+                onClick={schermoIntero ? disattivaSchermoIntero : abbandonaSessione}
+                aria-label={schermoIntero ? 'Esci da schermo intero' : 'Abbandona la sessione'}
+                title={schermoIntero ? 'Esci da schermo intero' : 'Abbandona'}
               >
                 &#x2715;
               </button>

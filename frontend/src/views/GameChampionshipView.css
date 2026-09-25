@@ -2,6 +2,21 @@
    Arena) + Campionato Mondiale Virtuale. Solo token di theme.css, stessa
    convenzione già usata da ArcadeView.css/ChronoQuizView.css. */
 
+/* Fallback fullscreen su tutta la pagina (non solo sul contenitore del
+   gioco): scatta quando il browser non supporta il fullscreen su un
+   div qualsiasi, solo sull'intera pagina (capita su alcuni browser
+   mobile — vedi attivaFallbackPaginaIntera in GameChampionshipView.jsx).
+   Questa regola è volutamente GLOBALE (non scoped al componente): deve
+   nascondere la barra di navigazione e il footer del sito, che vivono
+   fuori dall'albero di questo componente. */
+body.gioco-fullscreen-pagina-intera .app-tabs,
+body.gioco-fullscreen-pagina-intera .site-footer {
+  display: none !important;
+}
+body.gioco-fullscreen-pagina-intera {
+  overflow: hidden;
+}
+
 .game-championship-view__header {
   max-width: 720px;
   margin: 0 auto 1.4rem;
