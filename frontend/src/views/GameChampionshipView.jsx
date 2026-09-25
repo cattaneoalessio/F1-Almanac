@@ -17,7 +17,7 @@ import {
   segmentoA,
   controllaCatturaCheckpointSegmento,
 } from '../game/circuito3d.js';
-import { avanzaFisica, statoIniziale } from '../game/fisica3d.js';
+import { avanzaFisica, statoIniziale, VELOCITA_MASSIMA_BASE } from '../game/fisica3d.js';
 import { coloreGiro, estraiCheckpointDelGiro, trovaMigliorGiroValido } from '../game/sessione.js';
 import './GameChampionshipView.css';
 
@@ -53,6 +53,11 @@ const FATTORE_SEGUI_LATERALE = 0.7; // quanto la telecamera insegue lo scarto la
 const LARGHEZZA_AUTO_MONDO = 3; // metri, stessa larghezza di fisica3d.js (LARGHEZZA_AUTO)
 const CAMPO_VISIVO_GRADI = 100;
 const PROFONDITA_CAMERA = 1 / Math.tan((CAMPO_VISIVO_GRADI / 2) * (Math.PI / 180));
+// Inclinazione della visuale verso l'orizzonte: alza la prospettiva
+// per vedere le curve in anticipo (richiesta esplicita dell'utente,
+// verificata col segno giusto tramite screenshot prima di integrarla).
+const INCLINAZIONE_CAMERA_GRADI = 15;
+const INCLINAZIONE_CAMERA_RADIANTI = (INCLINAZIONE_CAMERA_GRADI * Math.PI) / 180;
 const SEGMENTI_PER_STRISCIA_CORDOLO = 4;
 const SEMI_LARGHEZZA_PISTA = LARGHEZZA_PISTA / 2;
 
@@ -113,6 +118,11 @@ export default function GameChampionshipView() {
   const [schermoIntero, setSchermoIntero] = useState(false);
   const [orientamentoPortrait, setOrientamentoPortrait] = useState(false);
   const [haTouch] = useState(() => typeof window !== 'undefined' && 'ontouchstart' in window);
+  const [supportaFullscreen] = useState(() => {
+    if (typeof document === 'undefined') return false;
+    const el = document.documentElement;
+    return Boolean(el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen);
+  });
 
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -179,8 +189,17 @@ export default function GameChampionshipView() {
   // blocco dell'orientamento landscape (fallisce silenziosamente su
   // iOS Safari, che non lo supporta — l'utente l'ha accettato).
   useEffect(() => {
+    function elementoFullscreenCorrente() {
+      return (
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement ||
+        null
+      );
+    }
     function suCambioFullscreen() {
-      const attivo = document.fullscreenElement === containerRef.current;
+      const attivo = elementoFullscreenCorrente() === containerRef.current;
       setSchermoIntero(attivo);
       if (attivo && haTouch && typeof screen !== 'undefined' && screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape').catch(() => {
@@ -189,8 +208,9 @@ export default function GameChampionshipView() {
         });
       }
     }
-    document.addEventListener('fullscreenchange', suCambioFullscreen);
-    return () => document.removeEventListener('fullscreenchange', suCambioFullscreen);
+    const EVENTI_FULLSCREEN = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'];
+    EVENTI_FULLSCREEN.forEach((nome) => document.addEventListener(nome, suCambioFullscreen));
+    return () => EVENTI_FULLSCREEN.forEach((nome) => document.removeEventListener(nome, suCambioFullscreen));
   }, [haTouch]);
 
   // Rileva l'orientamento del dispositivo, per l'invito a ruotare su
@@ -276,6 +296,97 @@ export default function GameChampionshipView() {
       ctx.fillRect(0, orizzonte, larghezza, altezza - orizzonte);
     }
 
+    /**
+     * 7 LED del cambio (shift lights), sempre in cima al canvas: 3
+     * verdi, 2 rossi, 2 ciano lampeggianti vicino alla velocità
+     * massima — il momento ideale di cambiata. `frazioneVelocita` è
+     * velocità attuale / velocità massima (0-1).
+     */
+    function disegnaLedCambio(ctx, larghezza, frazioneVelocita, adesso) {
+      const numeroLed = 7;
+      const raggio = Math.max(3, larghezza * 0.007);
+      const spaziatura = raggio * 2.8;
+      const centroX = larghezza / 2;
+      const y = raggio * 2.4;
+      const ledAccesi = Math.floor(frazioneVelocita * numeroLed);
+      const lampeggia = Math.floor(adesso / 150) % 2 === 0;
+
+      for (let i = 0; i < numeroLed; i++) {
+        const x = centroX + (i - (numeroLed - 1) / 2) * spaziatura;
+        const acceso = i < ledAccesi;
+        let colore = 'rgba(255,255,255,0.1)';
+        if (acceso) {
+          if (i < 3) colore = '#4ade80';
+          else if (i < 5) colore = '#e8432e';
+          else colore = lampeggia ? '#3fd0ff' : '#0d5266';
+        }
+        ctx.fillStyle = colore;
+        ctx.beginPath();
+        ctx.arc(x, y, raggio, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    /** Display digitale: marcia virtuale (1-8, proporzionale alla
+     * velocità) e velocità numerica in monospace. */
+    function disegnaDisplay(ctx, larghezza, velocitaKmh, frazioneVelocita) {
+      const larghezzaBox = Math.max(70, larghezza * 0.13);
+      const altezzaBox = larghezzaBox * 0.4;
+      const x = larghezza / 2 - larghezzaBox / 2;
+      const y = larghezzaBox * 0.42;
+
+      ctx.fillStyle = '#000';
+      ctx.fillRect(x, y, larghezzaBox, altezzaBox);
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, larghezzaBox, altezzaBox);
+
+      const marcia = Math.max(1, Math.min(8, Math.ceil(frazioneVelocita * 8)));
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#3fd0ff';
+      ctx.font = `700 ${Math.round(altezzaBox * 0.6)}px monospace`;
+      ctx.fillText(String(marcia), x + larghezzaBox * 0.2, y + altezzaBox * 0.52);
+
+      ctx.fillStyle = '#d9a441';
+      ctx.font = `600 ${Math.round(altezzaBox * 0.3)}px monospace`;
+      ctx.fillText(`${Math.round(velocitaKmh)} km/h`, x + larghezzaBox * 0.65, y + altezzaBox * 0.52);
+    }
+
+    /** Linee del vento: oltre 200 km/h virtuali, segmenti bianchi
+     * semi-trasparenti che convergono verso il punto di fuga
+     * (l'orizzonte), per accentuare la percezione di velocità. */
+    function disegnaLineeVento(ctx, larghezza, altezza, velocitaKmh, adesso) {
+      if (velocitaKmh < 200) return;
+      const centroX = larghezza / 2;
+      const centroY = altezza * 0.42;
+      const numeroLinee = 14;
+      const ciclo = 800;
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < numeroLinee; i++) {
+        const lato = i % 2 === 0 ? -1 : 1;
+        const raggioIniziale = larghezza * (0.35 + (i % 5) * 0.05);
+        const altezzaIniziale = altezza * (0.55 + ((i * 53) % 100) / 250);
+        const fase = ((adesso + i * (ciclo / numeroLinee)) % ciclo) / ciclo;
+        const faseCoda = Math.max(0, fase - 0.08);
+
+        const puntoA = {
+          x: centroX + lato * raggioIniziale * (1 - fase),
+          y: altezzaIniziale + (centroY - altezzaIniziale) * fase,
+        };
+        const puntoB = {
+          x: centroX + lato * raggioIniziale * (1 - faseCoda),
+          y: altezzaIniziale + (centroY - altezzaIniziale) * faseCoda,
+        };
+        ctx.beginPath();
+        ctx.moveTo(puntoA.x, puntoA.y);
+        ctx.lineTo(puntoB.x, puntoB.y);
+        ctx.stroke();
+      }
+    }
+
     function disegnaScenarioLato(ctx, xBase, yBase, scala, indiceSegmento, curva, lato) {
       const dimensione = Math.max(3, 55 * scala);
       if (dimensione < 3.5) return;
@@ -333,6 +444,13 @@ export default function GameChampionshipView() {
       if (larghezzaAuto < 4) return; // troppo lontana/piccola per valere la pena
       const altezzaAuto = larghezzaAuto * 0.42;
 
+      // Ombra: un'ellisse scura sotto l'auto, ancora al terreno (non
+      // ruota con l'auto) — evita la sensazione che galleggi sull'asfalto.
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(punto.x, punto.y + altezzaAuto * 0.06, larghezzaAuto * 0.42, altezzaAuto * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.save();
       ctx.translate(punto.x, punto.y);
       ctx.rotate(angolo);
@@ -384,6 +502,11 @@ export default function GameChampionshipView() {
       disegnaSfondo(ctx, W, H);
 
       const auto = statoAutoRef.current;
+      const frazioneVelocitaHud = Math.min(1, auto.velocita / VELOCITA_MASSIMA_BASE);
+      const velocitaKmhHud = auto.velocita * 3.6;
+      disegnaLedCambio(ctx, W, frazioneVelocitaHud, performance.now());
+      disegnaDisplay(ctx, W, velocitaKmhHud, frazioneVelocitaHud);
+
       const segmentoAuto = segmentoA(Math.floor(auto.distanza / LUNGHEZZA_SEGMENTO));
       const distanzaCamera = auto.distanza - DISTANZA_CAMERA_DIETRO;
       const segmentoCamera = segmentoA(Math.floor(distanzaCamera / LUNGHEZZA_SEGMENTO));
@@ -396,9 +519,22 @@ export default function GameChampionshipView() {
       const segmenti = calcolaSegmentiVisibili(camera, NUMERO_SEGMENTI_VISIBILI);
       const proiettati = [];
       for (const s of segmenti) {
-        const p = proietta(s, PROFONDITA_CAMERA, W, H);
+        const p = proietta(s, PROFONDITA_CAMERA, W, H, INCLINAZIONE_CAMERA_RADIANTI);
         if (p) proiettati.push({ ...s, ...p, y_mondo: s.y });
       }
+
+      // Camera shake: sopra l'85% della velocità massima, sui cordoli o
+      // sull'erba. Scuote la pista/scenario; l'auto (disegnata dopo)
+      // riceve solo una frazione in controfase, per dare l'idea che le
+      // sospensioni assorbano parte dell'urto invece di seguirlo in pieno.
+      const suSuperficieIrregolare = Boolean(auto.zona) && auto.zona !== 'pista';
+      const velocitaAlta = frazioneVelocitaHud > 0.85;
+      const intensitaScuotimento = (suSuperficieIrregolare ? 3 : 0) + (velocitaAlta ? 2.2 : 0);
+      const scuotimentoX = intensitaScuotimento > 0 ? (Math.random() - 0.5) * intensitaScuotimento * 2 : 0;
+      const scuotimentoY = intensitaScuotimento > 0 ? (Math.random() - 0.5) * intensitaScuotimento * 2 : 0;
+
+      ctx.save();
+      ctx.translate(scuotimentoX, scuotimentoY);
 
       for (let i = proiettati.length - 1; i > 0; i--) {
         const lontano = proiettati[i];
@@ -453,7 +589,9 @@ export default function GameChampionshipView() {
         }
       }
 
+      disegnaLineeVento(ctx, W, H, velocitaKmhHud, performance.now());
       disegnaCavalcavia(ctx, proiettati);
+      ctx.restore(); // fine dello scuotimento di pista/scenario/cavalcavia
 
       const puntoAuto = proietta(
         {
@@ -463,9 +601,18 @@ export default function GameChampionshipView() {
         },
         PROFONDITA_CAMERA,
         W,
-        H
+        H,
+        INCLINAZIONE_CAMERA_RADIANTI
       );
-      if (puntoAuto) disegnaAuto(ctx, puntoAuto, W, angoloVolanteRef.current * 0.3);
+      if (puntoAuto) {
+        // Contro-scuotimento più leggero per l'auto: le sospensioni
+        // assorbono parte dell'urto invece di seguirlo in pieno come
+        // il resto della scena.
+        ctx.save();
+        ctx.translate(-scuotimentoX * 0.35, -scuotimentoY * 0.35);
+        disegnaAuto(ctx, puntoAuto, W, angoloVolanteRef.current * 0.3);
+        ctx.restore();
+      }
     }
 
     function fotogramma(timestamp) {
@@ -602,13 +749,28 @@ export default function GameChampionshipView() {
 
   function attivaSchermoIntero() {
     const elemento = containerRef.current;
-    if (elemento && elemento.requestFullscreen) {
-      elemento.requestFullscreen().catch((errore) => console.error('Errore entrando in fullscreen:', errore));
+    if (!elemento) return;
+    const richiedi =
+      elemento.requestFullscreen ||
+      elemento.webkitRequestFullscreen ||
+      elemento.mozRequestFullScreen ||
+      elemento.msRequestFullscreen;
+    if (!richiedi) return; // fullscreen non supportato su questo browser, niente da fare
+    const risultato = richiedi.call(elemento);
+    if (risultato && risultato.catch) {
+      risultato.catch((errore) => console.error('Errore entrando in fullscreen:', errore));
     }
   }
   function disattivaSchermoIntero() {
-    if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
+    const esci =
+      document.exitFullscreen ||
+      document.webkitExitFullscreen ||
+      document.mozCancelFullScreen ||
+      document.msExitFullscreen;
+    if (!esci) return;
+    const risultato = esci.call(document);
+    if (risultato && risultato.catch) {
+      risultato.catch(() => {});
     }
   }
 
@@ -618,12 +780,9 @@ export default function GameChampionshipView() {
       inputRef.current[campo] = valore;
     };
     return {
-      onTouchStart: imposta(true),
-      onTouchEnd: imposta(false),
-      onTouchCancel: imposta(false),
-      onMouseDown: imposta(true),
-      onMouseUp: imposta(false),
-      onMouseLeave: imposta(false),
+      onPointerDown: imposta(true),
+      onPointerUp: imposta(false),
+      onPointerCancel: imposta(false),
     };
   }
 
@@ -781,18 +940,36 @@ export default function GameChampionshipView() {
 
           {!desktopFullscreenImmersivo && (
             <div className="game-championship-view__controlli-pov">
-              {!schermoIntero && (
-                <button type="button" className="game-championship-view__bottone-fullscreen" onClick={attivaSchermoIntero}>
-                  Schermo intero
+              {supportaFullscreen && !schermoIntero && (
+                <button
+                  type="button"
+                  className="game-championship-view__icona-controllo"
+                  onClick={attivaSchermoIntero}
+                  aria-label="Schermo intero"
+                  title="Schermo intero"
+                >
+                  &#x26F6;
                 </button>
               )}
-              {schermoIntero && haTouch && (
-                <button type="button" className="game-championship-view__bottone-fullscreen" onClick={disattivaSchermoIntero}>
-                  Esci da schermo intero
+              {supportaFullscreen && schermoIntero && haTouch && (
+                <button
+                  type="button"
+                  className="game-championship-view__icona-controllo"
+                  onClick={disattivaSchermoIntero}
+                  aria-label="Esci da schermo intero"
+                  title="Esci da schermo intero"
+                >
+                  &#x26F6;
                 </button>
               )}
-              <button type="button" className="game-championship-view__abbandona" onClick={abbandonaSessione}>
-                Abbandona
+              <button
+                type="button"
+                className="game-championship-view__icona-controllo game-championship-view__icona-controllo--abbandona"
+                onClick={abbandonaSessione}
+                aria-label="Abbandona la sessione"
+                title="Abbandona"
+              >
+                &#x2715;
               </button>
             </div>
           )}

@@ -202,18 +202,39 @@ export function calcolaSegmentiVisibili(camera, numeroSegmenti) {
 }
 
 /**
+ * Ruota un punto (y, z, camera-relativo) di `angoloRadianti` attorno
+ * alla telecamera — l'inclinazione (pitch) della visuale. x non
+ * cambia (l'inclinazione è solo verticale). Positivo = la telecamera
+ * guarda più verso l'orizzonte, mostrando più pista in lontananza —
+ * verificato col segno giusto tramite screenshot, non solo a calcolo.
+ */
+export function inclinaPunto(punto, angoloRadianti) {
+  if (!angoloRadianti) return punto;
+  const cosA = Math.cos(angoloRadianti);
+  const sinA = Math.sin(angoloRadianti);
+  return {
+    x: punto.x,
+    y: punto.y * cosA - punto.z * sinA,
+    z: punto.y * sinA + punto.z * cosA,
+  };
+}
+
+/**
  * Proietta un punto del mondo 3D (x laterale, y altezza, z profondità
  * — tutti relativi alla camera) sullo schermo. Formula prospettica
  * standard (pseudo-3D "Pole Position style"): più lontano (z grande),
  * più la scala si riduce. Ritorna null se il punto è dietro la camera
- * (z <= 0, non proiettabile).
+ * (z <= 0, non proiettabile). `inclinazioneRadianti` (opzionale, 0 di
+ * default) applica un'inclinazione verticale della visuale prima di
+ * proiettare — vedi inclinaPunto().
  */
-export function proietta(punto, profonditaCamera, larghezzaSchermo, altezzaSchermo) {
-  if (punto.z <= 0) return null;
-  const scala = profonditaCamera / punto.z;
+export function proietta(punto, profonditaCamera, larghezzaSchermo, altezzaSchermo, inclinazioneRadianti = 0) {
+  const p = inclinazioneRadianti ? inclinaPunto(punto, inclinazioneRadianti) : punto;
+  if (p.z <= 0) return null;
+  const scala = profonditaCamera / p.z;
   return {
-    x: larghezzaSchermo / 2 + (scala * punto.x * larghezzaSchermo) / 2,
-    y: altezzaSchermo / 2 - (scala * punto.y * altezzaSchermo) / 2,
+    x: larghezzaSchermo / 2 + (scala * p.x * larghezzaSchermo) / 2,
+    y: altezzaSchermo / 2 - (scala * p.y * altezzaSchermo) / 2,
     scala,
     larghezzaProiettata: scala * LARGHEZZA_PISTA * larghezzaSchermo,
   };
