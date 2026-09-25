@@ -11,6 +11,7 @@ import {
 } from '../api/backend.js';
 import {
   calcolaSegmentiVisibili,
+  CARTELLI_CURVA,
   LARGHEZZA_PISTA,
   LUNGHEZZA_SEGMENTO,
   proietta,
@@ -47,8 +48,8 @@ const NUMERO_SEGMENTI_VISIBILI = 300; // ~2100m di pista visibile (7m/segmento) 
 // Telecamera in terza persona, dietro e sopra l'auto (cambio deciso
 // insieme all'utente dopo aver visto un riferimento fotografico: non
 // più la vista "dentro l'abitacolo" della prima stesura).
-const DISTANZA_CAMERA_DIETRO = 9; // metri dietro l'auto lungo il tracciato
-const ALTEZZA_CAMERA_SOPRA = 2.3; // metri sopra il piano stradale del punto in cui si trova la telecamera
+const DISTANZA_CAMERA_DIETRO = 10; // metri dietro l'auto lungo il tracciato
+const ALTEZZA_CAMERA_SOPRA = 3.4; // metri sopra il piano stradale del punto in cui si trova la telecamera — alzata (era 2.3): con la telecamera bassa l'auto in primo piano copriva troppa pista, rendendo difficile capire quando curvare (segnalato dall'utente, confrontato con foto di riferimento di viste POV reali)
 const FATTORE_SEGUI_LATERALE = 0.7; // quanto la telecamera insegue lo scarto laterale dell'auto (0=fissa sul centro pista, 1=insegue in pieno, annullando ogni feedback visivo dello sterzo)
 const LARGHEZZA_AUTO_MONDO = 3; // metri, stessa larghezza di fisica3d.js (LARGHEZZA_AUTO)
 const CAMPO_VISIVO_GRADI = 100;
@@ -420,8 +421,14 @@ export default function GameChampionshipView() {
       }
     }
 
-    function disegnaScenarioLato(ctx, xBase, yBase, scala, indiceSegmento, curva, lato) {
-      const dimensione = Math.max(3, 55 * scala);
+    function disegnaScenarioLato(ctx, xBase, yBase, scala, larghezzaSchermo, indiceSegmento, curva, lato) {
+      // Bug corretto: mancava la moltiplicazione per larghezzaSchermo
+      // (come fa l'auto con LARGHEZZA_AUTO_MONDO) — senza, "scala" da
+      // sola è un numero minuscolo (~0.001-0.01) e la dimensione finiva
+      // sempre sul minimo, rendendo lo scenario di fatto invisibile
+      // oltre pochissimi metri. ~6m: altezza plausibile di un albero o
+      // una gradinata bassa.
+      const dimensione = Math.max(3, scala * 6 * larghezzaSchermo);
       if (dimensione < 3.5) return;
       const x = xBase + lato * dimensione * 2.2;
       if (Math.abs(curva) > 1.2) {
@@ -442,6 +449,58 @@ export default function GameChampionshipView() {
           ctx.fillRect(x - dimensione * 0.65, yBase - dimensione * 0.9, dimensione * 1.3, dimensione * 0.22);
         }
       }
+    }
+
+    function disegnaCartelloCurva(ctx, xBase, yBase, scala, larghezzaSchermo, cartello) {
+      // Stesso bug di disegnaScenarioLato: mancava ×larghezzaSchermo,
+      // il cartello non si disegnava MAI (verificato: a 400-500m,
+      // "70*scala" restava sempre sotto la soglia minima). ~5.5m:
+      // dimensione scelta per essere ben leggibile già alla distanza
+      // di comparsa prevista (i cartelli iniziano a ~400-500m prima
+      // della curva), non solo quando l'auto è già vicina.
+      const dimensione = Math.max(4, scala * 5.5 * larghezzaSchermo);
+      if (dimensione < 5) return; // troppo lontano/piccolo per essere leggibile
+      const x = xBase - dimensione * 3.4; // fisso sul lato sinistro della pista, oltre lo scenario (2.2), niente sovrapposizioni
+      const yBaseCartello = yBase - dimensione * 0.9;
+      const largh = dimensione * 1.5;
+      const alt = dimensione * 1.05;
+
+      // Palo di sostegno
+      ctx.strokeStyle = '#4a4d54';
+      ctx.lineWidth = Math.max(1, dimensione * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(x, yBase);
+      ctx.lineTo(x, yBaseCartello + alt / 2);
+      ctx.stroke();
+
+      // Tabellone: sfondo chiaro, bordo scuro — leggibile come un vero
+      // cartello di velocità consigliata a bordo pista.
+      ctx.fillStyle = '#f4f1e8';
+      ctx.fillRect(x - largh / 2, yBaseCartello - alt / 2, largh, alt);
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = Math.max(1, dimensione * 0.05);
+      ctx.strokeRect(x - largh / 2, yBaseCartello - alt / 2, largh, alt);
+
+      // Numero (velocità consigliata)
+      ctx.fillStyle = '#c0392b';
+      ctx.font = `bold ${Math.round(alt * 0.62)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(cartello.velocita), x, yBaseCartello - alt * 0.08);
+
+      // Freccina di direzione sotto il numero
+      ctx.fillStyle = '#1a1a1a';
+      const puntaX = x + cartello.direzione * largh * 0.22;
+      const codaX = x - cartello.direzione * largh * 0.22;
+      const yFreccia = yBaseCartello + alt * 0.28;
+      ctx.beginPath();
+      ctx.moveTo(puntaX, yFreccia);
+      ctx.lineTo(codaX, yFreccia - alt * 0.1);
+      ctx.lineTo(codaX, yFreccia + alt * 0.1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.textAlign = 'start';
+      ctx.textBaseline = 'alphabetic';
     }
 
     function disegnaCavalcavia(ctx, proiettati) {
@@ -473,7 +532,12 @@ export default function GameChampionshipView() {
      * sterzo, per dare l'impressione che l'auto stia girando.
      */
     function disegnaAuto(ctx, punto, larghezzaSchermo, angolo) {
-      const larghezzaAuto = punto.scala * LARGHEZZA_AUTO_MONDO * larghezzaSchermo;
+      // Scala visiva ridotta (0.72) solo per il disegno: l'auto a piena
+      // scala copriva troppa pista in primo piano, rendendo difficile
+      // vedere la curva in anticipo (segnalato dall'utente, confrontato
+      // con foto di riferimento) — non tocca la fisica/collisioni,
+      // solo l'ingombro a schermo.
+      const larghezzaAuto = punto.scala * LARGHEZZA_AUTO_MONDO * larghezzaSchermo * 0.72;
       if (larghezzaAuto < 4) return; // troppo lontana/piccola per valere la pena
       const altezzaAuto = larghezzaAuto * 0.42;
 
@@ -617,8 +681,15 @@ export default function GameChampionshipView() {
           // minuscolo) ma costa comunque due disegni extra a segmento —
           // con la distanza di rendering ora molto più lunga, tagliarlo
           // presto aiuta le prestazioni senza perdita percepibile.
-          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, -1);
-          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, vicino.indiceSegmento, vicino.curva, 1);
+          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, W, vicino.indiceSegmento, vicino.curva, -1);
+          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, W, vicino.indiceSegmento, vicino.curva, 1);
+        }
+        const cartello = CARTELLI_CURVA.get(vicino.indiceSegmento);
+        if (cartello && vicino.z < 1400) {
+          // I cartelli di velocità restano leggibili (e utili per
+          // sapere quando rallentare) da più lontano dello scenario
+          // puramente decorativo.
+          disegnaCartelloCurva(ctx, vicino.x, vicino.y, vicino.scala, W, cartello);
         }
 
         ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2f4a2f' : '#28422c';

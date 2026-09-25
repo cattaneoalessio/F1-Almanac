@@ -117,6 +117,62 @@ export const LUNGHEZZA_CIRCUITO = NUMERO_SEGMENTI_TOTALE * LUNGHEZZA_SEGMENTO;
   }
 })();
 
+const SOGLIA_CURVA_SIGNIFICATIVA = 0.8; // sotto questo valore assoluto di curva, il tratto è considerato "dritto" ai fini dei cartelli
+
+/**
+ * Individua, per ogni curva significativa del circuito, i 3 cartelli
+ * di velocità consigliata da mostrare a bordo pista avvicinandosi
+ * (come i cartelli reali "200/100/50", qui usati per la velocità
+ * consigliata invece che per la distanza di frenata — richiesta
+ * esplicita dell'utente). Calcolato una sola volta alla costruzione
+ * del circuito, non ad ogni fotogramma.
+ */
+function calcolaCartelliCurva(segmenti) {
+  const cartelli = [];
+  let i = 0;
+  while (i < segmenti.length) {
+    if (Math.abs(segmenti[i].curva) < SOGLIA_CURVA_SIGNIFICATIVA) {
+      i++;
+      continue;
+    }
+    // Trovato l'inizio di una curva significativa: scandisco in avanti
+    // per trovarne il picco di curvatura (la severità) e dove finisce.
+    const indiceInizio = i;
+    let picco = 0;
+    let j = i;
+    while (j < segmenti.length && Math.abs(segmenti[j].curva) >= SOGLIA_CURVA_SIGNIFICATIVA) {
+      picco = Math.max(picco, Math.abs(segmenti[j].curva));
+      j++;
+    }
+    const direzione = segmenti[indiceInizio].curva > 0 ? 1 : -1; // 1 = destra, -1 = sinistra
+    // Più la curva è severa (picco alto), più bassa la velocità
+    // consigliata all'apice — intervallo scelto sui picchi reali di
+    // questo circuito (~2.4 a ~5), arrotondata alla decina.
+    const velocitaApice = Math.round(Math.max(50, Math.min(200, 230 - picco * 34)) / 10) * 10;
+    // Tre cartelli scalando all'indietro dall'inizio curva, ai metri
+    // indicati, con velocità che scende verso quella dell'apice.
+    for (const [metriPrima, deltaVelocita] of [
+      [150, 60],
+      [90, 30],
+      [40, 0],
+    ]) {
+      const indiceCartello = indiceInizio - Math.round(metriPrima / LUNGHEZZA_SEGMENTO);
+      if (indiceCartello < 0) continue; // troppo vicino all'inizio pista, salto (raro, solo per la primissima curva)
+      cartelli.push({
+        indiceSegmento: ((indiceCartello % segmenti.length) + segmenti.length) % segmenti.length,
+        velocita: Math.min(200, velocitaApice + deltaVelocita),
+        direzione,
+      });
+    }
+    i = j; // riprendo la scansione dopo la curva appena trovata
+  }
+  return cartelli;
+}
+
+// Mappa indiceSegmento -> cartello, per una ricerca O(1) in fase di
+// disegno (calcolata una sola volta, non ad ogni fotogramma).
+export const CARTELLI_CURVA = new Map(calcolaCartelliCurva(BRIANZA_SPEED_RING).map((c) => [c.indiceSegmento, c]));
+
 /** Il segmento all'indice dato, con wraparound (il circuito è un
  * anello: oltre l'ultimo segmento si ricomincia dal primo). */
 export function segmentoA(indice) {
