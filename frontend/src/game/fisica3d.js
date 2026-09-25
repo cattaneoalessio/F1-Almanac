@@ -16,7 +16,6 @@
 export const VELOCITA_MASSIMA_BASE = 90; // m/s ≈ 324 km/h
 export const ACCELERAZIONE = 25; // m/s^2 (0 a velocità massima in ~3.6s in pista libera)
 export const FRENO = 40; // m/s^2
-export const ATTRITO = 15; // m/s^2, decelerazione passiva senza input (attrito/resistenza dell'aria)
 
 export const LARGHEZZA_AUTO = 3; // metri, dato dall'utente
 export const SEMI_LARGHEZZA_AUTO = LARGHEZZA_AUTO / 2;
@@ -93,9 +92,10 @@ export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLa
     velocita += ACCELERAZIONE * dt;
   } else if (input.frena) {
     velocita = Math.max(0, velocita - FRENO * dt);
-  } else {
-    velocita = Math.max(0, velocita - ATTRITO * dt);
   }
+  // Nessun input: la velocità resta ESATTAMENTE costante (nessuna
+  // decelerazione passiva/attrito) — richiesta esplicita dell'utente,
+  // sostituisce il comportamento precedente che rallentava da solo.
 
   const { zona, fattoreVelocita } = statoPosizioneLaterale(x, semiLarghezzaPista);
   const velocitaMassimaCorrente = VELOCITA_MASSIMA_BASE * fattoreVelocita;

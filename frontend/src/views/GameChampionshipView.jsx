@@ -118,6 +118,13 @@ export default function GameChampionshipView() {
   const [schermoIntero, setSchermoIntero] = useState(false);
   const [orientamentoPortrait, setOrientamentoPortrait] = useState(false);
   const [haTouch] = useState(() => typeof window !== 'undefined' && 'ontouchstart' in window);
+  // Feedback visivo "premuto" dei pulsanti touch, gestito a mano in
+  // stato React invece di affidarsi solo a :active CSS: con due
+  // pulsanti tenuti insieme (es. direzione + gas), su alcuni browser
+  // mobile :active si accende solo su uno dei due, rendendo poco
+  // chiaro se entrambi gli input sono davvero attivi (segnalato
+  // dall'utente).
+  const [pulsantiPremuti, setPulsantiPremuti] = useState({});
   // L'icona ora si mostra sempre (un pre-controllo di supporto si è
   // rivelato inaffidabile su mobile — segnalato dall'utente): il
   // tentativo vero al click decide, con un fallback su tutta la
@@ -140,6 +147,15 @@ export default function GameChampionshipView() {
   const mioRecordRef = useRef({ qualifica: null, gara: null });
   const ultimoAggiornamentoHudRef = useRef(0);
   const angoloVolanteRef = useRef(0);
+  // Scuotimento smorzato: un nuovo bersaglio casuale solo ogni ~70ms,
+  // interpolato morbidamente fotogramma per fotogramma — un valore
+  // casuale puro a OGNI fotogramma (versione precedente) sembrava uno
+  // sfarfallio/salto d'immagine, non una vibrazione (segnalato
+  // dall'utente, specialmente evidente in curva dove capita più spesso
+  // di toccare cordoli/erba).
+  const scuotimentoTargetRef = useRef({ x: 0, y: 0 });
+  const scuotimentoAttualeRef = useRef({ x: 0, y: 0 });
+  const ultimoCambioScuotimentoRef = useRef(0);
 
   // Sicurezza: se si naviga via mentre si è nel fallback fullscreen su
   // tutta la pagina, la classe sul body non deve restare appiccicata.
@@ -470,7 +486,13 @@ export default function GameChampionshipView() {
 
       ctx.save();
       ctx.translate(punto.x, punto.y);
-      ctx.rotate(angolo);
+      // Non una rotazione rigida (sembrava un'inclinazione orizzontale
+      // irrealistica, come una moto in piega — segnalato dall'utente):
+      // una leggera deformazione a taglio, che sposta la parte alta
+      // (ala/muso) lateralmente rispetto alle ruote, che restano
+      // ancorate a terra — dà l'idea di vedere un po' la fiancata in
+      // curva invece di un banking innaturale.
+      ctx.transform(1, 0, angolo * 0.8, 1, 0, 0);
 
       // Gomme posteriori
       ctx.fillStyle = '#111214';
@@ -478,6 +500,14 @@ export default function GameChampionshipView() {
       const altGomma = altezzaAuto * 1.05;
       ctx.fillRect(-larghezzaAuto * 0.58, -altGomma, largGomma, altGomma);
       ctx.fillRect(larghezzaAuto * 0.38, -altGomma, largGomma, altGomma);
+
+      // Fiancate: collegano il corpo centrale al bordo interno delle
+      // gomme, altrimenti resta un vuoto visibile tra loro (segnalato
+      // dall'utente) — dal bordo gomma (±0.38) al bordo corpo (±0.28),
+      // nessuno spazio scoperto in mezzo.
+      ctx.fillStyle = '#17191d';
+      ctx.fillRect(-larghezzaAuto * 0.38, -altezzaAuto * 0.68, larghezzaAuto * 0.1, altezzaAuto * 0.68);
+      ctx.fillRect(larghezzaAuto * 0.28, -altezzaAuto * 0.68, larghezzaAuto * 0.1, altezzaAuto * 0.68);
 
       // Diffusore (sotto il corpo, tra le gomme)
       ctx.strokeStyle = '#3a3d44';
@@ -491,7 +521,7 @@ export default function GameChampionshipView() {
 
       // Corpo/pancia centrale
       ctx.fillStyle = '#1a1d22';
-      ctx.fillRect(-larghezzaAuto * 0.26, -altezzaAuto * 0.75, larghezzaAuto * 0.52, altezzaAuto * 0.75);
+      ctx.fillRect(-larghezzaAuto * 0.28, -altezzaAuto * 0.75, larghezzaAuto * 0.56, altezzaAuto * 0.75);
 
       // Fanalino posteriore
       ctx.fillStyle = '#ff2a2a';
@@ -544,11 +574,25 @@ export default function GameChampionshipView() {
       // sull'erba. Scuote la pista/scenario; l'auto (disegnata dopo)
       // riceve solo una frazione in controfase, per dare l'idea che le
       // sospensioni assorbano parte dell'urto invece di seguirlo in pieno.
+      // Smorzato (nuovo bersaglio casuale ogni ~70ms, interpolato
+      // morbidamente) invece di un valore casuale puro a ogni
+      // fotogramma, che sembrava uno sfarfallio/salto d'immagine più
+      // che una vibrazione — specie evidente in curva.
       const suSuperficieIrregolare = Boolean(auto.zona) && auto.zona !== 'pista';
       const velocitaAlta = frazioneVelocitaHud > 0.85;
       const intensitaScuotimento = (suSuperficieIrregolare ? 3 : 0) + (velocitaAlta ? 2.2 : 0);
-      const scuotimentoX = intensitaScuotimento > 0 ? (Math.random() - 0.5) * intensitaScuotimento * 2 : 0;
-      const scuotimentoY = intensitaScuotimento > 0 ? (Math.random() - 0.5) * intensitaScuotimento * 2 : 0;
+      const adessoScuotimento = performance.now();
+      if (adessoScuotimento - ultimoCambioScuotimentoRef.current > 70) {
+        ultimoCambioScuotimentoRef.current = adessoScuotimento;
+        scuotimentoTargetRef.current =
+          intensitaScuotimento > 0
+            ? { x: (Math.random() - 0.5) * intensitaScuotimento * 2, y: (Math.random() - 0.5) * intensitaScuotimento * 2 }
+            : { x: 0, y: 0 };
+      }
+      scuotimentoAttualeRef.current.x += (scuotimentoTargetRef.current.x - scuotimentoAttualeRef.current.x) * 0.3;
+      scuotimentoAttualeRef.current.y += (scuotimentoTargetRef.current.y - scuotimentoAttualeRef.current.y) * 0.3;
+      const scuotimentoX = scuotimentoAttualeRef.current.x;
+      const scuotimentoY = scuotimentoAttualeRef.current.y;
 
       ctx.save();
       ctx.translate(scuotimentoX, scuotimentoY);
@@ -731,6 +775,11 @@ export default function GameChampionshipView() {
     giriCompletatiRef.current = [];
     ultimoAggiornamentoHudRef.current = 0;
     angoloVolanteRef.current = 0;
+    scuotimentoTargetRef.current = { x: 0, y: 0 };
+    scuotimentoAttualeRef.current = { x: 0, y: 0 };
+    ultimoCambioScuotimentoRef.current = 0;
+    inputRef.current = { accelera: false, frena: false, sterzaSinistra: false, sterzaDestra: false };
+    setPulsantiPremuti({});
 
     setTipoSessione(tipo);
     setStatoInvio('inattivo');
@@ -776,44 +825,39 @@ export default function GameChampionshipView() {
   }
 
   /**
-   * Fullscreen sull'INTERA pagina (non più sul solo contenitore del
-   * gioco): un tentativo sul solo contenitore, seguito da un eventuale
-   * fallback async, si è rivelato inaffidabile su mobile — molti
-   * browser (soprattutto Safari) concedono il fullscreen SOLO se la
-   * richiesta avviene in modo sincrono, nello stesso "giro" del click
-   * dell'utente. Un fallback dentro un .catch() o un setTimeout arriva
-   * fuori da quella finestra e viene rifiutato in silenzio: era
-   * probabilmente proprio questo a far fallire il fallback. Un solo
-   * tentativo sincrono, sempre sullo stesso bersaglio (l'intera
-   * pagina, il più universalmente supportato), evita il problema alla
-   * radice. Menu e footer del sito vengono nascosti a mano via classe
-   * CSS (vivono fuori dall'albero di questo componente).
+   * Fullscreen sull'INTERA pagina. Confermato (verificato a settembre
+   * 2026, non per assunzione): iOS Safari su iPhone non implementa
+   * affatto la Fullscreen API sugli elementi (solo su <video>, e solo
+   * su iPad — mai su iPhone, un bug WebKit aperto da anni senza
+   * soluzione). Nessun codice può aggirarlo. Per questo il CSS scatta
+   * SEMPRE, subito, indipendentemente dall'API nativa: il gioco riempie
+   * comunque lo schermo (menu/footer del sito nascosti), anche dove
+   * l'API non esiste proprio — resta solo la barra di Safari in alto,
+   * rimovibile solo installando il sito come app ("Condividi -> Aggiungi
+   * alla schermata Home"). Dove l'API nativa ESISTE, viene comunque
+   * tentata in aggiunta (un solo tentativo sincrono, nello stesso giro
+   * del click: molti browser la concedono solo così).
    */
   function attivaSchermoIntero() {
+    document.body.classList.add('gioco-fullscreen-pagina-intera');
+    modoFullscreenPaginaInteraRef.current = true;
+    setSchermoIntero(true); // impostato subito: dove l'API nativa non esiste (iPhone), nessun evento fullscreenchange arriverebbe mai a farlo al posto nostro
+
     const richiedi =
       document.documentElement.requestFullscreen ||
       document.documentElement.webkitRequestFullscreen ||
       document.documentElement.mozRequestFullScreen ||
       document.documentElement.msRequestFullscreen;
-    if (!richiedi) {
-      console.error('Fullscreen non supportato su questo browser.');
-      return;
-    }
-    document.body.classList.add('gioco-fullscreen-pagina-intera');
-    modoFullscreenPaginaInteraRef.current = true;
+    if (!richiedi) return; // API assente (es. iPhone): il CSS sopra è già tutto quello che si può ottenere
     try {
       const risultato = richiedi.call(document.documentElement);
       if (risultato && risultato.catch) {
         risultato.catch((errore) => {
-          console.error('Errore entrando in fullscreen:', errore);
-          document.body.classList.remove('gioco-fullscreen-pagina-intera');
-          modoFullscreenPaginaInteraRef.current = false;
+          console.error('Errore entrando in fullscreen nativo (il gioco resta comunque a schermo intero via CSS):', errore);
         });
       }
     } catch (errore) {
-      console.error('Errore chiamando requestFullscreen:', errore);
-      document.body.classList.remove('gioco-fullscreen-pagina-intera');
-      modoFullscreenPaginaInteraRef.current = false;
+      console.error('Errore chiamando requestFullscreen (il gioco resta comunque a schermo intero via CSS):', errore);
     }
   }
 
@@ -831,12 +875,14 @@ export default function GameChampionshipView() {
     }
     document.body.classList.remove('gioco-fullscreen-pagina-intera');
     modoFullscreenPaginaInteraRef.current = false;
+    setSchermoIntero(false); // impostato subito, stesso motivo di sopra (nessun evento nativo su iPhone)
   }
 
   function gestoriPulsanteControllo(campo) {
     const imposta = (valore) => (evento) => {
       evento.preventDefault();
       inputRef.current[campo] = valore;
+      setPulsantiPremuti((precedente) => ({ ...precedente, [campo]: valore }));
     };
     return {
       onPointerDown: imposta(true),
@@ -987,12 +1033,40 @@ export default function GameChampionshipView() {
           {haTouch && (
             <div className="game-championship-view__touch-pov">
               <div className="game-championship-view__touch-pov-dpad">
-                <button type="button" className="game-championship-view__pulsante-pov" aria-label="Sterza a sinistra" {...gestoriPulsanteControllo('sterzaSinistra')}>&larr;</button>
-                <button type="button" className="game-championship-view__pulsante-pov" aria-label="Sterza a destra" {...gestoriPulsanteControllo('sterzaDestra')}>&rarr;</button>
+                <button
+                  type="button"
+                  className={`game-championship-view__pulsante-pov ${pulsantiPremuti.sterzaSinistra ? 'game-championship-view__pulsante-pov--premuto' : ''}`}
+                  aria-label="Sterza a sinistra"
+                  {...gestoriPulsanteControllo('sterzaSinistra')}
+                >
+                  &larr;
+                </button>
+                <button
+                  type="button"
+                  className={`game-championship-view__pulsante-pov ${pulsantiPremuti.sterzaDestra ? 'game-championship-view__pulsante-pov--premuto' : ''}`}
+                  aria-label="Sterza a destra"
+                  {...gestoriPulsanteControllo('sterzaDestra')}
+                >
+                  &rarr;
+                </button>
               </div>
               <div className="game-championship-view__touch-pov-pedali">
-                <button type="button" className="game-championship-view__pulsante-pov game-championship-view__pulsante-pov--freno" aria-label="Freno" {...gestoriPulsanteControllo('frena')}>&darr;</button>
-                <button type="button" className="game-championship-view__pulsante-pov game-championship-view__pulsante-pov--gas" aria-label="Accelera" {...gestoriPulsanteControllo('accelera')}>&uarr;</button>
+                <button
+                  type="button"
+                  className={`game-championship-view__pulsante-pov game-championship-view__pulsante-pov--freno ${pulsantiPremuti.frena ? 'game-championship-view__pulsante-pov--premuto' : ''}`}
+                  aria-label="Freno"
+                  {...gestoriPulsanteControllo('frena')}
+                >
+                  &darr;
+                </button>
+                <button
+                  type="button"
+                  className={`game-championship-view__pulsante-pov game-championship-view__pulsante-pov--gas ${pulsantiPremuti.accelera ? 'game-championship-view__pulsante-pov--premuto' : ''}`}
+                  aria-label="Accelera"
+                  {...gestoriPulsanteControllo('accelera')}
+                >
+                  &uarr;
+                </button>
               </div>
             </div>
           )}

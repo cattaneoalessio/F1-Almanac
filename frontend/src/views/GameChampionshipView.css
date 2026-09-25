@@ -324,17 +324,20 @@ body.gioco-fullscreen-pagina-intera {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.game-championship-view__pulsante-pov:active {
+.game-championship-view__pulsante-pov:active,
+.game-championship-view__pulsante-pov--premuto {
   background: var(--accent-gold);
   border-color: var(--accent-gold);
   color: #2a1f04;
 }
-.game-championship-view__pulsante-pov--gas:active {
+.game-championship-view__pulsante-pov--gas:active,
+.game-championship-view__pulsante-pov--gas.game-championship-view__pulsante-pov--premuto {
   background: var(--accent-cyan);
   border-color: var(--accent-cyan);
   color: #04131a;
 }
-.game-championship-view__pulsante-pov--freno:active {
+.game-championship-view__pulsante-pov--freno:active,
+.game-championship-view__pulsante-pov--freno.game-championship-view__pulsante-pov--premuto {
   background: var(--accent-red);
   border-color: var(--accent-red);
   color: #fff;
