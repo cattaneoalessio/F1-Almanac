@@ -102,15 +102,28 @@ export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLa
   velocita = Math.min(velocita, velocitaMassimaCorrente);
   velocita = Math.max(velocita, 0); // ridondante con i Math.max sopra, ma esplicito: mai negativa
 
-  // Lo sterzo è proporzionale alla velocità attuale: da fermi girare il
-  // volante non sposta la macchina.
+  // Lo sterzo è proporzionale alla velocità attuale (da fermi girare
+  // il volante non sposta la macchina), ma con un minimo garantito:
+  // senza, finire sull'erba (dove la velocità crolla all'80% in meno)
+  // rendeva lo sterzo quasi inutile proprio quando serve di più per
+  // rientrare in pista — ci si restava bloccati (segnalato
+  // dall'utente: "a fatica si rimette al centro").
   const frazioneVelocita = velocita / VELOCITA_MASSIMA_BASE;
-  if (input.sterzaSinistra) x -= VELOCITA_STERZO_LATERALE * dt * frazioneVelocita;
-  if (input.sterzaDestra) x += VELOCITA_STERZO_LATERALE * dt * frazioneVelocita;
+  const frazioneVelocitaSterzo = Math.max(0.35, frazioneVelocita);
+  if (input.sterzaSinistra) x -= VELOCITA_STERZO_LATERALE * dt * frazioneVelocitaSterzo;
+  if (input.sterzaDestra) x += VELOCITA_STERZO_LATERALE * dt * frazioneVelocitaSterzo;
 
   // Effetto centrifugo: la curva del tracciato tira l'auto verso
-  // l'esterno, più forte quanto più si va veloci.
-  x += curvaturaSegmentoCorrente * frazioneVelocita * dt * EFFETTO_CENTRIFUGO;
+  // l'esterno, più forte quanto più si va veloci. Il segno era
+  // invertito: spingeva verso l'INTERNO della curva (nella stessa
+  // direzione in cui si sterza istintivamente entrando in curva) — i
+  // due effetti si sommavano invece di contrastarsi, mandando l'auto
+  // dritta sul muro esterno e bloccandocela (segnalato dall'utente:
+  // "premendo la direzione l'auto lampeggia... si fissa a 65km/h").
+  // Verificato: con curva=-3,98 (sinistra) e sterzo a sinistra tenuto,
+  // x restava fissa esattamente al muro (-16, il limite assoluto) per
+  // tutta la curva.
+  x -= curvaturaSegmentoCorrente * frazioneVelocita * dt * EFFETTO_CENTRIFUGO;
 
   x = limitaXAiMuri(x, semiLarghezzaPista);
 
