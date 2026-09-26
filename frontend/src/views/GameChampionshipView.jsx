@@ -673,6 +673,36 @@ export default function GameChampionshipView() {
       ctx.restore();
     }
 
+    /**
+     * Posizione (mondoX, mondoY) interpolata con continuità fra un
+     * segmento e il successivo, in base alla distanza esatta (non
+     * arrotondata al segmento). BUG TROVATO E CORRETTO: usare
+     * direttamente segmentoA(...).mondoX (un valore "a gradini", fisso
+     * per tutto il segmento da 7m) per la posizione dell'auto E per
+     * quella della telecamera dava due "scalini" che non scattavano
+     * mai esattamente nello stesso istante (la telecamera guarda un
+     * punto diverso, 10m indietro) — la differenza fra i due (che
+     * determina dove l'auto appare a schermo) faceva un salto ogni
+     * volta che UNO dei due passava al segmento successivo mentre
+     * l'altro no, tanto più grande quanto più la curva è stretta.
+     * Verificato con un log dedicato: la posizione a schermo dell'auto
+     * oscillava fra due valori fissi (differenza ~245px) frame dopo
+     * frame, anche ad auto ferma lateralmente e senza alcun input —
+     * era questo, non lo scuotimento (già rimosso), a dare l'idea di
+     * "saltella/vibra" segnalata dall'utente.
+     */
+    function posizioneMondoInterpolata(distanza) {
+      const indiceEsatto = distanza / LUNGHEZZA_SEGMENTO;
+      const indiceBase = Math.floor(indiceEsatto);
+      const frazione = indiceEsatto - indiceBase;
+      const segA = segmentoA(indiceBase);
+      const segB = segmentoA(indiceBase + 1);
+      return {
+        mondoX: segA.mondoX + (segB.mondoX - segA.mondoX) * frazione,
+        mondoY: segA.mondoY + (segB.mondoY - segA.mondoY) * frazione,
+      };
+    }
+
     function disegna() {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -696,13 +726,13 @@ export default function GameChampionshipView() {
         disegnaMinimappa(ctxMinimappa, minimappa.width, minimappa.height, segmentoAutoFrazionale);
       }
 
-      const segmentoAuto = segmentoA(Math.floor(auto.distanza / LUNGHEZZA_SEGMENTO));
+      const posizioneAutoMondo = posizioneMondoInterpolata(auto.distanza);
       const distanzaCamera = auto.distanza - DISTANZA_CAMERA_DIETRO;
-      const segmentoCamera = segmentoA(Math.floor(distanzaCamera / LUNGHEZZA_SEGMENTO));
+      const posizioneCameraMondo = posizioneMondoInterpolata(distanzaCamera);
       const camera = {
         distanza: distanzaCamera,
-        mondoX: segmentoCamera.mondoX + auto.x * FATTORE_SEGUI_LATERALE,
-        mondoY: segmentoCamera.mondoY + ALTEZZA_CAMERA_SOPRA,
+        mondoX: posizioneCameraMondo.mondoX + auto.x * FATTORE_SEGUI_LATERALE,
+        mondoY: posizioneCameraMondo.mondoY + ALTEZZA_CAMERA_SOPRA,
       };
 
       const segmenti = calcolaSegmentiVisibili(camera, NUMERO_SEGMENTI_VISIBILI);
@@ -793,8 +823,8 @@ export default function GameChampionshipView() {
 
       const puntoAuto = proietta(
         {
-          x: segmentoAuto.mondoX + auto.x - camera.mondoX,
-          y: segmentoAuto.mondoY - camera.mondoY,
+          x: posizioneAutoMondo.mondoX + auto.x - camera.mondoX,
+          y: posizioneAutoMondo.mondoY - camera.mondoY,
           z: auto.distanza - camera.distanza,
         },
         PROFONDITA_CAMERA,
