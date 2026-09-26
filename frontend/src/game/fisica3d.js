@@ -13,7 +13,7 @@
  * di sistema, testabile in isolamento con Node.
  */
 
-export const VELOCITA_MASSIMA_BASE = 90; // m/s ≈ 324 km/h
+export const VELOCITA_MASSIMA_BASE = 350 / 3.6; // ≈ 97.2 m/s = 350 km/h (richiesta esplicita dell'utente, era 324 km/h)
 export const ACCELERAZIONE = 25; // m/s^2 (0 a velocità massima in ~3.6s in pista libera)
 export const FRENO = 40; // m/s^2
 
@@ -31,7 +31,7 @@ export const LARGHEZZA_CORDOLO = 1;
 export const DISTANZA_MURO_OLTRE_BORDO_PISTA = 10;
 
 export const VELOCITA_STERZO_LATERALE = 10; // m/s di spostamento laterale a piena velocità e piena sterzata
-export const EFFETTO_CENTRIFUGO = 3.5; // quanto la curvatura del segmento "tira" lateralmente l'auto (m/s a piena velocità)
+export const EFFETTO_CENTRIFUGO = 1.4; // quanto la curvatura del segmento "tira" lateralmente l'auto (m/s a piena velocità) — alla curva più stretta del tracciato (5) dà una spinta di 7, sotto le 10 dello sterzo (VELOCITA_STERZO_LATERALE): prima (3.5) dava 17.5, più dello sterzo anche a fondo, impossibile da controbilanciare (segnalato dall'utente: "scivola sempre troppo rispetto allo sterzo")
 
 /**
  * Zona in cui si trova l'auto in base alla posizione laterale, e la
@@ -90,6 +90,7 @@ export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLa
   // Nessun input: la velocità resta ESATTAMENTE costante (nessuna
   // decelerazione passiva/attrito) — richiesta esplicita dell'utente,
   // sostituisce il comportamento precedente che rallentava da solo.
+  velocita = Math.min(velocita, VELOCITA_MASSIMA_BASE); // tetto assoluto — era sparito per errore insieme al vecchio tetto fisso di cordolo/erba, permettendo di accelerare ben oltre (segnalato dall'utente: fino a 500 km/h)
 
   const { zona, fattoreRiduzione } = statoPosizioneLaterale(x, semiLarghezzaPista);
   if (fattoreRiduzione > 0) {
