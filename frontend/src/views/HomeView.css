@@ -54,10 +54,6 @@
     padding: 4.5rem 0;
   }
 }
-.home-hero__art {
-  z-index: 1;
-  color: var(--accent-gold);
-}
 .home-hero__content {
   position: relative;
   z-index: 2;

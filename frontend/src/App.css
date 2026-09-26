@@ -53,12 +53,13 @@
   text-decoration: none;
   color: var(--text-primary);
 }
-.app-tabs__logo-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--accent-red);
+.app-tabs__logo-icona {
+  height: 22px;
+  width: auto;
   flex-shrink: 0;
+}
+.app-tabs__logo-ai {
+  color: var(--accent-red);
 }
 .app-tabs__links {
   display: flex;

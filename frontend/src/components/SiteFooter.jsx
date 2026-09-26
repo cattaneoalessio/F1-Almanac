@@ -11,6 +11,7 @@ import './SiteFooter.css';
  * loghi), usati solo a scopo descrittivo/informativo.
  */
 export default function SiteFooter() {
+  const anno = new Date().getFullYear();
   return (
     <footer className="site-footer">
       <p className="site-footer__disclaimer">
@@ -20,6 +21,7 @@ export default function SiteFooter() {
         nomi dei piloti citati appartengono ai rispettivi proprietari e vengono utilizzati esclusivamente
         a scopo descrittivo e informativo.
       </p>
+      <p className="site-footer__copyright">&copy; {anno} Monoposto.ai. Logo e contenuti del sito, tutti i diritti riservati.</p>
     </footer>
   );
 }

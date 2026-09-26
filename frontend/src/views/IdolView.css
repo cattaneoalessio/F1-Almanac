@@ -1,0 +1,37 @@
+.idol-view {
+  max-width: 720px;
+}
+
+.idol-view__indietro {
+  display: inline-block;
+  margin-bottom: 1.6rem;
+  color: var(--text-gray);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.idol-view__indietro:hover {
+  color: var(--text-primary);
+}
+
+.idol-view__nome {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.05;
+}
+
+.idol-view__payoff {
+  margin-top: 0.8rem;
+  color: var(--text-gray);
+  font-size: 1rem;
+  line-height: 1.5;
+  max-width: 48ch;
+}
+
+.idol-view__nota {
+  margin-top: 2rem;
+  color: var(--text-gray);
+  font-size: 0.85rem;
+  font-style: italic;
+}

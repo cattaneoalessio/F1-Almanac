@@ -1,0 +1,402 @@
+/* IdolSennaView.css — sottopagina editoriale di Ayrton Senna.
+   Solo token di theme.css (colori, font), stessa convenzione delle
+   altre viste del sito. Niente font nuovi: l'eleganza delle citazioni
+   viene da corsivo + spaziatura + il nero attorno, non da un font a
+   parte da caricare. */
+
+.idol-senna {
+  padding: 0;
+}
+
+/* ---------- HERO ---------- */
+.idol-senna__hero {
+  position: relative;
+  height: clamp(320px, 48vw, 480px);
+  width: 100%;
+  overflow: hidden;
+  margin-bottom: 2.4rem;
+}
+.idol-senna__hero-sfondo {
+  position: absolute;
+  inset: 0;
+  /* Placeholder dichiarato: gradiente nei colori del casco di Senna,
+     in attesa di una foto verificata (vedi nota licenze in
+     IdolSennaView.jsx). Sostituire con background-image quando pronta. */
+  background: linear-gradient(155deg, #f6c90e, #1a1a1a 70%);
+}
+.idol-senna__hero-velo {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 10%, rgba(0, 0, 0, 0.45) 55%, rgba(0, 0, 0, 0.15) 100%);
+}
+.idol-senna__hero-contenuto {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  height: 100%;
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.idol-senna__indietro {
+  align-self: flex-start;
+  margin-bottom: auto;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.idol-senna__indietro:hover {
+  color: var(--text-primary);
+}
+.idol-senna__hero-nome {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 7vw, 4rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.idol-senna__hero-payoff {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ---------- CORPO ARTICOLO ---------- */
+.idol-senna__corpo {
+  max-width: 720px;
+  margin: 0 auto 3rem;
+  padding: 0 1.6rem;
+  font-size: 1.02rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+.idol-senna__corpo h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 1.9rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 2.6rem 0 1.1rem;
+  color: var(--text-primary);
+}
+.idol-senna__corpo p {
+  margin: 0 0 1.2rem;
+  color: rgba(255, 255, 255, 0.88);
+}
+.idol-senna__intro {
+  font-size: 1.15rem;
+  color: var(--text-primary);
+}
+
+/* ---------- CITAZIONE CALLOUT ---------- */
+.idol-senna__citazione {
+  margin: 2.6rem calc(50% - 50vw);
+  padding: 3rem 1.6rem;
+  text-align: center;
+  background: var(--bg-card);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.idol-senna__citazione blockquote {
+  max-width: 760px;
+  margin: 0 auto;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.3rem, 4vw, 1.9rem);
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+.idol-senna__citazione figcaption {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-gold);
+}
+
+/* ---------- WIDGET STATISTICHE ---------- */
+.idol-senna__stat-griglia {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin: 1.8rem 0;
+}
+@media (max-width: 560px) {
+  .idol-senna__stat-griglia {
+    grid-template-columns: 1fr;
+  }
+}
+.idol-senna__stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1.3rem 1.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+}
+.idol-senna__stat-numero {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: var(--accent-red);
+  line-height: 1;
+}
+.idol-senna__stat-etichetta {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+.idol-senna__stat-nota {
+  font-size: 0.72rem;
+  color: var(--text-gray);
+}
+
+/* ---------- TIMELINE PERCORSO ---------- */
+.idol-senna__timeline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  margin: 1.8rem 0;
+  padding: 1.2rem 0;
+  border-top: 2px solid var(--line);
+}
+@media (max-width: 640px) {
+  .idol-senna__timeline {
+    grid-template-columns: 1fr;
+  }
+}
+.idol-senna__timeline-tappa {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.idol-senna__timeline-anno {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--accent-gold);
+}
+.idol-senna__timeline-squadra {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.idol-senna__timeline-nota {
+  font-size: 0.78rem;
+  color: var(--text-gray);
+  line-height: 1.4;
+}
+
+/* ---------- SEQUENZA DONINGTON ---------- */
+.idol-senna__sequenza {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.8rem 0 0.8rem;
+  padding: 1.2rem;
+  border-radius: 6px;
+  background: var(--bg-card);
+}
+.idol-senna__sequenza-passo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.idol-senna__sequenza-valore {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--accent-red);
+}
+.idol-senna__sequenza-etichetta {
+  font-size: 0.72rem;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  max-width: 8ch;
+}
+.idol-senna__sequenza-freccia {
+  color: var(--text-gray);
+  font-size: 1.2rem;
+  margin: 0 0.3rem;
+}
+
+/* ---------- MAPPA DONINGTON (astratta) ---------- */
+.idol-senna__mappa-contenitore {
+  margin: 0 0 1.8rem;
+  padding: 1.2rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+}
+.idol-senna__mappa-svg {
+  width: 100%;
+  height: auto;
+  max-height: 180px;
+}
+.idol-senna__mappa-didascalia {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-gray);
+  text-align: center;
+  min-height: 1.4em;
+}
+
+/* ---------- GRAFICO TELEMETRIA ---------- */
+.idol-senna__telemetria {
+  margin: 1.8rem 0;
+  padding: 1.3rem 1.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+}
+.idol-senna__telemetria-riga {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+}
+.idol-senna__telemetria-etichetta {
+  flex-shrink: 0;
+  width: 11rem;
+  font-size: 0.78rem;
+  color: var(--text-gray);
+}
+.idol-senna__telemetria-svg {
+  flex: 1;
+  height: 32px;
+}
+.idol-senna__telemetria-linea {
+  fill: none;
+  stroke-width: 2.5;
+}
+.idol-senna__telemetria-linea--senna {
+  stroke: var(--accent-red);
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  animation: idol-senna-disegna 3.5s ease-in-out infinite alternate;
+}
+.idol-senna__telemetria-linea--media {
+  stroke: var(--text-gray);
+}
+@keyframes idol-senna-disegna {
+  from {
+    stroke-dashoffset: 900;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.idol-senna__telemetria-nota {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--text-gray);
+}
+@media (prefers-reduced-motion: reduce) {
+  .idol-senna__telemetria-linea--senna {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ---------- TABELLA/TAB DI CONFRONTO ---------- */
+.idol-senna__confronto {
+  max-width: 720px;
+  margin: 0 auto 3rem;
+  padding: 0 1.6rem;
+}
+.idol-senna__confronto-titolo {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 1.9rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 1.2rem;
+  text-align: center;
+}
+.idol-senna__tab-barra {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+  border-bottom: 1px solid var(--line);
+}
+.idol-senna__tab-bottone {
+  padding: 0.6rem 1.1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-gray);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.idol-senna__tab-bottone--attivo {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-red);
+}
+
+.idol-senna__tabella {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.idol-senna__tabella th,
+.idol-senna__tabella td {
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.idol-senna__tabella thead th {
+  color: var(--text-gray);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.idol-senna__tabella tbody th {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}
+.idol-senna__tabella td {
+  text-align: right;
+}
+
+.idol-senna__rivalita-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+.idol-senna__rivalita-voce {
+  display: flex;
+  gap: 1rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--line);
+}
+.idol-senna__rivalita-anno {
+  flex-shrink: 0;
+  width: 3.6rem;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--accent-gold);
+}
+.idol-senna__rivalita-episodio-titolo {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+}
+.idol-senna__rivalita-testo {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 0.6rem;
+}
+.idol-senna__rivalita-badge {
+  background: var(--accent-red);
+  color: #fff;
+}

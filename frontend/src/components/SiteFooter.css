@@ -19,3 +19,13 @@
   color: var(--text-gray);
   font-weight: 700;
 }
+
+.site-footer__copyright {
+  max-width: 960px;
+  margin: 0.6rem auto 0;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  color: var(--text-gray);
+  opacity: 0.75;
+  text-align: center;
+}

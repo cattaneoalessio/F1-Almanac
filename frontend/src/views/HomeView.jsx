@@ -3,7 +3,6 @@ import './HomeView.css';
 import GlassPanel from '../components/GlassPanel.jsx';
 import TeamBadge from '../components/TeamBadge.jsx';
 import PreviewBadge from '../components/PreviewBadge.jsx';
-import CircuitArt from '../components/CircuitArt.jsx';
 import LoSapeviWidget from '../components/LoSapeviWidget.jsx';
 import AdSlot from '../components/AdSlot.jsx';
 import heroFoto from '../assets/hero/home-hero.jpg';
@@ -66,7 +65,6 @@ export default function HomeView() {
       <section className="home-hero">
         <img className="home-hero__foto" src={heroFoto} alt="" aria-hidden="true" />
         <div className="home-hero__scrim" />
-        <CircuitArt watermark className="home-hero__art" />
         <div className="home-hero__content">
           <p className="home-hero__kicker">GP Almanac — L'almanacco della Formula 1</p>
           <h1 className="home-hero__titolo">Ogni stagione. Ogni pilota. Ogni circuito.</h1>

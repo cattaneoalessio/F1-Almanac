@@ -13,12 +13,16 @@ import ScuderiesIndexView from './views/ScuderiesIndexView.jsx';
 import ScuderiaView from './views/ScuderiaView.jsx';
 import NewsView from './views/NewsView.jsx';
 import ArcadeView from './views/ArcadeView.jsx';
+import IdolsIndexView from './views/IdolsIndexView.jsx';
+import IdolSennaView from './views/IdolSennaView.jsx';
+import IdolView from './views/IdolView.jsx';
 import ChronoQuizView from './views/ChronoQuizView.jsx';
 import GameChampionshipView from './views/GameChampionshipView.jsx';
 import AdminGpView from './views/AdminGpView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
 import AdSlot from './components/AdSlot.jsx';
 import { AuthProvider, nomeUtente, useAuth } from './auth/AuthContext.jsx';
+import monopostoIcona from './assets/monoposto-nav-icon.png';
 
 const TABS = [
   // "/" è un caso speciale: con startsWith() combacerebbe con QUALSIASI
@@ -32,6 +36,7 @@ const TABS = [
   { pattern: '/news', to: '/news', label: 'News' },
   { pattern: '/live', to: '/live', label: 'Live Timing' },
   { pattern: '/arcade', to: '/arcade', label: 'Arcade' },
+  { pattern: '/idols', to: '/idols', label: 'Idols' },
 ];
 
 function BarraNavigazione() {
@@ -76,8 +81,8 @@ function BarraNavigazione() {
   return (
     <nav className="app-tabs" aria-label="Sezioni del sito" ref={barraRef}>
       <Link to="/" className="app-tabs__logo">
-        <span className="app-tabs__logo-dot" aria-hidden="true" />
-        GP Almanac
+        <img src={monopostoIcona} alt="" className="app-tabs__logo-icona" aria-hidden="true" />
+        Monoposto<span className="app-tabs__logo-ai">.ai</span>
       </Link>
 
       {/* Riga orizzontale di link, visibile da tablet in su (≥700px):
@@ -177,6 +182,9 @@ export default function App() {
           <Route path="/news" element={<NewsView />} />
           <Route path="/live" element={<LiveTimingView />} />
           <Route path="/arcade" element={<ArcadeView />} />
+          <Route path="/idols" element={<IdolsIndexView />} />
+          <Route path="/idols/senna" element={<IdolSennaView />} />
+          <Route path="/idols/:slug" element={<IdolView />} />
           <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
           <Route path="/arcade/time-attack" element={<GameChampionshipView />} />
           <Route path="/admin/chiudi-gp" element={<AdminGpView />} />
