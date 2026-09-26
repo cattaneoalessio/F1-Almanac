@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GlassPanel from '../components/GlassPanel.jsx';
-import { getClassificaArcade, getDomandeChronoQuiz, inviaPunteggioArcade } from '../api/backend.js';
-import { salvaPunteggioSeRecord } from '../utils/arcadeStorage.js';
+import { getClassificaArcade, getDomandeChronoQuiz, getMioRecordArcade, inviaPunteggioArcade } from '../api/backend.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import './ChronoQuizView.css';
 
-const CHIAVE_RECORD = 'monoposto_chronoquiz_high';
 const DURATA_DOMANDA_SECONDI = 15;
 const PAUSA_RIVELAZIONE_MS = 1500;
 
@@ -43,6 +41,17 @@ export default function ChronoQuizView() {
   const [usernameSalvato, setUsernameSalvato] = useState(null);
   const [classifica, setClassifica] = useState([]);
   const [statoClassifica, setStatoClassifica] = useState('inattivo'); // inattivo | caricamento | pronto | errore
+  // Record personale (legato all'account, non più a localStorage) e
+  // relativo stato di caricamento — mostrati insieme al record assoluto
+  // (primo della classifica) già nella schermata delle regole, prima
+  // di giocare (stessa dinamica di Time Attack).
+  const [mioRecordArcade, setMioRecordArcade] = useState({ punti: null });
+  const [statoMioRecordArcade, setStatoMioRecordArcade] = useState('inattivo'); // inattivo | caricamento | pronto | errore
+  // Il proprio record PRIMA di questa partita, catturato all'inizio:
+  // serve per decidere "Nuovo record!" confrontando col punteggio
+  // appena fatto, non con un valore che nel frattempo potrebbe essere
+  // già stato aggiornato.
+  const recordPrimaDellaPartitaRef = useRef(null);
 
   // Valori "autorevoli" del punteggio/risposte corrette, aggiornati in
   // modo sincrono (a differenza dello state, che si aggiorna al prossimo
@@ -78,6 +87,17 @@ export default function ChronoQuizView() {
     caricaDomande();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Record personale (legato all'account) e classifica assoluta,
+  // precaricati già per la schermata delle regole — non solo dopo aver
+  // giocato — così sono visibili prima ancora di iniziare (richiesta
+  // esplicita dell'utente: "in ogni scheda gioco deve esserci record
+  // personale e record assoluto"). Rieseguito se l'utente accede/esce.
+  useEffect(() => {
+    caricaMioRecordArcade();
+    caricaClassifica();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [utente]);
 
   // Timer dei 15 secondi per la domanda corrente: riparte a ogni cambio
   // di indiceDomanda, si pulisce da solo se il componente cambia fase o
@@ -148,7 +168,12 @@ export default function ChronoQuizView() {
   }
 
   function concludiPartita() {
-    const record = salvaPunteggioSeRecord(CHIAVE_RECORD, punteggioRef.current);
+    // "Nuovo record" ha senso solo per chi è loggato (è un record
+    // legato all'account, non più al browser): senza login, o senza un
+    // record precedente, qualunque punteggio positivo conta come nuovo
+    // record personale.
+    const recordPrecedente = recordPrimaDellaPartitaRef.current;
+    const record = Boolean(utente) && punteggioRef.current > 0 && (recordPrecedente === null || punteggioRef.current > recordPrecedente);
     setNuovoRecord(record);
     setFase('finale');
     inviaEsitoPartita(punteggioRef.current);
@@ -156,9 +181,10 @@ export default function ChronoQuizView() {
 
   // Invia il punteggio al backend (se il giocatore è loggato: senza
   // login il backend risponde comunque, semplicemente con salvato:false,
-  // vedi backend.js) e carica sempre la classifica subito dopo, così è
-  // visibile anche a chi non era loggato — solo in lettura, per motivarlo
-  // ad accedere la prossima volta.
+  // vedi backend.js) e ricarica sempre classifica e record personale
+  // subito dopo, così sono visibili anche a chi non era loggato — solo
+  // in lettura, per motivarlo ad accedere la prossima volta — e
+  // aggiornati per chi invece lo era.
   async function inviaEsitoPartita(punti) {
     setStatoInvio('invio');
     try {
@@ -171,6 +197,7 @@ export default function ChronoQuizView() {
       setStatoInvio('errore');
     }
     caricaClassifica();
+    caricaMioRecordArcade();
   }
 
   function caricaClassifica() {
@@ -186,10 +213,25 @@ export default function ChronoQuizView() {
       });
   }
 
+  function caricaMioRecordArcade() {
+    setStatoMioRecordArcade('caricamento');
+    ottieniToken()
+      .then((token) => getMioRecordArcade('chronoquiz', token))
+      .then((dati) => {
+        setMioRecordArcade(dati);
+        setStatoMioRecordArcade('pronto');
+      })
+      .catch((errore) => {
+        console.error('Errore nel caricare il mio record personale ChronoQuiz:', errore);
+        setStatoMioRecordArcade('errore');
+      });
+  }
+
   function resetPartita() {
     punteggioRef.current = 0;
     risposteCorretteRef.current = 0;
     gestitoRef.current = false;
+    recordPrimaDellaPartitaRef.current = mioRecordArcade.punti;
     setPunteggioTotale(0);
     setRisposteCorrette(0);
     setIndiceDomanda(0);
@@ -198,7 +240,6 @@ export default function ChronoQuizView() {
     setNuovoRecord(false);
     setStatoInvio('inattivo');
     setUsernameSalvato(null);
-    setStatoClassifica('inattivo');
   }
 
   function iniziaPartita() {
@@ -229,6 +270,26 @@ export default function ChronoQuizView() {
             <li>Risposta corretta: 100 punti base, più un bonus fino a 150 punti in base a quanto sei stato veloce.</li>
             <li>Risposta sbagliata o tempo scaduto: 0 punti per quella domanda, si va avanti comunque.</li>
           </ul>
+
+          <div className="chronoquiz-view__record-riepilogo">
+            <div className="chronoquiz-view__record-voce">
+              <span className="chronoquiz-view__record-etichetta">Il tuo record</span>
+              <span className="tab-num">
+                {!utente && 'Accedi per vederlo'}
+                {utente && statoMioRecordArcade === 'caricamento' && 'Carico...'}
+                {utente && statoMioRecordArcade === 'errore' && '--'}
+                {utente && statoMioRecordArcade === 'pronto' && (mioRecordArcade.punti !== null ? `${mioRecordArcade.punti} pts` : 'Nessuno ancora')}
+              </span>
+            </div>
+            <div className="chronoquiz-view__record-voce">
+              <span className="chronoquiz-view__record-etichetta">Record assoluto</span>
+              <span className="tab-num">
+                {statoClassifica === 'caricamento' && 'Carico...'}
+                {statoClassifica === 'errore' && '--'}
+                {statoClassifica === 'pronto' && (classifica.length > 0 ? `${classifica[0].punti} pts — ${classifica[0].username}` : 'Nessuno ancora')}
+              </span>
+            </div>
+          </div>
 
           <p className="chronoquiz-view__regole-nota">
             {utente
@@ -371,6 +432,7 @@ export default function ChronoQuizView() {
                   <span className="chronoquiz-view__classifica-posizione tab-num">{indice + 1}</span>
                   <span className="chronoquiz-view__classifica-nome">{voce.username}</span>
                   <span className="chronoquiz-view__classifica-punti tab-num">{voce.punti} pts</span>
+                  {indice === 0 && <span className="badge chronoquiz-view__badge-record-assoluto">Record assoluto</span>}
                 </li>
               ))}
             </ol>

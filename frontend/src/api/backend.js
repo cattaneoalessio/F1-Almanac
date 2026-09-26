@@ -120,6 +120,22 @@ export function getClassificaArcade(gioco, limite = 10) {
   return fetchBackend('/arcade/classifica', { gioco, limite });
 }
 
+/** Il mio punteggio massimo (su tutte le partite) per un gioco Arcade —
+ * usato per mostrare "il tuo record" accanto al record assoluto della
+ * classifica. Login facoltativo: senza token risponde comunque con
+ * punti null, non è un errore. */
+export async function getMioRecordArcade(gioco, token) {
+  const url = new URL('/arcade/mio-record', BASE_URL);
+  url.searchParams.set('gioco', gioco);
+  const risposta = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} chiamando ${url.pathname}`);
+  }
+  return risposta.json();
+}
+
 /** Invia un tempo di Time Attack. A differenza di inviaPunteggioArcade,
  * qui il login NON è facoltativo lato server: senza token valido la
  * risposta è un 401 (fetchBackend lo propaga come eccezione, il

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import GlassPanel from '../components/GlassPanel.jsx';
-import { leggiPunteggioSalvato } from '../utils/arcadeStorage.js';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { getLivelloPilota } from '../api/backend.js';
+import { getClassificaArcade, getLivelloPilota, getMioRecordArcade } from '../api/backend.js';
 import './ArcadeView.css';
 
 /**
@@ -76,8 +75,6 @@ const GIOCHI = [
   },
 ];
 
-const CHIAVE_RECORD_CHRONOQUIZ = 'monoposto_chronoquiz_high';
-
 /**
  * Soglie di punti totali → Livello Pilota, usate SOLO come fallback per
  * chi non è loggato (nessuna identità server a cui agganciare un
@@ -93,10 +90,11 @@ const LIVELLI_PILOTA = [
   { soglia: 0, nome: 'Rookie' },
 ];
 
-/** Punti totali per il fallback locale (solo ChronoQuiz, da localStorage):
- * usato quando non c'è login, quindi nessun modo di sommare Time Attack. */
-function calcolaPuntiTotaliLocale(recordChronoQuiz) {
-  return recordChronoQuiz;
+/** Punti totali per il fallback quando non si è loggati: senza un
+ * account non c'è più nulla da sommare (il record non vive più nel
+ * browser) — resta semplicemente Rookie finché non si accede. */
+function calcolaPuntiTotaliLocale() {
+  return 0;
 }
 
 function livelloPilotaLocale(puntiTotali) {
@@ -105,13 +103,40 @@ function livelloPilotaLocale(puntiTotali) {
 
 export default function ArcadeView() {
   const { utente, ottieniToken } = useAuth();
-  const [recordChronoQuiz, setRecordChronoQuiz] = useState(0);
   const [livelloServer, setLivelloServer] = useState(null); // { puntiTotali, livello } | null
   const [statoLivelloServer, setStatoLivelloServer] = useState('inattivo'); // inattivo | caricamento | pronto | errore
+  // Record personale (legato all'account) e assoluto di ChronoQuiz,
+  // mostrati sia nel pannello statistiche sia sulla scheda del gioco —
+  // stessa dinamica di Time Attack, non più localStorage.
+  const [mioRecordChronoQuiz, setMioRecordChronoQuiz] = useState({ punti: null });
+  const [statoMioRecordChronoQuiz, setStatoMioRecordChronoQuiz] = useState('inattivo');
+  const [recordAssolutoChronoQuiz, setRecordAssolutoChronoQuiz] = useState(null); // { username, punti } | null
+  const [statoRecordAssolutoChronoQuiz, setStatoRecordAssolutoChronoQuiz] = useState('inattivo');
 
   useEffect(() => {
-    setRecordChronoQuiz(leggiPunteggioSalvato(CHIAVE_RECORD_CHRONOQUIZ));
-  }, []);
+    setStatoMioRecordChronoQuiz('caricamento');
+    ottieniToken()
+      .then((token) => getMioRecordArcade('chronoquiz', token))
+      .then((dati) => {
+        setMioRecordChronoQuiz(dati);
+        setStatoMioRecordChronoQuiz('pronto');
+      })
+      .catch((errore) => {
+        console.error('Errore nel caricare il mio record ChronoQuiz:', errore);
+        setStatoMioRecordChronoQuiz('errore');
+      });
+
+    setStatoRecordAssolutoChronoQuiz('caricamento');
+    getClassificaArcade('chronoquiz', 1)
+      .then((dati) => {
+        setRecordAssolutoChronoQuiz(dati && dati.length > 0 ? dati[0] : null);
+        setStatoRecordAssolutoChronoQuiz('pronto');
+      })
+      .catch((errore) => {
+        console.error('Errore nel caricare il record assoluto ChronoQuiz:', errore);
+        setStatoRecordAssolutoChronoQuiz('errore');
+      });
+  }, [utente, ottieniToken]);
 
   // Livello unificato (ChronoQuiz + Time Attack) da loggati; senza login
   // resta il fallback locale calcolato più sotto, l'unico possibile senza
@@ -137,7 +162,7 @@ export default function ArcadeView() {
 
   const giochiAttivi = useMemo(() => GIOCHI.filter((gioco) => gioco.attivo).length, []);
 
-  const puntiTotaliLocale = calcolaPuntiTotaliLocale(recordChronoQuiz);
+  const puntiTotaliLocale = calcolaPuntiTotaliLocale();
   const usaLivelloServer = statoLivelloServer === 'pronto' && livelloServer !== null;
   const puntiTotali = usaLivelloServer ? livelloServer.punti_totali : puntiTotaliLocale;
   const livello = usaLivelloServer ? livelloServer.livello : livelloPilotaLocale(puntiTotaliLocale);
@@ -163,8 +188,12 @@ export default function ArcadeView() {
         </GlassPanel>
 
         <GlassPanel className="arcade-view__stat-panel">
-          <span className="arcade-view__stat-label">Record ChronoQuiz</span>
-          <span className="arcade-view__stat-valore tab-num">{recordChronoQuiz} pts</span>
+          <span className="arcade-view__stat-label">Il tuo record ChronoQuiz</span>
+          <span className="arcade-view__stat-valore tab-num">
+            {!utente && 'Accedi per vederlo'}
+            {utente && statoMioRecordChronoQuiz !== 'pronto' && '...'}
+            {utente && statoMioRecordChronoQuiz === 'pronto' && `${mioRecordChronoQuiz.punti ?? 0} pts`}
+          </span>
         </GlassPanel>
 
         <GlassPanel className="arcade-view__stat-panel">
@@ -200,7 +229,17 @@ export default function ArcadeView() {
                 <>
                   {gioco.slug === 'chronoquiz' && (
                     <span className="arcade-view__card-record">
-                      Record: <strong className="tab-num">{recordChronoQuiz} pts</strong>
+                      Il tuo record:{' '}
+                      <strong className="tab-num">
+                        {utente && statoMioRecordChronoQuiz === 'pronto' ? `${mioRecordChronoQuiz.punti ?? 0} pts` : '--'}
+                      </strong>
+                      {' · '}
+                      Assoluto:{' '}
+                      <strong className="tab-num">
+                        {statoRecordAssolutoChronoQuiz === 'pronto' && recordAssolutoChronoQuiz
+                          ? `${recordAssolutoChronoQuiz.punti} pts (${recordAssolutoChronoQuiz.username})`
+                          : '--'}
+                      </strong>
                     </span>
                   )}
                   <Link to={gioco.path} className="arcade-view__gioca">

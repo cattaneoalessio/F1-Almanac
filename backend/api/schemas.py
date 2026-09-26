@@ -165,6 +165,14 @@ class VoceClassificaArcade(BaseModel):
     creato_il: datetime
 
 
+class RispostaMioRecordArcade(BaseModel):
+    """Il punteggio massimo (su tutte le partite) dell'utente loggato
+    per un gioco Arcade — a differenza di arcade_punteggi (una riga per
+    partita), qui è il MAX su tutte quelle righe. Null se non loggato
+    o se non ha ancora giocato quel gioco: non è un errore."""
+    punti: Optional[int] = None
+
+
 class VoceAlboOro(BaseModel):
     pilota: str
     pilota_slug: str

@@ -65,6 +65,7 @@ from schemas import (
     RispostaInvioTempo,
     RispostaLivelloPilota,
     RispostaMioRecord,
+    RispostaMioRecordArcade,
     RispostaPunteggio,
     SchedaCircuito,
     SchedaPilota,
@@ -843,6 +844,39 @@ def classifica_arcade(gioco: str, limite: int = 10):
         conn.close()
 
     return [VoceClassificaArcade(**r) for r in righe]
+
+
+@app.get("/arcade/mio-record", response_model=RispostaMioRecordArcade)
+def mio_record_arcade(gioco: str, authorization: str = Header(default="")):
+    """Il punteggio massimo dell'utente loggato per un gioco Arcade, su
+    tutte le partite giocate (arcade_punteggi tiene una riga per
+    partita, non solo la migliore) — usato dal frontend per mostrare
+    "il tuo record" accanto al record assoluto della classifica. Login
+    facoltativo: senza token risponde comunque 200 con punti=null."""
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    conn = get_connection()
+    conn.autocommit = True  # utente_da_token può scrivere una riga nuova al primo accesso
+    try:
+        with conn.cursor() as cur:
+            utente_id, _username = utente_da_token(cur, token)
+            if utente_id is None:
+                return RispostaMioRecordArcade(punti=None)
+
+            cur.execute(
+                """
+                SELECT MAX(punti) AS punti FROM arcade_punteggi
+                WHERE utente_id = %(u)s AND gioco = %(gioco)s
+                """,
+                {"u": utente_id, "gioco": gioco},
+            )
+            riga = cur.fetchone()
+    finally:
+        conn.close()
+
+    return RispostaMioRecordArcade(punti=riga["punti"] if riga is not None else None)
 
 
 # == Time Attack ("Monoposto Virtual Arena") ==

@@ -206,6 +206,42 @@
   margin-bottom: 0.4rem;
 }
 
+.chronoquiz-view__badge-record-assoluto {
+  background: var(--accent-cyan);
+  color: #04131a;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.chronoquiz-view__record-riepilogo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+.chronoquiz-view__record-voce {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+}
+.chronoquiz-view__record-etichetta {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-gray);
+}
+.chronoquiz-view__record-voce .tab-num {
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chronoquiz-view__finale-etichetta {
   font-size: 0.8rem;
   color: var(--text-gray);
