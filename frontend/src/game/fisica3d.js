@@ -34,16 +34,13 @@ export const VELOCITA_STERZO_LATERALE = 10; // m/s di spostamento laterale a pie
 export const EFFETTO_CENTRIFUGO = 3.5; // quanto la curvatura del segmento "tira" lateralmente l'auto (m/s a piena velocità)
 
 /**
- * Zona in cui si trova l'auto in base alla posizione laterale, e il
- * fattore che riduce la velocità massima lì — sistema a ruote, dalle
- * specifiche dell'utente:
+ * Zona in cui si trova l'auto in base alla posizione laterale, e la
+ * riduzione (proporzionale, continua — non un tetto massimo fisso,
+ * vedi avanzaFisica) applicata lì:
  * - completamente in pista: nessuna riduzione
- * - 1 ruota sul cordolo (il bordo esterno dell'auto ha superato il
- *   bordo pista, quello interno no): -10%
- * - 2 ruote sul cordolo (entrambi i bordi dell'auto hanno superato il
- *   bordo pista, ma quello interno è ancora entro il cordolo): -25%
- * - più di 2 ruote oltre cordoli/pista (il bordo interno dell'auto ha
- *   superato anche il cordolo): -80%
+ * - almeno una ruota sul cordolo (bordo esterno o interno dell'auto
+ *   oltre il bordo pista, ma non oltre il cordolo): -20% al secondo
+ * - oltre il cordolo, sull'erba: -40% al secondo
  */
 export function statoPosizioneLaterale(xMetri, semiLarghezzaPista) {
   const distanzaCentro = Math.abs(xMetri);
@@ -52,15 +49,12 @@ export function statoPosizioneLaterale(xMetri, semiLarghezzaPista) {
   const bordoCordolo = semiLarghezzaPista + LARGHEZZA_CORDOLO;
 
   if (bordoLontano <= semiLarghezzaPista) {
-    return { zona: 'pista', fattoreVelocita: 1 };
-  }
-  if (bordoVicino <= semiLarghezzaPista) {
-    return { zona: 'cordolo-una-ruota', fattoreVelocita: 0.9 };
+    return { zona: 'pista', fattoreRiduzione: 0 };
   }
   if (bordoVicino <= bordoCordolo) {
-    return { zona: 'cordolo-due-ruote', fattoreVelocita: 0.75 };
+    return { zona: 'cordolo', fattoreRiduzione: 0.2 };
   }
-  return { zona: 'erba', fattoreVelocita: 0.2 };
+  return { zona: 'erba', fattoreRiduzione: 0.4 };
 }
 
 /** L'auto non può mai superare lateralmente il muro di contenimento:
@@ -97,15 +91,23 @@ export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLa
   // decelerazione passiva/attrito) — richiesta esplicita dell'utente,
   // sostituisce il comportamento precedente che rallentava da solo.
 
-  const { zona, fattoreVelocita } = statoPosizioneLaterale(x, semiLarghezzaPista);
-  const velocitaMassimaCorrente = VELOCITA_MASSIMA_BASE * fattoreVelocita;
-  velocita = Math.min(velocita, velocitaMassimaCorrente);
+  const { zona, fattoreRiduzione } = statoPosizioneLaterale(x, semiLarghezzaPista);
+  if (fattoreRiduzione > 0) {
+    // Riduzione proporzionale CONTINUA alla velocità attuale, non un
+    // tetto massimo fisso (richiesta esplicita dell'utente — con un
+    // tetto fisso, ci si trovava bloccati esattamente a quel valore,
+    // es. 65 km/h sull'erba, invece di rallentare "e basta" da lì).
+    // (1-fattoreRiduzione)^dt: dopo un secondo pieno sulla superficie,
+    // la velocità è scesa esattamente di quella percentuale rispetto a
+    // quella con cui vi si è entrati, indipendentemente dal framerate.
+    velocita *= (1 - fattoreRiduzione) ** dt;
+  }
   velocita = Math.max(velocita, 0); // ridondante con i Math.max sopra, ma esplicito: mai negativa
 
   // Lo sterzo è proporzionale alla velocità attuale (da fermi girare
   // il volante non sposta la macchina), ma con un minimo garantito:
-  // senza, finire sull'erba (dove la velocità crolla all'80% in meno)
-  // rendeva lo sterzo quasi inutile proprio quando serve di più per
+  // senza, sull'erba (dove la velocità cala progressivamente) sterzare
+  // sarebbe via via meno efficace proprio mentre serve di più per
   // rientrare in pista — ci si restava bloccati (segnalato
   // dall'utente: "a fatica si rimette al centro").
   const frazioneVelocita = velocita / VELOCITA_MASSIMA_BASE;

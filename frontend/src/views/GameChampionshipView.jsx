@@ -36,7 +36,7 @@ const CIRCUITO_NOME = 'Brianza Speed Ring';
 const GIRI_GARA = 10; // richiesta esplicita dell'utente
 const LIMITE_TEMPO_QUALIFICA_SECONDI = 180;
 const ETICHETTA_SESSIONE = { prove_libere: 'Prove Libere', qualifica: 'Qualifica', gara: 'Gara' };
-const ETICHETTA_ZONA = { 'cordolo-una-ruota': 'CORDOLO', 'cordolo-due-ruote': 'CORDOLO', erba: "SULL'ERBA" };
+const ETICHETTA_ZONA = { cordolo: 'CORDOLO', erba: "SULL'ERBA" };
 
 // Semaforo di partenza — stessa logica del vecchio motore 2D (confermata
 // esplicitamente dall'utente: "la logica del semaforo rimane").
@@ -157,15 +157,6 @@ export default function GameChampionshipView() {
   // fotogramma (vedi il punto in cui telemetriaRef viene aggiornato).
   const tempiIntermediGiroRef = useRef([null, null, null]);
   const [tempiIntermedi, setTempiIntermedi] = useState([null, null, null]);
-  // Scuotimento smorzato: un nuovo bersaglio casuale solo ogni ~70ms,
-  // interpolato morbidamente fotogramma per fotogramma — un valore
-  // casuale puro a OGNI fotogramma (versione precedente) sembrava uno
-  // sfarfallio/salto d'immagine, non una vibrazione (segnalato
-  // dall'utente, specialmente evidente in curva dove capita più spesso
-  // di toccare cordoli/erba).
-  const scuotimentoTargetRef = useRef({ x: 0, y: 0 });
-  const scuotimentoAttualeRef = useRef({ x: 0, y: 0 });
-  const ultimoCambioScuotimentoRef = useRef(0);
 
   // Sicurezza: se si naviga via mentre si è nel fallback fullscreen su
   // tutta la pagina, la classe sul body non deve restare appiccicata.
@@ -407,7 +398,7 @@ export default function GameChampionshipView() {
      * stilizzata), partenza/traguardo, i 3 checkpoint intermedi e la
      * posizione live dell'auto — su un canvas SEPARATO dal 3D
      * principale (più semplice: niente da mescolare con la
-     * prospettiva/scuotimento del gioco).
+     * prospettiva del gioco).
      */
     function disegnaMinimappa(ctx, larghezza, altezza, segmentoAutoFrazionale) {
       ctx.clearRect(0, 0, larghezza, altezza);
@@ -721,32 +712,10 @@ export default function GameChampionshipView() {
         if (p) proiettati.push({ ...s, ...p, y_mondo: s.y });
       }
 
-      // Camera shake: sopra l'85% della velocità massima, sui cordoli o
-      // sull'erba. Scuote la pista/scenario; l'auto (disegnata dopo)
-      // riceve solo una frazione in controfase, per dare l'idea che le
-      // sospensioni assorbano parte dell'urto invece di seguirlo in pieno.
-      // Smorzato (nuovo bersaglio casuale ogni ~70ms, interpolato
-      // morbidamente) invece di un valore casuale puro a ogni
-      // fotogramma, che sembrava uno sfarfallio/salto d'immagine più
-      // che una vibrazione — specie evidente in curva.
-      const suSuperficieIrregolare = auto.zona === 'erba'; // niente vibrazione sul cordolo (richiesta esplicita dell'utente), resta solo sull'erba
-      const velocitaAlta = frazioneVelocitaHud > 0.85;
-      const intensitaScuotimento = (suSuperficieIrregolare ? 3 : 0) + (velocitaAlta ? 2.2 : 0);
-      const adessoScuotimento = performance.now();
-      if (adessoScuotimento - ultimoCambioScuotimentoRef.current > 70) {
-        ultimoCambioScuotimentoRef.current = adessoScuotimento;
-        scuotimentoTargetRef.current =
-          intensitaScuotimento > 0
-            ? { x: (Math.random() - 0.5) * intensitaScuotimento * 2, y: (Math.random() - 0.5) * intensitaScuotimento * 2 }
-            : { x: 0, y: 0 };
-      }
-      scuotimentoAttualeRef.current.x += (scuotimentoTargetRef.current.x - scuotimentoAttualeRef.current.x) * 0.3;
-      scuotimentoAttualeRef.current.y += (scuotimentoTargetRef.current.y - scuotimentoAttualeRef.current.y) * 0.3;
-      const scuotimentoX = scuotimentoAttualeRef.current.x;
-      const scuotimentoY = scuotimentoAttualeRef.current.y;
-
-      ctx.save();
-      ctx.translate(scuotimentoX, scuotimentoY);
+      // Niente più camera shake: anche smorzato, restava percepito come
+      // uno sfarfallio/salto d'immagine (soprattutto in curva) invece
+      // che come una vibrazione — rimosso del tutto su richiesta
+      // esplicita dell'utente, non solo attenuato.
 
       for (let i = proiettati.length - 1; i > 0; i--) {
         const lontano = proiettati[i];
@@ -821,7 +790,6 @@ export default function GameChampionshipView() {
 
       disegnaLineeVento(ctx, W, H, velocitaKmhHud, performance.now());
       disegnaCavalcavia(ctx, proiettati);
-      ctx.restore(); // fine dello scuotimento di pista/scenario/cavalcavia
 
       const puntoAuto = proietta(
         {
@@ -835,13 +803,7 @@ export default function GameChampionshipView() {
         INCLINAZIONE_CAMERA_RADIANTI
       );
       if (puntoAuto) {
-        // Contro-scuotimento più leggero per l'auto: le sospensioni
-        // assorbono parte dell'urto invece di seguirlo in pieno come
-        // il resto della scena.
-        ctx.save();
-        ctx.translate(-scuotimentoX * 0.35, -scuotimentoY * 0.35);
         disegnaAuto(ctx, puntoAuto, W, angoloVolanteRef.current * 0.3);
-        ctx.restore();
       }
     }
 
@@ -945,9 +907,6 @@ export default function GameChampionshipView() {
     giriCompletatiRef.current = [];
     ultimoAggiornamentoHudRef.current = 0;
     angoloVolanteRef.current = 0;
-    scuotimentoTargetRef.current = { x: 0, y: 0 };
-    scuotimentoAttualeRef.current = { x: 0, y: 0 };
-    ultimoCambioScuotimentoRef.current = 0;
     inputRef.current = { accelera: false, frena: false, sterzaSinistra: false, sterzaDestra: false };
     setPulsantiPremuti({});
 
@@ -1405,8 +1364,7 @@ export default function GameChampionshipView() {
           </div>
 
           <ul className="game-championship-view__regole-lista">
-            <li>Un cordolo sotto una ruota rallenta del 10%, sotto due ruote del 25%.</li>
-            <li>Oltre i cordoli con più di due ruote sei sull&rsquo;erba: -80% di velocità.</li>
+            <li>Il cordolo riduce la velocità del 20% al secondo, l&rsquo;erba del 40% al secondo.</li>
             <li>Muri di contenimento oltre l&rsquo;erba: l&rsquo;auto non può uscirne. Niente retromarcia.</li>
             {tipoSessione === 'qualifica' && (
               <li>
