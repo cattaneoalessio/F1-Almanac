@@ -265,7 +265,7 @@ CREATE TABLE gioco_tempi (
     id               SERIAL PRIMARY KEY,
     utente_id        INTEGER NOT NULL REFERENCES utenti(id) ON DELETE CASCADE,
     circuito_id      INTEGER NOT NULL REFERENCES circuiti(id) ON DELETE CASCADE,
-    tipo_sessione    VARCHAR(20) NOT NULL CHECK (tipo_sessione IN ('qualifica', 'gara')),
+    tipo_sessione    VARCHAR(20) NOT NULL CHECK (tipo_sessione IN ('prove_libere', 'qualifica', 'gara')),
     tempo_totale     NUMERIC(8,3) NOT NULL,   -- secondi, es. 47.812
     telemetria_json  JSONB,                   -- checkpoint [{giro, indice, t}], vedi game.py
     creato_il        TIMESTAMPTZ NOT NULL DEFAULT now(),

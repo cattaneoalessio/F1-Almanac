@@ -945,9 +945,10 @@ def invia_tempo_gioco(payload: InvioTempoGioco, authorization: str = Header(defa
 
 @app.get("/game/leaderboard/{slug}", response_model=ClassificaTempiCircuito)
 def classifica_tempi_circuito(slug: str, limite: int = 10):
-    """Classifica Qualifica e Gara per un circuito, separate. Un solo
-    tempo per utente per sessione (il record personale, vedi
-    gioco_tempi), quindi nessuna riga duplicata per lo stesso pilota."""
+    """Classifica Prove Libere, Qualifica e Gara per un circuito,
+    separate. Un solo tempo per utente per sessione (il record
+    personale, vedi gioco_tempi), quindi nessuna riga duplicata per lo
+    stesso pilota."""
     limite = max(1, min(limite, 50))
     conn = get_connection()
     try:
@@ -957,7 +958,7 @@ def classifica_tempi_circuito(slug: str, limite: int = 10):
                 raise HTTPException(status_code=404, detail="Circuito non trovato.")
 
             classifiche = {}
-            for tipo in ("qualifica", "gara"):
+            for tipo in ("prove_libere", "qualifica", "gara"):
                 cur.execute(
                     """
                     SELECT u.username, gt.tempo_totale, gt.creato_il
@@ -975,6 +976,7 @@ def classifica_tempi_circuito(slug: str, limite: int = 10):
 
     return ClassificaTempiCircuito(
         circuito=circuito["nome"],
+        prove_libere=classifiche["prove_libere"],
         qualifica=classifiche["qualifica"],
         gara=classifiche["gara"],
     )
@@ -1222,10 +1224,10 @@ def livello_pilota(authorization: str = Header(default="")):
 @app.get("/game/mio-record/{slug}", response_model=RispostaMioRecord)
 def mio_record(slug: str, authorization: str = Header(default="")):
     """Il tempo personale dell'utente loggato su questo circuito, per
-    Qualifica e Gara separatamente — usato dal frontend per colorare di
-    viola un giro che batte il proprio record assoluto. Login
-    facoltativo: senza token risponde comunque 200 con entrambi i campi
-    null (nessun errore, semplicemente niente da confrontare)."""
+    Prove Libere, Qualifica e Gara separatamente — usato dal frontend
+    per colorare di viola un giro che batte il proprio record assoluto.
+    Login facoltativo: senza token risponde comunque 200 con tutti i
+    campi null (nessun errore, semplicemente niente da confrontare)."""
     token = None
     if authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()
@@ -1240,10 +1242,10 @@ def mio_record(slug: str, authorization: str = Header(default="")):
 
             utente_id, _username = utente_da_token(cur, token)
             if utente_id is None:
-                return RispostaMioRecord(qualifica=None, gara=None)
+                return RispostaMioRecord(prove_libere=None, qualifica=None, gara=None)
 
             valori = {}
-            for tipo in ("qualifica", "gara"):
+            for tipo in ("prove_libere", "qualifica", "gara"):
                 cur.execute(
                     """
                     SELECT tempo_totale FROM gioco_tempi

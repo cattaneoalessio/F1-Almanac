@@ -257,7 +257,7 @@ class InvioTempoGioco(BaseModel):
     ogni altro endpoint di questa API, il frontend parla per slug, mai
     per id numerico interno (vedi /circuiti/{slug}, /piloti/{slug}...)."""
     circuito_slug: str
-    tipo_sessione: Literal["qualifica", "gara"]
+    tipo_sessione: Literal["prove_libere", "qualifica", "gara"]
     tempo_totale: float = Field(gt=0)
     checkpoint: list[CheckpointTelemetria]
 
@@ -279,6 +279,7 @@ class VoceClassificaTempi(BaseModel):
 
 class ClassificaTempiCircuito(BaseModel):
     circuito: str
+    prove_libere: list[VoceClassificaTempi]
     qualifica: list[VoceClassificaTempi]
     gara: list[VoceClassificaTempi]
 
@@ -313,9 +314,11 @@ class RispostaLivelloPilota(BaseModel):
 
 class RispostaMioRecord(BaseModel):
     """Il record personale (se esiste) dell'utente loggato su un
-    circuito, per Qualifica e Gara separatamente. Campi null se non
-    loggato o se non ha ancora un tempo per quella sessione — non è un
-    errore, è lo stato normale prima del primo tentativo."""
+    circuito, per Prove Libere, Qualifica e Gara separatamente. Campi
+    null se non loggato o se non ha ancora un tempo per quella
+    sessione — non è un errore, è lo stato normale prima del primo
+    tentativo."""
+    prove_libere: Optional[float] = None
     qualifica: Optional[float] = None
     gara: Optional[float] = None
 

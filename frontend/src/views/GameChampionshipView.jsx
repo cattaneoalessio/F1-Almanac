@@ -103,6 +103,10 @@ export default function GameChampionshipView() {
   const [nuovoRecord, setNuovoRecord] = useState(false);
 
   const [classificaCircuito, setClassificaCircuito] = useState(null);
+  // Record personale mostrato nella schermata di SELEZIONE (prima di
+  // giocare) — stato React, non il ref mioRecordRef (quello è per il
+  // colore dei giri durante la guida e non aggiorna la UI da solo).
+  const [mioRecordSelezione, setMioRecordSelezione] = useState({ prove_libere: null, qualifica: null, gara: null });
   const [statoClassificaCircuito, setStatoClassificaCircuito] = useState('inattivo');
 
   const [campionato, setCampionato] = useState([]);
@@ -178,6 +182,20 @@ export default function GameChampionshipView() {
         setStatoCampionato('errore');
       });
   }, []);
+
+  // Record personale (Prove Libere/Qualifica/Gara) e classifica del
+  // circuito, precaricati per la schermata di SELEZIONE — prima ancora
+  // di giocare, non solo dopo (richiesta esplicita dell'utente: "in
+  // ogni scheda gioco deve esserci record personale e record
+  // assoluto"). Rieseguito anche se l'utente accede/esce a sessione in
+  // corso, così il record personale compare/sparisce di conseguenza.
+  useEffect(() => {
+    ottieniToken()
+      .then((token) => getMioRecord(CIRCUITO_SLUG, token))
+      .then((dati) => setMioRecordSelezione(dati))
+      .catch((errore) => console.error('Errore nel caricare il mio record personale:', errore));
+    caricaClassificaCircuito();
+  }, [utente]);
 
   // Input da tastiera, solo mentre si è in pista. Attivo anche durante
   // il semaforo: i tasti non fanno nulla finché viaRef non è true.
@@ -887,6 +905,16 @@ export default function GameChampionshipView() {
           tempiIntermediGiroRef.current = [null, null, null]; // nuovo giro, nuovi intermedi
           setTempiIntermedi(tempiIntermediGiroRef.current);
 
+          if (tipoSessione === 'prove_libere') {
+            // Le Prove Libere non hanno un limite di tempo che le
+            // concluda (a differenza della Qualifica): ogni giro
+            // completato è di per sé un'occasione di record, inviato
+            // subito senza uscire dalla sessione (richiesta esplicita
+            // dell'utente: il miglior tempo in Prove Libere deve
+            // salvarsi come per Qualifica e Gara).
+            inviaERicaricaClassifica(tempoGiroSecondi, checkpointDiQuestoGiro);
+          }
+
           if (tipoSessione === 'gara' && giroCorrenteRef.current >= GIRI_GARA) {
             fermo = true;
             concludiGara(tSessione / 1000);
@@ -948,7 +976,7 @@ export default function GameChampionshipView() {
     setGiriCompletati([]);
     setHud({ tempoTrascorso: 0, giro: 1, velocitaKmh: 0, zona: 'pista' });
 
-    mioRecordRef.current = { qualifica: null, gara: null };
+    mioRecordRef.current = { prove_libere: null, qualifica: null, gara: null };
     ottieniToken()
       .then((token) => getMioRecord(CIRCUITO_SLUG, token))
       .then((dati) => {
@@ -1085,8 +1113,6 @@ export default function GameChampionshipView() {
   }
 
   async function inviaERicaricaClassifica(tempoTotaleSecondi, checkpoint) {
-    if (tipoSessione === 'prove_libere') return;
-
     setStatoInvio('invio');
     try {
       const token = await ottieniToken();
@@ -1299,9 +1325,6 @@ export default function GameChampionshipView() {
               {formattaTempo(risultatoFinale?.tempoTotale)}
             </span>
 
-            {tipoSessione === 'prove_libere' && (
-              <p className="game-championship-view__esito">Prove Libere: nessun tempo salvato, solo allenamento.</p>
-            )}
             {statoInvio === 'nessun-tempo' && (
               <p className="game-championship-view__esito">Nessun giro completato entro il tempo limite &mdash; riprova.</p>
             )}
@@ -1333,27 +1356,26 @@ export default function GameChampionshipView() {
             </div>
           </GlassPanel>
 
-          {tipoSessione !== 'prove_libere' && (
-            <GlassPanel className="game-championship-view__panel game-championship-view__classifica">
-              <h3 className="game-championship-view__classifica-titolo">Classifica &mdash; {CIRCUITO_NOME}</h3>
-              {statoClassificaCircuito === 'caricamento' && <p className="game-championship-view__classifica-stato">Carico la classifica...</p>}
-              {statoClassificaCircuito === 'errore' && <p className="game-championship-view__classifica-stato">Non riesco a mostrare la classifica ora.</p>}
-              {statoClassificaCircuito === 'pronto' && classificaCircuito && (
-                <ol className="game-championship-view__classifica-lista">
-                  {(classificaCircuito[tipoSessione] || []).map((voce, indice) => (
-                    <li key={`${voce.username}-${indice}`} className="game-championship-view__classifica-voce">
-                      <span className="tab-num">{indice + 1}</span>
-                      <span className="game-championship-view__classifica-nome">{voce.username}</span>
-                      <span className="tab-num">{formattaTempo(voce.tempo_totale)}</span>
-                    </li>
-                  ))}
-                  {(classificaCircuito[tipoSessione] || []).length === 0 && (
-                    <p className="game-championship-view__classifica-stato">Nessun tempo ancora registrato per questa sessione.</p>
-                  )}
-                </ol>
-              )}
-            </GlassPanel>
-          )}
+          <GlassPanel className="game-championship-view__panel game-championship-view__classifica">
+            <h3 className="game-championship-view__classifica-titolo">Classifica &mdash; {CIRCUITO_NOME}</h3>
+            {statoClassificaCircuito === 'caricamento' && <p className="game-championship-view__classifica-stato">Carico la classifica...</p>}
+            {statoClassificaCircuito === 'errore' && <p className="game-championship-view__classifica-stato">Non riesco a mostrare la classifica ora.</p>}
+            {statoClassificaCircuito === 'pronto' && classificaCircuito && (
+              <ol className="game-championship-view__classifica-lista">
+                {(classificaCircuito[tipoSessione] || []).map((voce, indice) => (
+                  <li key={`${voce.username}-${indice}`} className="game-championship-view__classifica-voce">
+                    <span className="tab-num">{indice + 1}</span>
+                    <span className="game-championship-view__classifica-nome">{voce.username}</span>
+                    <span className="tab-num">{formattaTempo(voce.tempo_totale)}</span>
+                    {indice === 0 && <span className="badge game-championship-view__badge-record-assoluto">Record assoluto</span>}
+                  </li>
+                ))}
+                {(classificaCircuito[tipoSessione] || []).length === 0 && (
+                  <p className="game-championship-view__classifica-stato">Nessun tempo ancora registrato per questa sessione.</p>
+                )}
+              </ol>
+            )}
+          </GlassPanel>
         </>
       );
     }
@@ -1371,8 +1393,8 @@ export default function GameChampionshipView() {
           </p>
           <p className="game-championship-view__nota-login">
             {utente
-              ? 'Sei connesso: i tempi di Qualifica e Gara verranno salvati e conteranno per il Campionato.'
-              : 'Puoi giocare senza account (le Prove Libere sono sempre gratuite): accedi dalla barra in alto per salvare tempi ufficiali.'}
+              ? 'Sei connesso: il tuo miglior tempo in Prove Libere, Qualifica e Gara viene salvato, e Qualifica/Gara contano per il Campionato.'
+              : 'Puoi giocare senza account: accedi dalla barra in alto per salvare il tuo miglior tempo (anche in Prove Libere) e vederlo qui accanto al record assoluto del circuito.'}
           </p>
         </header>
 
@@ -1390,6 +1412,27 @@ export default function GameChampionshipView() {
                   {ETICHETTA_SESSIONE[tipo]}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="game-championship-view__record-riepilogo">
+            <div className="game-championship-view__record-voce">
+              <span className="game-championship-view__record-etichetta">Il tuo record</span>
+              <span className="tab-num">
+                {utente ? formattaTempo(mioRecordSelezione[tipoSessione]) : 'Accedi per vederlo'}
+              </span>
+            </div>
+            <div className="game-championship-view__record-voce">
+              <span className="game-championship-view__record-etichetta">Record assoluto</span>
+              <span className="tab-num">
+                {statoClassificaCircuito === 'caricamento' && 'Carico...'}
+                {statoClassificaCircuito === 'errore' && '--'}
+                {statoClassificaCircuito === 'pronto' && classificaCircuito && (
+                  (classificaCircuito[tipoSessione] || []).length > 0
+                    ? `${formattaTempo(classificaCircuito[tipoSessione][0].tempo_totale)} — ${classificaCircuito[tipoSessione][0].username}`
+                    : 'Nessuno ancora'
+                )}
+              </span>
             </div>
           </div>
 
