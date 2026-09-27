@@ -212,6 +212,21 @@ def carica_sessione(anno: int, round_: int, tipo: str) -> Optional[fastf1.core.S
     try:
         sessione = fastf1.get_session(anno, round_, tipo)
         sessione.load(laps=True, telemetry=True, weather=False, messages=False)
+        # session.load() NON solleva un'eccezione se i dati non sono
+        # disponibili per questa sessione (es. self.f1_api_support è
+        # False, capita per sessioni troppo recenti i cui dati non sono
+        # ancora stati pubblicati, o weekend con formato particolare):
+        # si limita a loggare un avviso interno e a lasciare .laps/
+        # .results non impostati. Verifichiamo esplicitamente qui,
+        # subito dopo il load, invece di scoprirlo più avanti nella
+        # pipeline con un DataNotLoadedError non gestito.
+        if not sessione.f1_api_support:
+            raise RuntimeError(
+                "l'API F1 non supporta questa sessione (dati non ancora "
+                "pubblicati o formato non supportato)"
+            )
+        if sessione.laps.empty:
+            raise RuntimeError("nessun giro caricato per questa sessione")
         return sessione
     except Exception as errore:  # fastf1 solleva vari tipi di eccezione a seconda del problema
         log.warning(
