@@ -121,63 +121,6 @@ def stato():
     return {"stato": "ok", "servizio": "gp-almanac-api"}
 
 
-# --- INIZIO rotta diagnostica temporanea -----------------------------------
-# Verifica se il traffico in uscita da questo servizio Render passa il
-# blocco che F1 applica agli indirizzi IP dei provider cloud/hosting (vedi
-# analisi-gp/README.md — lo stesso blocco che impedisce a FastF1 di
-# funzionare da GitHub Actions). Usa urllib della libreria standard invece
-# di 'requests' apposta: non è tra le dipendenze già installate su questo
-# servizio (vedi il Build Command), e per un test così piccolo non vale la
-# pena aggiungerne una nuova solo per questo.
-# DA RIMUOVERE dopo il test, non è pensata per restare nell'API definitiva.
-import urllib.error
-import urllib.request
-
-
-@app.get("/debug/f1check")
-def controllo_blocco_f1():
-    """Prova a raggiungere un URL reale e noto dei server F1 (GP del
-    Bahrein 2022, gara — una sessione sicuramente esistente e pubblicata da
-    anni) con gli stessi header esatti usati da FastF1. Se risponde 200,
-    il traffico da qui non è bloccato; se risponde 403 (o comunque fallisce),
-    lo è, come già confermato per GitHub Actions."""
-    url = (
-        "https://livetiming.formula1.com/static/2022/"
-        "2022-03-20_Bahrain_Grand_Prix/2022-03-20_Race/DriverList.jsonStream"
-    )
-    richiesta = urllib.request.Request(
-        url,
-        headers={
-            "Connection": "close",
-            "TE": "identity",
-            "User-Agent": "BestHTTP",
-            "Accept-Encoding": "gzip, identity",
-        },
-    )
-    try:
-        with urllib.request.urlopen(richiesta, timeout=15) as risposta:
-            return {
-                "codice_http": risposta.status,
-                "bloccato": False,
-                "bytes_ricevuti": len(risposta.read()),
-            }
-    except urllib.error.HTTPError as errore:
-        # Questo è il caso atteso se il traffico è bloccato: F1 risponde
-        # comunque (non è un errore di rete), ma con un codice di errore
-        # HTTP (tipicamente 403).
-        return {
-            "codice_http": errore.code,
-            "bloccato": errore.code == 403,
-            "dettaglio": str(errore.reason),
-        }
-    except Exception as errore:
-        # Errore di rete vero e proprio (timeout, connessione rifiutata,
-        # DNS, ecc.) — un esito diverso dal blocco applicativo di F1, ma
-        # comunque segnale che da qui non funzionerebbe.
-        return {"codice_http": None, "bloccato": None, "errore": str(errore)}
-# --- FINE rotta diagnostica temporanea --------------------------------------
-
-
 @app.get("/gare/risultati", response_model=RisultatiGara)
 def risultati_gara(
     anno: int = Query(..., description="Anno della stagione, es. 1950"),
