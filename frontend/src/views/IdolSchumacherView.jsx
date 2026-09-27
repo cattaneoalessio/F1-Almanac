@@ -271,7 +271,7 @@ export default function IdolSchumacherView() {
           fonteLabel={DRIVER_PHOTOS.schumacher.mentalita.fonteLabel}
           licenzaUrl={DRIVER_PHOTOS.schumacher.mentalita.licenzaUrl}
           licenzaLabel={DRIVER_PHOTOS.schumacher.mentalita.licenzaLabel}
-          didascalia="La F2002 a Spa-Francorchamps, la sua pista preferita — GP del Belgio 2002"
+          didascalia="Michael Schumacher con la Ferrari, GP degli Stati Uniti 2002"
         />
 
         <div className="idol-schumacher__stat-griglia">

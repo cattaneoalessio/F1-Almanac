@@ -1,0 +1,11 @@
+# Cache di FastF1 per la sezione Analisi GP — rigenerata in locale al
+# primo avvio, e tenuta tra un'esecuzione e l'altra del workflow tramite
+# la cache di GitHub Actions (vedi .github/workflows/f1-update.yml):
+# non va versionata nel repository.
+analisi-gp/cache/
+analisi-gp/scripts/__pycache__/
+*.pyc
+
+# Dipendenze e build del frontend
+frontend/node_modules/
+frontend/dist/

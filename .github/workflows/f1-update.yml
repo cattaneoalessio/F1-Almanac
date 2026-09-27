@@ -1,0 +1,119 @@
+name: Aggiornamento dati F1
+
+# Attivazione:
+# 1. Ogni lunedì alle 08:00 UTC (dopo il weekend di gara — la Domenica sera
+#    tardi/Lunedì mattina presto i dati di sessione sono ormai stabili sui
+#    server F1, evitando di richiederli troppo a ridosso della gara).
+# 2. Manualmente da GitHub (tab "Actions" -> questo workflow -> "Run
+#    workflow"), con la possibilità di forzare un anno/round specifico —
+#    utile per rigenerare un GP se i dati non erano ancora pronti al primo
+#    tentativo, o per ripopolare l'intera stagione da zero.
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Anno (vuoto = anno corrente)"
+        required: false
+        type: string
+      round:
+        description: "Round specifico (vuoto = ultimo GP disputato)"
+        required: false
+        type: string
+      all:
+        description: "Rigenera TUTTI i GP disputati della stagione (ignora round)"
+        required: false
+        type: boolean
+        default: false
+
+# Serve esplicitamente perché il push automatico dei dati aggiornati usa
+# GITHUB_TOKEN: dal 2023 i repository nuovi hanno di default permessi di
+# sola lettura per il token, senza questo blocco il push fallirebbe con un
+# 403 invece di aggiornare il repository.
+permissions:
+  contents: write
+
+# Evita run sovrapposti se, per qualunque motivo, la schedule settimanale e
+# un avvio manuale finissero per partire vicini nel tempo: il secondo run
+# aspetta che il primo finisca invece di lavorare in parallelo sugli stessi
+# file (rischio di commit in conflitto).
+concurrency:
+  group: aggiornamento-dati-f1
+  cancel-in-progress: false
+
+jobs:
+  aggiorna:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout del repository
+        uses: actions/checkout@v4
+
+      - name: Imposta Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Installa le dipendenze
+        run: pip install -r analisi-gp/scripts/requirements.txt
+
+      # FONDAMENTALE, come richiesto esplicitamente: senza questa cache,
+      # OGNI esecuzione del workflow ripartirebbe da zero e riscaricherebbe
+      # da capo tutti i dati di telemetria/sessione già ottenuti in run
+      # precedenti — un carico inutile e ripetuto sui server F1/Jolpica,
+      # con un rischio concreto di essere rate-limitati o bloccati per
+      # troppe richieste. La cache persiste tra un'esecuzione e l'altra
+      # del workflow (non solo all'interno di un singolo run) grazie ad
+      # actions/cache.
+      #
+      # La chiave include l'ID univoco del run, con restore-keys come
+      # fallback che accetta qualunque chiave "fastf1-cache-" preesistente:
+      # così ogni run RIPARTE dalla cache più recente disponibile (via
+      # restore-keys) mentre SALVA comunque una nuova voce di cache alla
+      # fine (perché la chiave esatta, con l'ID del run, è sempre nuova).
+      # Con una chiave fissa la cache si limiterebbe a essere ripristinata
+      # sempre uguale, senza mai crescere con i nuovi GP scaricati.
+      - name: Cache della cartella cache di FastF1
+        uses: actions/cache@v4
+        with:
+          path: analisi-gp/cache
+          key: fastf1-cache-${{ github.run_id }}
+          restore-keys: |
+            fastf1-cache-
+
+      - name: Esegui lo script di aggiornamento
+        env:
+          FASTF1_CACHE_DIR: analisi-gp/cache
+          F1_DATA_DIR: frontend/public/analisi-gp/data
+        run: |
+          ARGOMENTI=""
+          if [ -n "${{ inputs.year }}" ]; then
+            ARGOMENTI="$ARGOMENTI --year ${{ inputs.year }}"
+          fi
+          if [ "${{ inputs.all }}" = "true" ]; then
+            ARGOMENTI="$ARGOMENTI --all"
+          elif [ -n "${{ inputs.round }}" ]; then
+            ARGOMENTI="$ARGOMENTI --round ${{ inputs.round }}"
+          fi
+          echo "Eseguo: python analisi-gp/scripts/update_data.py $ARGOMENTI"
+          python analisi-gp/scripts/update_data.py $ARGOMENTI
+
+      - name: Commit e push dei dati aggiornati (solo se cambiati)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/public/analisi-gp/data
+          # `git commit` termina con stato diverso da zero se non c'è nulla
+          # da salvare (es. lo script non ha trovato un nuovo GP disputato
+          # dall'ultima esecuzione): senza questo controllo esplicito, il
+          # passo — e quindi l'intero workflow — fallirebbe ogni volta che
+          # non c'è alcuna novità, anche se non è un errore reale.
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica ai dati, salto il commit."
+          else
+            git commit -m "Aggiorna dati F1 ($(date -u +%Y-%m-%d))"
+            git push
+          fi

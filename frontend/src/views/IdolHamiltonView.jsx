@@ -324,7 +324,7 @@ export default function IdolHamiltonView() {
           fonteLabel={DRIVER_PHOTOS.hamilton.stileTecnico.fonteLabel}
           licenzaUrl={DRIVER_PHOTOS.hamilton.stileTecnico.licenzaUrl}
           licenzaLabel={DRIVER_PHOTOS.hamilton.stileTecnico.licenzaLabel}
-          didascalia="La Mercedes W10 in piena piega, GP di Francia 2019"
+          didascalia="Lewis Hamilton con la Mercedes W10, GP d'Ungheria 2019"
         />
 
         <div className="idol-hamilton__stat-griglia">
@@ -359,7 +359,7 @@ export default function IdolHamiltonView() {
           fonteLabel={DRIVER_PHOTOS.hamilton.eredita.fonteLabel}
           licenzaUrl={DRIVER_PHOTOS.hamilton.eredita.licenzaUrl}
           licenzaLabel={DRIVER_PHOTOS.hamilton.eredita.licenzaLabel}
-          didascalia="Nel paddock coi tifosi, GP d’Austria 2022"
+          didascalia="Lewis Hamilton, GP d'Austria 2022"
         />
 
         <p>

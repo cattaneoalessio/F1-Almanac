@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analisi GP — Monoposto.ai</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Plotly.js: zoom/pan nativi sui grafici, nessun plugin aggiuntivo
+       necessario (a differenza di Chart.js, che richiederebbe
+       chartjs-plugin-zoom a parte) — versione fissata esplicitamente,
+       "plotly-latest" non viene più aggiornata dalla v2 in poi. -->
+  <script src="https://cdn.plot.ly/plotly-4.1.1.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <header class="testata">
+    <div class="testata__marchio">
+      <span class="testata__pallino" aria-hidden="true"></span>
+      Monoposto<span class="testata__ai">.ai</span> — Analisi GP
+    </div>
+    <p class="testata__sottotitolo">Telemetria, strategie gomme e ritmo gara, GP per GP.</p>
+  </header>
+
+  <main class="contenuto">
+    <!-- Selettori: GP + i due piloti da confrontare. Popolati da app.js a
+         partire da data/index.json e dal meta.json del GP scelto. -->
+    <section class="selettori" aria-label="Selezione Gran Premio e piloti">
+      <div class="selettori__campo">
+        <label for="selezione-gp">Gran Premio</label>
+        <select id="selezione-gp"></select>
+      </div>
+      <div class="selettori__campo">
+        <label for="selezione-pilota-1">Pilota 1</label>
+        <select id="selezione-pilota-1"></select>
+      </div>
+      <div class="selettori__campo">
+        <label for="selezione-pilota-2">Pilota 2</label>
+        <select id="selezione-pilota-2"></select>
+      </div>
+    </section>
+
+    <p id="messaggio-stato" class="messaggio-stato" hidden></p>
+
+    <div id="contenuto-gp" hidden>
+      <!-- Riepilogo GP: nome, data, podio — contesto rapido prima dei grafici -->
+      <section class="riepilogo-gp" aria-label="Riepilogo del Gran Premio">
+        <div>
+          <h1 id="riepilogo-nome-evento" class="riepilogo-gp__titolo"></h1>
+          <p id="riepilogo-dettagli" class="riepilogo-gp__dettagli"></p>
+        </div>
+        <ol id="riepilogo-podio" class="riepilogo-gp__podio" aria-label="Podio"></ol>
+      </section>
+
+      <!-- 1. Telemetria comparativa -->
+      <section class="pannello" aria-label="Telemetria comparativa">
+        <div class="pannello__intestazione">
+          <h2>Telemetria comparativa</h2>
+          <div class="pannello__azioni" role="radiogroup" aria-label="Sessione">
+            <button type="button" class="bottone-sessione bottone-sessione--attivo" data-sessione="gara">Gara</button>
+            <button type="button" class="bottone-sessione" data-sessione="qualifica">Qualifica</button>
+          </div>
+        </div>
+        <p class="pannello__nota">
+          Il giro più veloce di ciascun pilota nella sessione scelta, sovrapposto per distanza percorsa (non per
+          tempo): permette di vedere esattamente <em>dove</em> in pista un pilota guadagna o perde rispetto
+          all'altro. Zoom con trascinamento, doppio clic per tornare alla vista intera.
+        </p>
+        <div id="grafico-telemetria" class="grafico grafico--telemetria"></div>
+      </section>
+
+      <!-- 2. Strategie gomme -->
+      <section class="pannello" aria-label="Strategie gomme">
+        <h2>Strategie gomme (tutti i piloti)</h2>
+        <p class="pannello__nota">
+          Ogni barra è uno stint: la lunghezza è il numero di giri percorsi con quella mescola prima del cambio
+          gomme successivo.
+        </p>
+        <div id="grafico-stint" class="grafico grafico--stint"></div>
+      </section>
+
+      <!-- 3. Confronto tempi sul giro -->
+      <section class="pannello" aria-label="Confronto tempi sul giro">
+        <h2>Confronto tempi sul giro — Gara</h2>
+        <p class="pannello__nota">
+          Tempo di ciascun giro di gara per i due piloti selezionati: i picchi verso l'alto segnalano di solito un
+          pit stop o una fase di traffico/safety car.
+        </p>
+        <div id="grafico-giri" class="grafico grafico--giri"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="piede">
+    Dati: <a href="https://github.com/theOehrly/Fast-F1" target="_blank" rel="noreferrer noopener">FastF1</a>
+    e <a href="https://github.com/jolpica/jolpica-f1" target="_blank" rel="noreferrer noopener">Jolpica-F1</a>
+    (successore di Ergast). Aggiornato automaticamente ogni lunedì dopo il weekend di gara.
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
