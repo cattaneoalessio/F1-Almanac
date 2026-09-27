@@ -211,27 +211,52 @@ def carica_sessione(anno: int, round_: int, tipo: str) -> Optional[fastf1.core.S
     l'intero workflow GitHub Actions."""
     try:
         sessione = fastf1.get_session(anno, round_, tipo)
+    except Exception:
+        log.exception("Impossibile ottenere la sessione %s del round %s/%s", tipo, anno, round_)
+        return None
+
+    # Contesto diagnostico loggato SUBITO, prima di qualunque cosa possa
+    # fallire più sotto: anche se il load()/le verifiche successive si
+    # rompono, il log di GitHub Actions ci dice già di quale gara/data
+    # si tratta — utile per correlare con il calendario reale.
+    log.info(
+        "Sessione trovata: %s - %s (%s), data evento %s",
+        sessione.event.get("EventName", "?"), sessione.name,
+        sessione.event.get("Country", "?"), sessione.event.get("EventDate", "?"),
+    )
+
+    try:
         sessione.load(laps=True, telemetry=True, weather=False, messages=False)
-        # session.load() NON solleva un'eccezione se i dati non sono
-        # disponibili per questa sessione (es. self.f1_api_support è
-        # False, capita per sessioni troppo recenti i cui dati non sono
-        # ancora stati pubblicati, o weekend con formato particolare):
-        # si limita a loggare un avviso interno e a lasciare .laps/
-        # .results non impostati. Verifichiamo esplicitamente qui,
-        # subito dopo il load, invece di scoprirlo più avanti nella
-        # pipeline con un DataNotLoadedError non gestito.
+    except Exception:
+        log.exception("session.load() ha sollevato un'eccezione per %s round %s/%s", tipo, anno, round_)
+        return None
+
+    # session.load() NON solleva un'eccezione se i dati non sono
+    # disponibili per questa sessione (es. self.f1_api_support è False):
+    # si limita a loggare un avviso interno e a lasciare .laps/.results
+    # non impostati. Verifichiamo esplicitamente qui, loggando anche il
+    # valore effettivo di f1_api_support — un log.exception() qui sotto
+    # cattura anche il caso (osservato in produzione) in cui
+    # f1_api_support risulti True ma .laps sollevi comunque
+    # DataNotLoadedError per un altro motivo non ancora chiaro: il
+    # traceback completo dirà da quale riga esatta parte l'eccezione,
+    # cosa che il solo messaggio non rivelava nel log precedente.
+    log.info("f1_api_support per questa sessione: %s", sessione.f1_api_support)
+    try:
         if not sessione.f1_api_support:
             raise RuntimeError(
                 "l'API F1 non supporta questa sessione (dati non ancora "
                 "pubblicati o formato non supportato)"
             )
-        if sessione.laps.empty:
+        numero_giri = len(sessione.laps)
+        log.info("Giri caricati: %d", numero_giri)
+        if numero_giri == 0:
             raise RuntimeError("nessun giro caricato per questa sessione")
         return sessione
-    except Exception as errore:  # fastf1 solleva vari tipi di eccezione a seconda del problema
-        log.warning(
-            "Impossibile caricare la sessione %s del round %s/%s: %s",
-            tipo, anno, round_, errore,
+    except Exception:
+        log.exception(
+            "Dati non disponibili per la sessione %s del round %s/%s (f1_api_support=%s)",
+            tipo, anno, round_, sessione.f1_api_support,
         )
         return None
 
