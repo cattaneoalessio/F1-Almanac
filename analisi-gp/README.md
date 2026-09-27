@@ -7,10 +7,19 @@ sessioni) e [Jolpica-F1](https://github.com/jolpica/jolpica-f1) (classifiche
 — tramite il client integrato in FastF1, `fastf1.ergast`, non un pacchetto a
 parte: "jolpica-f1" non esiste come pacchetto pip installabile).
 
-Integrata nel repository principale di monoposto.ai (non un progetto a
-parte): lo script Python vive qui in `analisi-gp/`, mentre la pagina statica
-vive dentro `frontend/public/analisi-gp/` così Vite la pubblica così com'è,
-raggiungibile su `/analisi-gp/` accanto al resto del sito.
+## ⚠️ Aggiornamento: solo manuale, non automatico
+
+I server di F1 (`livetiming.formula1.com`, la fonte usata da FastF1 per
+telemetria e tempi sul giro) **bloccano attivamente le richieste dagli
+indirizzi IP dei servizi cloud/hosting** — GitHub Actions, Google Colab, VPS
+in genere — con un errore 403, indipendentemente dal codice usato. È un
+blocco lato server di F1, documentato pubblicamente da più utenti FastF1 e
+non aggirabile con nessuna modifica allo script. Per questo **non c'è un
+workflow GitHub Actions**: girerebbe regolarmente a vuoto, fallendo sempre e
+generando solo email di errore inutili.
+
+L'aggiornamento va quindi lanciato **a mano, dal tuo computer** (una
+connessione residenziale normale funziona correttamente) — vedi sotto.
 
 ## Struttura
 
@@ -24,61 +33,55 @@ frontend/public/analisi-gp/
   data/                            JSON generati da update_data.py — Vite
                                     copia questa intera cartella così com'è
                                     nella build finale del sito
-.github/workflows/
-  f1-update.yml         aggiornamento automatico ogni lunedì
 ```
 
-## Uso in locale
+## Come aggiornare i dati (dal tuo computer)
 
 ```bash
+# La prima volta soltanto
 pip install -r analisi-gp/scripts/requirements.txt
 
 # Ultimo GP disputato dell'anno corrente
-python analisi-gp/scripts/update_data.py
+F1_DATA_DIR=frontend/public/analisi-gp/data python analisi-gp/scripts/update_data.py
 
 # Un anno/round specifico
-python analisi-gp/scripts/update_data.py --year 2026 --round 15
+F1_DATA_DIR=frontend/public/analisi-gp/data python analisi-gp/scripts/update_data.py --year 2026 --round 15
 
 # Tutti i GP già disputati della stagione (prima esecuzione, o per
 # ripopolare l'intero storico)
-python analisi-gp/scripts/update_data.py --all
+F1_DATA_DIR=frontend/public/analisi-gp/data python analisi-gp/scripts/update_data.py --all
 ```
 
-Per default lo script scrive in `data/` nella cartella corrente: da dentro il
-repository, lancialo impostando la variabile d'ambiente in modo che scriva
-dove il sito se li aspetta:
+Poi fai commit e push dei JSON generati come faresti con qualunque altra
+modifica:
 
 ```bash
-F1_DATA_DIR=frontend/public/analisi-gp/data python analisi-gp/scripts/update_data.py
+git add frontend/public/analisi-gp/data
+git commit -m "Aggiorna dati F1"
+git push
 ```
 
-Poi apri la pagina con un piccolo server locale (necessario perché il
-browser blocca il `fetch()` dei JSON se apri il file direttamente da disco
-con `file://`):
+Una volta pushato, il sito si aggiorna da solo (la pubblicazione del sito
+resta automatica, è solo la *raccolta* dei dati a dover partire da un tuo
+computer). Ripeti questo giro ogni volta che vuoi aggiungere un GP — non
+c'è una cadenza obbligata, dipende solo da quando trovi il tempo di
+lanciarlo.
+
+**Cache**: la cartella `analisi-gp/cache/` (cache di FastF1) si crea da
+sola al primo avvio e resta sul tuo computer tra un lancio e l'altro
+dello script — non va versionata nel repository (già esclusa in
+`.gitignore`), evita di riscaricare da zero i dati già ottenuti in
+precedenza.
+
+## Verifica in locale prima di pushare (facoltativo)
 
 ```bash
 cd frontend/public/analisi-gp && python3 -m http.server 8000
 # poi apri http://127.0.0.1:8000/
 ```
 
-(Oppure lancia `npm run dev`/`npm run build` nel frontend come al solito: la
-pagina sarà raggiungibile su `/analisi-gp/` accanto al resto del sito.)
-
-## Aggiornamento automatico
-
-Il workflow `.github/workflows/f1-update.yml` gira ogni lunedì alle 08:00
-UTC, e può anche essere lanciato a mano dalla tab "Actions" di GitHub
-(pulsante "Run workflow"), con la possibilità di specificare un anno/round
-preciso o rigenerare l'intera stagione. Aggiorna
-`frontend/public/analisi-gp/data/` e fa commit/push da solo: dato che il
-sito si ripubblica automaticamente a ogni push, la sezione Analisi si
-aggiorna da sola senza altri interventi.
-
-**Nota sulla cache**: la cartella `analisi-gp/cache/` (cache di FastF1) NON
-va versionata nel repository (già in `.gitignore`) — è tenuta in una cache
-di GitHub Actions tra un'esecuzione e l'altra del workflow (vedi il
-commento nel file `.yml`). Se lanci lo script in locale, la prima
-esecuzione crea quella cartella da sola.
+(Necessario un piccolo server locale: il browser blocca il `fetch()` dei
+JSON se apri `index.html` direttamente da disco con `file://`.)
 
 ## Estendere i dati esportati
 
@@ -92,3 +95,12 @@ esecuzione crea quella cartella da sola.
   non ancora estratte — `carica_sessione()` accetta già qualunque
   identificatore FastF1 valido, andrebbe solo aggiunta la chiamata e i
   relativi file di output.
+
+## Se in futuro vuoi riprovare l'automazione
+
+Se un giorno F1 cambia politica, o vuoi comunque un aggiornamento
+automatico, l'unica strada che risulta funzionare è un runner GitHub
+Actions **self-hosted** (un tuo computer/server sempre acceso, registrato
+come runner del repository, così le richieste partono dal tuo indirizzo IP
+residenziale invece che da quello di GitHub) — non un workflow sulle
+macchine cloud condivise di GitHub, che restano bloccate allo stesso modo.

@@ -67,10 +67,11 @@ import pandas as pd
 
 # Cartella della cache FastF1: FONDAMENTALE. Senza cache, ogni run riscarica
 # da zero tutti i dati di sessione dai server F1/Jolpica, sovraccaricandoli
-# inutilmente e rischiando un blocco per troppe richieste (vedi il commento
-# nel workflow GitHub Actions, che mette in cache questa stessa cartella tra
-# un run e l'altro). Sovrascrivibile con la variabile d'ambiente
-# FASTF1_CACHE_DIR (usata anche nel workflow), altrimenti ./cache di default.
+# inutilmente e rischiando un blocco per troppe richieste. Rimane sul tuo
+# computer da un lancio all'altro dello script (esecuzione manuale locale,
+# non un workflow GitHub Actions — i server F1 bloccano le richieste dagli
+# indirizzi IP dei servizi cloud, vedi README). Sovrascrivibile con la
+# variabile d'ambiente FASTF1_CACHE_DIR, altrimenti ./cache di default.
 import os  # noqa: E402  (import qui per leggere subito la env var)
 
 CACHE_DIR = Path(os.environ.get("FASTF1_CACHE_DIR", "cache"))
@@ -153,9 +154,8 @@ def _rendi_confrontabile_utc(colonna_date: pd.Series) -> pd.Series:
     fuso esplicito) — ma un cambiamento futuro in FastF1, o un backend
     dati diverso da quello di default, potrebbe restituirla tz-aware.
     Gestiamo entrambi i casi esplicitamente invece di assumerne uno solo:
-    questo script gira automaticamente ogni lunedì senza supervisione
-    (vedi il workflow GitHub Actions), un errore qui bloccherebbe
-    l'aggiornamento intero senza che nessuno se ne accorga subito."""
+    un errore qui bloccherebbe la scelta del GP giusto senza un motivo
+    ovvio da diagnosticare."""
     if colonna_date.dt.tz is None:
         return colonna_date.dt.tz_localize("UTC")
     return colonna_date.dt.tz_convert("UTC")
@@ -208,7 +208,8 @@ def carica_sessione(anno: int, round_: int, tipo: str) -> Optional[fastf1.core.S
     dati non sono ancora disponibili sui server F1 — capita ad esempio se
     lo script gira a ridosso della gara e i dati non sono stati ancora
     pubblicati: meglio saltare quel GP con un avviso che far fallire
-    l'intero workflow GitHub Actions."""
+    l'intera esecuzione (specie con --all, dove un solo GP problematico
+    non deve bloccare gli altri)."""
     try:
         sessione = fastf1.get_session(anno, round_, tipo)
     except Exception:
@@ -217,8 +218,8 @@ def carica_sessione(anno: int, round_: int, tipo: str) -> Optional[fastf1.core.S
 
     # Contesto diagnostico loggato SUBITO, prima di qualunque cosa possa
     # fallire più sotto: anche se il load()/le verifiche successive si
-    # rompono, il log di GitHub Actions ci dice già di quale gara/data
-    # si tratta — utile per correlare con il calendario reale.
+    # rompono, il log dice già di quale gara/data si tratta — utile per
+    # correlare con il calendario reale mentre si diagnostica un problema.
     log.info(
         "Sessione trovata: %s - %s (%s), data evento %s",
         sessione.event.get("EventName", "?"), sessione.name,
