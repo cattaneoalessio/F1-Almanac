@@ -15,6 +15,8 @@ import NewsView from './views/NewsView.jsx';
 import ArcadeView from './views/ArcadeView.jsx';
 import IdolsIndexView from './views/IdolsIndexView.jsx';
 import IdolSennaView from './views/IdolSennaView.jsx';
+import IdolSchumacherView from './views/IdolSchumacherView.jsx';
+import IdolHamiltonView from './views/IdolHamiltonView.jsx';
 import IdolView from './views/IdolView.jsx';
 import ChronoQuizView from './views/ChronoQuizView.jsx';
 import GameChampionshipView from './views/GameChampionshipView.jsx';
@@ -184,6 +186,8 @@ export default function App() {
           <Route path="/arcade" element={<ArcadeView />} />
           <Route path="/idols" element={<IdolsIndexView />} />
           <Route path="/idols/senna" element={<IdolSennaView />} />
+          <Route path="/idols/schumacher" element={<IdolSchumacherView />} />
+          <Route path="/idols/hamilton" element={<IdolHamiltonView />} />
           <Route path="/idols/:slug" element={<IdolView />} />
           <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
           <Route path="/arcade/time-attack" element={<GameChampionshipView />} />
