@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { DRIVER_PHOTOS } from '../data/driverPhotos.js';
 import './IdolsIndexView.css';
 
 /**
@@ -28,7 +29,8 @@ const IDOLI = [
     slug: 'senna',
     nome: 'Ayrton Senna',
     payoff: 'Il misticismo della velocit\u00e0.',
-    immagine: null,
+    immagine: DRIVER_PHOTOS.senna.eroe.src,
+    credito: `Foto: ${DRIVER_PHOTOS.senna.eroe.autore} / ${DRIVER_PHOTOS.senna.eroe.licenzaLabel}`,
     accentoDa: '#f6c90e',
     accentoA: '#1a1a1a',
   },
@@ -76,6 +78,7 @@ export default function IdolsIndexView() {
           >
             <span className="idols-card__sfondo" aria-hidden="true" />
             <span className="idols-card__velo" aria-hidden="true" />
+            {idolo.credito && <span className="idols-card__credito">{idolo.credito}</span>}
             <span className="idols-card__contenuto">
               <span className="idols-card__nome">{idolo.nome}</span>
               <span className="idols-card__payoff">{idolo.payoff}</span>

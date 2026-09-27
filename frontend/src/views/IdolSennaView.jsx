@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import CreditedFigure from '../components/CreditedFigure.jsx';
+import { DRIVER_PHOTOS } from '../data/driverPhotos.js';
 import './IdolSennaView.css';
 
 /**
@@ -30,10 +32,13 @@ import './IdolSennaView.css';
  *   formati dal 1994 è il numero più solido trovato (fonte RSI,
  *   2024) — non un dato in tempo reale, ma non lasciato vuoto/inventato.
  *
- * FOTO: nessuna, stesso motivo già discusso per la griglia Idols — il
- * progetto verifica le licenze immagine file per file, non è una
- * scelta che si fa dentro a un componente. I punti dove andrebbe
- * un'immagine sono commentati esplicitamente nel JSX sotto.
+ * FOTO: 4 immagini vere da Wikimedia Commons, elenco e attribuzione
+ * forniti e verificati dall'utente (autore, pagina del file, licenza —
+ * vedi src/data/driverPhotos.js). Wikimedia risulta bloccato per il
+ * fetch da questo ambiente di lavoro (stesso esito già documentato in
+ * circuitPhotos.js per le foto dei circuiti): non ricontrollate di
+ * nuovo da Claude in questa sessione, stessa convenzione già in uso
+ * nel progetto per questo tipo di materiale.
  */
 
 function BoxStatistica({ numero, etichetta, nota }) {
@@ -259,11 +264,13 @@ function TabellaConfronto() {
 export default function IdolSennaView() {
   const anniDalTamburello = new Date().getFullYear() - 1994;
 
+  const fotoEroe = DRIVER_PHOTOS.senna.eroe;
+
   return (
     <main className="idol-senna">
-      {/* IMMAGINE 1: ritratto full-bleed, primissimo piano, non un'azione
-          in pista (vedi nota licenze in cima al file: oggi placeholder). */}
-      <section className="idol-senna__hero">
+      {/* IMMAGINE 1: ritratto full-bleed, foto vera verificata dall'utente
+          su Wikimedia Commons (vedi src/data/driverPhotos.js). */}
+      <section className="idol-senna__hero" style={{ '--idol-senna-hero-foto': `url(${fotoEroe.src})` }}>
         <span className="idol-senna__hero-sfondo" aria-hidden="true" />
         <span className="idol-senna__hero-velo" aria-hidden="true" />
         <div className="idol-senna__hero-contenuto">
@@ -273,6 +280,16 @@ export default function IdolSennaView() {
           <h1 className="idol-senna__hero-nome">Ayrton Senna</h1>
           <p className="idol-senna__hero-payoff">Il misticismo della velocità.</p>
         </div>
+        <p className="idol-senna__hero-credito">
+          Foto:{' '}
+          <a href={fotoEroe.fonteUrl} target="_blank" rel="noreferrer noopener">
+            {fotoEroe.autore}
+          </a>{' '}
+          /{' '}
+          <a href={fotoEroe.licenzaUrl} target="_blank" rel="noreferrer noopener">
+            {fotoEroe.licenzaLabel}
+          </a>
+        </p>
       </section>
 
       <article className="idol-senna__corpo">
@@ -308,7 +325,28 @@ export default function IdolSennaView() {
           dall&rsquo;immortalità.
         </p>
 
+        <CreditedFigure
+          src={DRIVER_PHOTOS.senna.genesi.src}
+          alt={DRIVER_PHOTOS.senna.genesi.alt}
+          autore={DRIVER_PHOTOS.senna.genesi.autore}
+          fonteUrl={DRIVER_PHOTOS.senna.genesi.fonteUrl}
+          fonteLabel={DRIVER_PHOTOS.senna.genesi.fonteLabel}
+          licenzaUrl={DRIVER_PHOTOS.senna.genesi.licenzaUrl}
+          licenzaLabel={DRIVER_PHOTOS.senna.genesi.licenzaLabel}
+          didascalia="Il debutto: Senna sulla Toleman TG184, GP di Gran Bretagna 1984"
+        />
+
         <h2>La mistica del Re della Pioggia</h2>
+        <CreditedFigure
+          src={DRIVER_PHOTOS.senna.pioggia.src}
+          alt={DRIVER_PHOTOS.senna.pioggia.alt}
+          autore={DRIVER_PHOTOS.senna.pioggia.autore}
+          fonteUrl={DRIVER_PHOTOS.senna.pioggia.fonteUrl}
+          fonteLabel={DRIVER_PHOTOS.senna.pioggia.fonteLabel}
+          licenzaUrl={DRIVER_PHOTOS.senna.pioggia.licenzaUrl}
+          licenzaLabel={DRIVER_PHOTOS.senna.pioggia.licenzaLabel}
+          didascalia="Con la McLaren, 1988"
+        />
         <p>
           Ciò che rende Senna un&rsquo;icona transgenerazionale è la totale assenza di filtri tra l&rsquo;uomo e la
           macchina. Ayrton parlava apertamente di Dio, di visioni nell&rsquo;abitacolo, di dimensioni ultraterrene
@@ -358,8 +396,10 @@ export default function IdolSennaView() {
           segreto tecnico che lasciava sbigottiti i telemetristi.
         </p>
 
-        {/* IMMAGINE/ELEMENTO 4: qui il grafico sostituisce del tutto la
-            foto, come da piano — capitolo tecnico, non evocativo. */}
+        {/* ELEMENTO: grafico esplicativo della tecnica di parzializzazione,
+            affiancato dalla foto vera dell'aggressione ai cordoli poco
+            sotto (CreditedFigure) — non più un sostituto della foto,
+            visto che ora una foto verificata è disponibile anche qui. */}
         <GraficoTelemetria />
 
         <p>
@@ -368,6 +408,17 @@ export default function IdolSennaView() {
           in anticipo rispetto agli avversari, permettendogli di scaricare la potenza e raddrizzare il volante
           prima di chiunque altro.
         </p>
+
+        <CreditedFigure
+          src={DRIVER_PHOTOS.senna.stileTecnico.src}
+          alt={DRIVER_PHOTOS.senna.stileTecnico.alt}
+          autore={DRIVER_PHOTOS.senna.stileTecnico.autore}
+          fonteUrl={DRIVER_PHOTOS.senna.stileTecnico.fonteUrl}
+          fonteLabel={DRIVER_PHOTOS.senna.stileTecnico.fonteLabel}
+          licenzaUrl={DRIVER_PHOTOS.senna.stileTecnico.licenzaUrl}
+          licenzaLabel={DRIVER_PHOTOS.senna.stileTecnico.licenzaLabel}
+          didascalia="Aggressione ai cordoli, GP di Monaco 1991"
+        />
 
         <h2>L&rsquo;eredità: oltre il cordolo di Imola</h2>
         <p>

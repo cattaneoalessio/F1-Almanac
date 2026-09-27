@@ -19,10 +19,12 @@
 .idol-senna__hero-sfondo {
   position: absolute;
   inset: 0;
-  /* Placeholder dichiarato: gradiente nei colori del casco di Senna,
-     in attesa di una foto verificata (vedi nota licenze in
-     IdolSennaView.jsx). Sostituire con background-image quando pronta. */
-  background: linear-gradient(155deg, #f6c90e, #1a1a1a 70%);
+  /* Foto vera sopra un gradiente di riserva (mostrato solo se l'hotlink
+     a Wikimedia Commons non dovesse caricare): stessa tecnica a due
+     livelli già usata in IdolsIndexView.css. */
+  background-image: var(--idol-senna-hero-foto, none), linear-gradient(155deg, #f6c90e, #1a1a1a 70%);
+  background-size: cover;
+  background-position: center 20%;
 }
 .idol-senna__hero-velo {
   position: absolute;
@@ -61,6 +63,22 @@
 .idol-senna__hero-payoff {
   font-size: 1.1rem;
   color: rgba(255, 255, 255, 0.85);
+}
+.idol-senna__hero-credito {
+  position: absolute;
+  z-index: 1;
+  right: 1rem;
+  bottom: 0.7rem;
+  margin: 0;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.idol-senna__hero-credito a {
+  color: rgba(255, 255, 255, 0.75);
+}
+.idol-senna__hero-credito a:hover {
+  color: var(--accent-gold);
 }
 
 /* ---------- CORPO ARTICOLO ---------- */
