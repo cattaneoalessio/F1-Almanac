@@ -1,0 +1,88 @@
+name: Aggiornamento dati Analisi GP
+
+# Quando parte da solo:
+#   ogni lunedì e ogni mercoledì alle 08:00 UTC. Il lunedì i dati del weekend
+#   di gara sono di norma pronti; il mercoledì è solo un secondo tentativo,
+#   utile se lunedì OpenF1 non aveva ancora pubblicato tutto. Se non c'è nulla
+#   di nuovo, l'esecuzione dura pochi secondi e non cambia niente.
+#
+# Quando puoi farlo partire a mano:
+#   scheda "Actions" di GitHub -> "Aggiornamento dati Analisi GP" -> "Run
+#   workflow". La PRIMA volta, senza compilare nulla: scarica da solo tutti i
+#   GP già disputati della stagione in corso.
+on:
+  schedule:
+    - cron: "0 8 * * 1,3"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Stagione (vuoto = anno in corso; i dati OpenF1 partono dal 2023)"
+        required: false
+        type: string
+      round:
+        description: "Solo questo round (vuoto = tutti quelli mancanti)"
+        required: false
+        type: string
+      rigenera:
+        description: "Rielabora anche i GP già presenti"
+        required: false
+        type: boolean
+        default: false
+
+# Serve per salvare i dati aggiornati nel repository (dal 2023 il permesso di
+# scrittura del token va dichiarato esplicitamente).
+permissions:
+  contents: write
+
+# Mai due aggiornamenti contemporanei sugli stessi file.
+concurrency:
+  group: aggiornamento-dati-analisi-gp
+  cancel-in-progress: false
+
+jobs:
+  aggiorna:
+    runs-on: ubuntu-latest
+    # Una stagione intera da zero richiede circa un'ora; le esecuzioni normali
+    # pochi minuti. Lo script si ferma da solo prima di questo limite e
+    # riprende dal punto giusto alla volta successiva.
+    timeout-minutes: 120
+
+    steps:
+      - name: Scarica il repository
+        uses: actions/checkout@v4
+
+      - name: Installa Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Nessuna "pip install": lo script usa solo la libreria standard.
+      # I valori inseriti a mano passano da variabili d'ambiente (non scritti
+      # direttamente nel comando) per non aprire la porta a iniezioni.
+      - name: Scarica e prepara i dati
+        env:
+          INPUT_YEAR: ${{ inputs.year }}
+          INPUT_ROUND: ${{ inputs.round }}
+          INPUT_RIGENERA: ${{ inputs.rigenera }}
+        run: |
+          ARGOMENTI=()
+          if [ -n "$INPUT_YEAR" ]; then ARGOMENTI+=(--year "$INPUT_YEAR"); fi
+          if [ -n "$INPUT_ROUND" ]; then ARGOMENTI+=(--round "$INPUT_ROUND"); fi
+          if [ "$INPUT_RIGENERA" = "true" ]; then ARGOMENTI+=(--rigenera); fi
+          python3 analisi-gp/scripts/update_data.py "${ARGOMENTI[@]}"
+
+      # Anche se il passo sopra è finito con un errore (es. un solo GP
+      # fallito), i GP elaborati con successo prima vengono comunque salvati.
+      - name: Salva i dati nel repository
+        if: ${{ !cancelled() }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/public/analisi-gp/data
+          if git diff --cached --quiet; then
+            echo "Nessuna novità: niente da salvare."
+          else
+            git commit -m "Aggiorna dati Analisi GP ($(date -u +%Y-%m-%d))"
+            git pull --rebase
+            git push
+          fi

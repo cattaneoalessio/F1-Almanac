@@ -1,106 +1,111 @@
 # Analisi GP — sezione di monoposto.ai
 
-Sezione di analisi telemetrica per l'ultima stagione di Formula 1: telemetria
-comparativa tra due piloti, strategie gomme e confronto tempi sul giro, GP
-per GP. Dati da [FastF1](https://github.com/theOehrly/Fast-F1) (telemetria e
-sessioni) e [Jolpica-F1](https://github.com/jolpica/jolpica-f1) (classifiche
-— tramite il client integrato in FastF1, `fastf1.ergast`, non un pacchetto a
-parte: "jolpica-f1" non esiste come pacchetto pip installabile).
+Telemetria comparativa tra due piloti, strategie gomme e ritmo gara, Gran
+Premio per Gran Premio. La pagina è statica (`/analisi-gp/`) e legge dei file
+JSON già pronti: nessun server da mantenere.
 
-## ⚠️ Aggiornamento: solo manuale, non automatico
+## Come funziona (in breve)
 
-I server di F1 (`livetiming.formula1.com`, la fonte usata da FastF1 per
-telemetria e tempi sul giro) **bloccano attivamente le richieste dagli
-indirizzi IP dei servizi cloud/hosting** — GitHub Actions, Google Colab, VPS
-in genere — con un errore 403, indipendentemente dal codice usato. È un
-blocco lato server di F1, documentato pubblicamente da più utenti FastF1 e
-non aggirabile con nessuna modifica allo script. Per questo **non c'è un
-workflow GitHub Actions**: girerebbe regolarmente a vuoto, fallendo sempre e
-generando solo email di errore inutili.
+**Si aggiorna da sola.** Ogni **lunedì e mercoledì alle 08:00 UTC** un
+processo automatico su GitHub (`.github/workflows/f1-update.yml`) controlla se
+ci sono Gran Premi nuovi, scarica i dati, li salva nel repository e il sito si
+ripubblica da solo. Se non c'è nulla di nuovo non cambia niente. Il mercoledì
+è un secondo tentativo, utile se lunedì i dati non erano ancora pronti.
 
-L'aggiornamento va quindi lanciato **a mano, dal tuo computer** (una
-connessione residenziale normale funziona correttamente) — vedi sotto.
+Non serve fare nulla, se non **una volta sola** per riempire subito la
+stagione (vedi sotto).
+
+## La prima volta: riempire la stagione
+
+1. Su GitHub apri il repository → scheda **Actions**.
+2. A sinistra scegli **Aggiornamento dati Analisi GP**.
+3. Pulsante **Run workflow** → lascia i campi vuoti → **Run workflow**.
+4. Attendi (circa un'ora per una stagione intera). Se il tempo massimo
+   finisce prima, non è un problema: alla prossima esecuzione riprende da
+   dove si era fermato.
+
+Da lì in poi è automatico.
+
+## Se qualcosa non va
+
+- **La pagina dice "I dati non sono ancora disponibili"**: l'aggiornamento non
+  ha ancora salvato nessun GP. Lancia il passo "La prima volta" e controlla
+  l'esito in **Actions**.
+- **L'esecuzione risulta rossa (errore) su GitHub**: apri l'esecuzione, poi il
+  passo "Scarica e prepara i dati" e leggi le ultime righe. Le più comuni:
+  - *`Richiesta fallita dopo 5 tentativi ... 403`* → il servizio di dati ha
+    bloccato le richieste (con FastF1 succedeva sempre; con OpenF1 non
+    dovrebbe). Mandami l'errore.
+  - *`GP N rimandato: ...`* → non è un errore: i dati di quel GP non sono
+    ancora pubblicati, verrà ritentato da solo alla prossima esecuzione.
+- **Un GP non compare mai**: cerca nel log "rimandato": il motivo è scritto lì
+  (es. gara annullata, o assente su OpenF1).
+
+Un'esecuzione con dati "rimandati" non è rossa: solo gli errori veri lo sono, e
+in quel caso GitHub ti scrive per email.
+
+## Da dove arrivano i dati
+
+| Cosa | Fonte |
+|---|---|
+| Tempi sui giri, mescole/stint, telemetria (velocità, acceleratore, freno, DRS) | [OpenF1](https://openf1.org) — gratuita, senza chiave per lo storico |
+| Calendario, classifica finale, punti, classifica mondiale | [Jolpica-F1](https://github.com/jolpica/jolpica-f1) (successore di Ergast) |
+
+Entrambe sono progetti non ufficiali, non affiliati a Formula 1.
+
+**Perché non più FastF1.** FastF1 legge i server "live timing" di F1, che
+rifiutano (403) le richieste da servizi cloud come GitHub Actions o Render:
+verificato sia da GitHub Actions sia dal backend su Render. OpenF1 non ha il
+blocco, quindi l'aggiornamento può essere automatico. Lo script non usa
+nessuna libreria esterna (solo la libreria standard di Python).
+
+## Limiti da conoscere
+
+- **Solo dal 2023 in poi** (limite di OpenF1). Per la storia più antica il sito
+  ha le altre sezioni.
+- **Distanza in pista calcolata, non misurata.** OpenF1 non fornisce la
+  distanza: si ricava integrando la velocità e poi si allinea tra i piloti della
+  stessa sessione, così le curve si sovrappongono. Le curve possono risultare
+  sfasate di qualche decina di metri.
+- **Giro più veloce = il più veloce cronometrato.** In Qualifica può essere un
+  giro poi cancellato per track limits.
+- **Un giro per pilota** per la telemetria (il più veloce), non tutti i giri:
+  così due piloti qualsiasi sono confrontabili e i file restano leggeri.
+- **Compagni di squadra**: hanno lo stesso colore, quindi il secondo pilota
+  scelto è disegnato tratteggiato.
+- OpenF1 pubblica i dati storici con qualche ora di ritardo: un GP appena
+  finito può comparire il giorno dopo.
+
+## Uso manuale (facoltativo, per sviluppatori)
+
+Non serve installare nulla:
+
+```bash
+python3 analisi-gp/scripts/update_data.py                # GP mancanti dell'anno in corso
+python3 analisi-gp/scripts/update_data.py --year 2025    # un'altra stagione (>= 2023)
+python3 analisi-gp/scripts/update_data.py --round 15     # solo un round
+python3 analisi-gp/scripts/update_data.py --rigenera     # rielabora anche i GP già presenti
+```
+
+I file vengono scritti in `frontend/public/analisi-gp/data/` (si cambia con la
+variabile d'ambiente `F1_DATA_DIR`). Per vedere la pagina in locale:
+`cd frontend/public/analisi-gp && python3 -m http.server 8000`, poi apri
+http://127.0.0.1:8000/ (il browser blocca la lettura dei JSON aprendo il file
+direttamente).
 
 ## Struttura
 
 ```
-analisi-gp/
-  scripts/
-    update_data.py       lo script che scarica e prepara i dati
-    requirements.txt
-frontend/public/analisi-gp/
-  index.html, style.css, app.js    la dashboard statica
-  data/                            JSON generati da update_data.py — Vite
-                                    copia questa intera cartella così com'è
-                                    nella build finale del sito
+analisi-gp/scripts/update_data.py     lo script (solo libreria standard)
+frontend/public/analisi-gp/           la pagina statica (index.html, app.js, style.css)
+frontend/public/analisi-gp/data/      i JSON generati — Vite li pubblica così come sono
+.github/workflows/f1-update.yml       l'aggiornamento automatico
 ```
 
-## Come aggiornare i dati (dal tuo computer)
+## Estendere
 
-```bash
-# La prima volta soltanto
-pip install -r analisi-gp/scripts/requirements.txt
-
-# Ultimo GP disputato dell'anno corrente
-F1_DATA_DIR=frontend/public/analisi-gp/data python analisi-gp/scripts/update_data.py
-
-# Un anno/round specifico
-F1_DATA_DIR=frontend/public/analisi-gp/data python analisi-gp/scripts/update_data.py --year 2026 --round 15
-
-# Tutti i GP già disputati della stagione (prima esecuzione, o per
-# ripopolare l'intero storico)
-F1_DATA_DIR=frontend/public/analisi-gp/data python analisi-gp/scripts/update_data.py --all
-```
-
-Poi fai commit e push dei JSON generati come faresti con qualunque altra
-modifica:
-
-```bash
-git add frontend/public/analisi-gp/data
-git commit -m "Aggiorna dati F1"
-git push
-```
-
-Una volta pushato, il sito si aggiorna da solo (la pubblicazione del sito
-resta automatica, è solo la *raccolta* dei dati a dover partire da un tuo
-computer). Ripeti questo giro ogni volta che vuoi aggiungere un GP — non
-c'è una cadenza obbligata, dipende solo da quando trovi il tempo di
-lanciarlo.
-
-**Cache**: la cartella `analisi-gp/cache/` (cache di FastF1) si crea da
-sola al primo avvio e resta sul tuo computer tra un lancio e l'altro
-dello script — non va versionata nel repository (già esclusa in
-`.gitignore`), evita di riscaricare da zero i dati già ottenuti in
-precedenza.
-
-## Verifica in locale prima di pushare (facoltativo)
-
-```bash
-cd frontend/public/analisi-gp && python3 -m http.server 8000
-# poi apri http://127.0.0.1:8000/
-```
-
-(Necessario un piccolo server locale: il browser blocca il `fetch()` dei
-JSON se apri `index.html` direttamente da disco con `file://`.)
-
-## Estendere i dati esportati
-
-- **Un nuovo canale di telemetria** (es. RPM, marcia): aggiungi una riga al
-  dizionario `CANALI_TELEMETRIA` in `update_data.py` e la colonna
-  corrispondente nel dizionario ritornato da `estrai_telemetria_giro()`; poi
-  aggiungi la voce corrispondente in `CANALI_TELEMETRIA` (array) in
-  `app.js` per farla comparire come pannello nel grafico telemetria.
-- **Weekend Sprint**: lo script oggi carica Qualifica ('Q') e Gara ('R');
-  un weekend Sprint ha sessioni aggiuntive (Sprint, Sprint Qualifying/Shootout)
-  non ancora estratte — `carica_sessione()` accetta già qualunque
-  identificatore FastF1 valido, andrebbe solo aggiunta la chiamata e i
-  relativi file di output.
-
-## Se in futuro vuoi riprovare l'automazione
-
-Se un giorno F1 cambia politica, o vuoi comunque un aggiornamento
-automatico, l'unica strada che risulta funzionare è un runner GitHub
-Actions **self-hosted** (un tuo computer/server sempre acceso, registrato
-come runner del repository, così le richieste partono dal tuo indirizzo IP
-residenziale invece che da quello di GitHub) — non un workflow sulle
-macchine cloud condivise di GitHub, che restano bloccate allo stesso modo.
+- **Un nuovo canale di telemetria** (es. RPM o marcia; OpenF1 li fornisce):
+  aggiungilo in `traccia_giro()` di `update_data.py` e nell'array
+  `CANALI_TELEMETRIA` di `app.js`.
+- **Weekend Sprint**: oggi si usano Qualifica e Gara. La sessione "Sprint" si
+  può aggiungere con la stessa logica di `elabora_sessione()`.

@@ -1,48 +1,49 @@
 #!/usr/bin/env python3
 """
-update_data.py — Genera i JSON statici per la sezione "Analisi GP" di monoposto.ai.
+update_data.py — Prepara i dati statici della sezione "Analisi GP" di monoposto.ai.
+
+COSA FA
+-------
+Per ogni Gran Premio già disputato scarica:
+  * da OpenF1 (https://openf1.org, gratuita, senza chiave per lo storico):
+    tempi di ogni giro, mescole/stint, telemetria (velocità, acceleratore,
+    freno, DRS) del giro più veloce di ogni pilota, in Qualifica e in Gara;
+  * da Jolpica-F1 (https://github.com/jolpica/jolpica-f1, successore di
+    Ergast): calendario, classifica finale, punti, classifica mondiale.
+e scrive file JSON statici in data/<anno>_<round>_<gp>/ che la pagina web
+legge così come sono (nessun server da mantenere).
+
+PERCHÉ NON FASTF1
+-----------------
+FastF1 dipende dai server "live timing" di F1, che rifiutano (403) le
+richieste provenienti da servizi cloud/hosting come GitHub Actions o Render.
+OpenF1 non ha questo blocco, quindi lo script può girare da solo su GitHub
+Actions. Nessuna libreria esterna: solo la libreria standard di Python.
+
+LIMITI NOTI (da conoscere)
+--------------------------
+  * OpenF1 copre le stagioni dal 2023 in poi.
+  * La telemetria non ha una colonna "distanza": viene calcolata integrando
+    la velocità nel tempo (come fa anche FastF1) e poi allineata tra i
+    piloti della stessa sessione, così le curve si sovrappongono. I tracciati
+    possono restare sfasati di qualche decina di metri.
+  * Il "giro più veloce" è il più veloce cronometrato nei dati OpenF1: in
+    Qualifica può essere un giro poi cancellato per track limits.
+  * Una gara è considerata pronta solo se ci sono i giri e la telemetria di
+    almeno 10 piloti; altrimenti viene saltata e ritentata alla prossima
+    esecuzione (i dati OpenF1 possono arrivare con qualche ora di ritardo).
 
 USO
-----
-    python update_data.py                      # ultimo GP disputato della stagione in corso
-    python update_data.py --year 2026           # ultimo GP disputato di quella stagione
-    python update_data.py --year 2026 --round 15  # un GP specifico
-    python update_data.py --all                 # rigenera TUTTI i GP disputati della stagione in corso
+---
+    python3 update_data.py                    # elabora i GP dell'anno in corso
+                                              # non ancora presenti in data/
+    python3 update_data.py --year 2025        # idem per un altro anno (>= 2023)
+    python3 update_data.py --round 15         # solo quel round
+    python3 update_data.py --rigenera         # rigenera anche quelli già presenti
 
-OUTPUT
-------
-Per ogni GP elaborato, crea la cartella data/<anno>_<round>_<slug-circuito>/ con:
-    meta.json              - info evento, elenco piloti (con colori scuderia), risultati
-                              gara/qualifica, contesto mondiale (Jolpica: classifica piloti
-                              dopo questo GP)
-    laps.json               - TUTTI i giri di TUTTI i piloti (Qualifica + Gara): tempo sul
-                              giro, mescola, stint, posizione — usato per il grafico "Lap
-                              Time Comparison" e per gli "Tyre Stints"
-    telemetry.json          - il GIRO PIÙ VELOCE DI OGNI PILOTA (non solo i 3 assoluti, vedi
-                              nota sotto), con Velocità/Acceleratore/Freno/DRS vs Distanza —
-                              usato per il grafico di telemetria comparativa
-
-Aggiorna anche data/index.json con l'elenco di tutti i GP disponibili (serve al frontend per
-popolare il menu a tendina "Gran Premio").
-
-NOTA DI DESIGN — perché "il giro più veloce di ogni pilota" e non solo "i 3 più veloci in
-assoluto": la richiesta originale chiede entrambe le cose insieme ("i 3 giri più veloci in
-assoluto... per un confronto iniziale" E "due piloti A SCELTA") ma sono in tensione — se si
-esportano solo 3 giri in totale, la scelta tra i due piloti da confrontare non è più libera
-per chiunque non sia tra quei 3. Qui si esporta il giro più veloce di CIASCUN pilota (circa
-20 giri per sessione, non centinaia: non tutti i giri di tutti i piloti, che sarebbe troppo
-pesante per un sito statico), così il confronto è davvero libero come richiesto, e si
-marcano comunque esplicitamente i 3 assoluti più veloci in `meta.json` (campo
-`top3_qualifica` / `top3_gara`) perché il frontend li usi come selezione di default.
-
-DIPENDENZE
-----------
-    pip install fastf1
-
-    fastf1 include già un client per la Jolpica-F1 API (successore di Ergast, dismessa a
-    inizio 2025) in fastf1.ergast.Ergast — non serve un pacchetto "jolpica-f1" a parte:
-    non esiste come pacchetto pip installabile (verificato: 404 su PyPI), Jolpica è
-    un'API REST (https://api.jolpi.ca/ergast/f1/), e fastf1.ergast la incapsula già.
+Variabili d'ambiente opzionali: F1_DATA_DIR (cartella di output), F1_PAUSA_S
+(pausa tra richieste, default 0.5), F1_BUDGET_MINUTI (tempo massimo, default
+100: se finisce, i GP rimasti vengono elaborati alla prossima esecuzione).
 """
 
 from __future__ import annotations
@@ -50,37 +51,40 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
+import statistics
 import sys
+import time
 import unicodedata
-from datetime import datetime, timezone
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
-
-import fastf1
-import fastf1.ergast
-import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Configurazione
 # ---------------------------------------------------------------------------
 
-# Cartella della cache FastF1: FONDAMENTALE. Senza cache, ogni run riscarica
-# da zero tutti i dati di sessione dai server F1/Jolpica, sovraccaricandoli
-# inutilmente e rischiando un blocco per troppe richieste. Rimane sul tuo
-# computer da un lancio all'altro dello script (esecuzione manuale locale,
-# non un workflow GitHub Actions — i server F1 bloccano le richieste dagli
-# indirizzi IP dei servizi cloud, vedi README). Sovrascrivibile con la
-# variabile d'ambiente FASTF1_CACHE_DIR, altrimenti ./cache di default.
-import os  # noqa: E402  (import qui per leggere subito la env var)
+OPENF1 = "https://api.openf1.org/v1"
+JOLPICA = "https://api.jolpi.ca/ergast/f1"
 
-CACHE_DIR = Path(os.environ.get("FASTF1_CACHE_DIR", "cache"))
-DATA_DIR = Path(os.environ.get("F1_DATA_DIR", "data"))
+DATA_DIR = Path(os.environ.get("F1_DATA_DIR", "frontend/public/analisi-gp/data"))
+BUDGET_MINUTI = float(os.environ.get("F1_BUDGET_MINUTI", "100"))
+PAUSA_TRA_RICHIESTE_S = float(os.environ.get("F1_PAUSA_S", "0.5"))
 
-# Jolpica-F1 chiede esplicitamente un User-Agent identificativo (non quello
-# di default) per poter distinguere client "ben educati" in caso di abusi
-# altrui — vedi https://github.com/jolpica/jolpica-f1/blob/main/docs/README.md
-USER_AGENT = f"monoposto.ai-analisi-gp/1.0 fastf1/{fastf1.__version__}"
+# Le API gratuite chiedono di identificarsi e di non esagerare con le richieste.
+USER_AGENT = "monoposto.ai-analisi-gp/2.0 (+https://monoposto.ai)"
+TIMEOUT_S = 30
+MAX_TENTATIVI = 5
+CODICI_RIPROVABILI = (429, 500, 502, 503, 504)
+
+MIN_CAMPIONI_GIRO = 30            # ~8 s a 3,7 Hz: sotto, il giro è incompleto
+MIN_PILOTI_CON_TELEMETRIA = 10    # sotto, la gara non è considerata pronta
+FRAZIONE_MEDIANA_MINIMA = 0.6     # scarta "giri" assurdamente brevi (glitch)
+DRS_ATTIVO = (10, 12, 14)         # codifica DRS di OpenF1 (vedi documentazione)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -90,418 +94,531 @@ logging.basicConfig(
 log = logging.getLogger("update_data")
 
 
-def configura_ambiente() -> None:
-    """Cache FastF1 + User-Agent Jolpica. Va chiamata UNA VOLTA sola, prima
-    di qualunque altra chiamata a fastf1 (get_session, Ergast, ...)."""
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    fastf1.Cache.enable_cache(str(CACHE_DIR))
-    # Il modulo fastf1.ergast.interface espone l'header di default: lo
-    # sostituiamo con uno che include il nome della nostra app, come da
-    # linee guida Jolpica (non lo azzeriamo: manteniamo comunque
-    # l'indicazione della libreria sottostante, utile a loro per capire da
-    # dove arriva il traffico).
-    import fastf1.ergast.interface as ergast_interface
+class ErroreRete(Exception):
+    """Una richiesta HTTP è fallita anche dopo i tentativi di ripetizione."""
 
-    ergast_interface.HEADERS["User-Agent"] = USER_AGENT
+
+class DatiNonDisponibili(Exception):
+    """Dati non (ancora) pubblicati: il GP viene saltato e ritentato dopo."""
 
 
 # ---------------------------------------------------------------------------
-# Utility
+# Rete
+# ---------------------------------------------------------------------------
+
+
+def scarica_json(url: str) -> Any:
+    """GET + parsing JSON, con pausa tra richieste e ripetizione (con attesa
+    crescente) su errori temporanei. Un 404 vale "nessun risultato": OpenF1
+    risponde così quando un filtro non trova nulla."""
+    ultimo_errore: Optional[Exception] = None
+    for tentativo in range(1, MAX_TENTATIVI + 1):
+        attesa = min(60, 2 ** tentativo)
+        try:
+            richiesta = urllib.request.Request(
+                url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
+            )
+            with urllib.request.urlopen(richiesta, timeout=TIMEOUT_S) as risposta:
+                corpo = risposta.read().decode("utf-8")
+            dati = json.loads(corpo)
+            time.sleep(PAUSA_TRA_RICHIESTE_S)
+            return dati
+        except urllib.error.HTTPError as errore:
+            if errore.code == 404:
+                log.warning("Nessun risultato (404) per %s", url)
+                time.sleep(PAUSA_TRA_RICHIESTE_S)
+                return []
+            ultimo_errore = errore
+            if errore.code not in CODICI_RIPROVABILI:
+                break  # errore "definitivo" (es. 403): inutile riprovare
+            valore = errore.headers.get("Retry-After") if errore.headers else None
+            if valore and valore.isdigit():
+                attesa = min(60, int(valore))
+        except (OSError, json.JSONDecodeError) as errore:  # rete, timeout, JSON rotto
+            ultimo_errore = errore
+        if tentativo < MAX_TENTATIVI:
+            log.warning(
+                "Richiesta fallita (%s): riprovo tra %ss (%d/%d) — %s",
+                ultimo_errore, attesa, tentativo, MAX_TENTATIVI, url,
+            )
+            time.sleep(attesa)
+    raise ErroreRete(f"Richiesta fallita dopo {MAX_TENTATIVI} tentativi: {url} ({ultimo_errore})")
+
+
+# Operatori di filtro di OpenF1: codificati come nei link della loro documentazione.
+_OPERATORI_URL = {"=": "=", ">=": "%3E%3D", "<=": "%3C%3D", ">": "%3E", "<": "%3C"}
+
+
+def costruisci_query(filtri: tuple) -> str:
+    """Filtri come (chiave, valore) oppure (chiave, operatore, valore)."""
+    parti = []
+    for filtro in filtri:
+        chiave, operatore, valore = (filtro[0], "=", filtro[1]) if len(filtro) == 2 else filtro
+        parti.append(f"{chiave}{_OPERATORI_URL[operatore]}{urllib.parse.quote(str(valore), safe=':.-_')}")
+    return "&".join(parti)
+
+
+def openf1(endpoint: str, *filtri: tuple) -> list[dict]:
+    dati = scarica_json(f"{OPENF1}/{endpoint}?{costruisci_query(filtri)}")
+    return dati if isinstance(dati, list) else []
+
+
+def jolpica(percorso: str) -> dict:
+    dati = scarica_json(f"{JOLPICA}/{percorso}")
+    return dati if isinstance(dati, dict) else {}
+
+
+# ---------------------------------------------------------------------------
+# Utilità
 # ---------------------------------------------------------------------------
 
 
 def slug(testo: str) -> str:
-    """'São Paulo Grand Prix' -> 'sao-paulo-grand-prix' — per i nomi di cartella."""
+    """'São Paulo Grand Prix' -> 'sao-paulo-grand-prix' (nomi di cartella)."""
     testo = unicodedata.normalize("NFKD", testo).encode("ascii", "ignore").decode()
-    testo = re.sub(r"[^a-zA-Z0-9]+", "-", testo).strip("-").lower()
-    return testo
+    return re.sub(r"[^a-zA-Z0-9]+", "-", testo).strip("-").lower()
 
 
-def td_to_seconds(valore: Any) -> Optional[float]:
-    """Converte un pandas.Timedelta in secondi (float), None se NaT/NaN.
-    JSON non sa serializzare i Timedelta di pandas: vanno convertiti a mano
-    PRIMA di passare i dati a json.dump, altrimenti solleva TypeError."""
-    if valore is None or pd.isna(valore):
+def parse_data(testo: str) -> datetime:
+    """ISO 8601 -> datetime UTC (accetta anche il suffisso 'Z')."""
+    d = datetime.fromisoformat(str(testo).strip().replace("Z", "+00:00"))
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(timezone.utc)
+
+
+def formatta_per_query(d: datetime) -> str:
+    """Formato dei filtri data di OpenF1: UTC, senza fuso, al millisecondo."""
+    d = d.astimezone(timezone.utc)
+    return d.strftime("%Y-%m-%dT%H:%M:%S.") + f"{d.microsecond // 1000:03d}"
+
+
+def _int_o_none(valore: Any) -> Optional[int]:
+    try:
+        return int(valore)
+    except (TypeError, ValueError):
         return None
-    return round(valore.total_seconds(), 3)
-
-
-def pulisci_float(valore: Any, decimali: int = 2) -> Optional[float]:
-    """None se NaN, altrimenti float arrotondato — riduce sensibilmente la
-    dimensione dei JSON di telemetria senza perdere precisione utile
-    (i canali telemetria non hanno bisogno di 15 cifre decimali)."""
-    if valore is None or (isinstance(valore, float) and pd.isna(valore)):
-        return None
-    return round(float(valore), decimali)
 
 
 def scrivi_json(percorso: Path, dati: Any) -> None:
     percorso.parent.mkdir(parents=True, exist_ok=True)
     with open(percorso, "w", encoding="utf-8") as f:
-        # separators compatti: questi file li legge solo il browser, non un
-        # umano — risparmiare spazio conta più della leggibilità qui.
         json.dump(dati, f, ensure_ascii=False, separators=(",", ":"))
     log.info("Scritto %s (%.1f KB)", percorso, percorso.stat().st_size / 1024)
 
 
 # ---------------------------------------------------------------------------
-# Individuazione del GP da elaborare
+# Calendario e collegamento OpenF1 <-> Jolpica
 # ---------------------------------------------------------------------------
 
 
-def _rendi_confrontabile_utc(colonna_date: pd.Series) -> pd.Series:
-    """EventDate è normalmente tz-naive (rappresenta già l'UTC senza il
-    fuso esplicito) — ma un cambiamento futuro in FastF1, o un backend
-    dati diverso da quello di default, potrebbe restituirla tz-aware.
-    Gestiamo entrambi i casi esplicitamente invece di assumerne uno solo:
-    un errore qui bloccherebbe la scelta del GP giusto senza un motivo
-    ovvio da diagnosticare."""
-    if colonna_date.dt.tz is None:
-        return colonna_date.dt.tz_localize("UTC")
-    return colonna_date.dt.tz_convert("UTC")
+def calendario_gare(anno: int) -> list[dict]:
+    """Gare dell'anno secondo Jolpica: round, nome, paese, località, data."""
+    corse = jolpica(f"{anno}.json?limit=100").get("MRData", {}).get("RaceTable", {}).get("Races", [])
+    gare = []
+    for c in corse:
+        try:
+            gare.append({
+                "round": int(c["round"]),
+                "nome": c["raceName"],
+                "paese": c.get("Circuit", {}).get("Location", {}).get("country", ""),
+                "localita": c.get("Circuit", {}).get("Location", {}).get("locality", ""),
+                "data": date.fromisoformat(c["date"]),
+            })
+        except (KeyError, ValueError):
+            log.warning("Voce di calendario non valida ignorata: %s", c)
+    return sorted(gare, key=lambda g: g["round"])
 
 
-def trova_ultimo_gp_disputato(anno: int) -> int:
-    """Numero di round dell'ultimo GP di `anno` la cui gara è già avvenuta
-    (EventDate nel passato), esclusi i weekend di test. Solleva
-    RuntimeError se nessun GP di quell'anno è ancora stato disputato."""
-    calendario = fastf1.get_event_schedule(anno, include_testing=False)
-    adesso = pd.Timestamp.now(tz="UTC")
-
-    # Confrontiamo "alla giornata" (normalize) per evitare falsi
-    # negativi/positivi legati all'ora esatta della gara.
-    disputati = calendario[
-        _rendi_confrontabile_utc(calendario["EventDate"]).dt.normalize()
-        <= adesso.normalize()
-    ]
-    if disputati.empty:
-        raise RuntimeError(
-            f"Nessun Gran Premio del {anno} risulta ancora disputato."
-        )
-    ultimo = disputati.sort_values("RoundNumber").iloc[-1]
-    log.info(
-        "Ultimo GP disputato del %s: round %s (%s, %s)",
-        anno, int(ultimo["RoundNumber"]), ultimo["EventName"], ultimo["Country"],
+def trova_sessioni(sessioni: list[dict], data_gara: date) -> tuple[Optional[dict], Optional[dict]]:
+    """Sessione di Gara OpenF1 con la data più vicina a quella di Jolpica
+    (±1 giorno: la data Jolpica è locale, quella OpenF1 è UTC) e la Qualifica
+    dello stesso weekend."""
+    migliore: Optional[tuple[int, dict]] = None
+    for s in sessioni:
+        if s.get("session_name") != "Race" or s.get("is_cancelled"):
+            continue
+        try:
+            scarto = abs((parse_data(s["date_start"]).date() - data_gara).days)
+        except (KeyError, ValueError):
+            continue
+        if scarto <= 1 and (migliore is None or scarto < migliore[0]):
+            migliore = (scarto, s)
+    if migliore is None:
+        return None, None
+    gara = migliore[1]
+    quali = next(
+        (s for s in sessioni
+         if s.get("session_name") == "Qualifying"
+         and s.get("meeting_key") == gara.get("meeting_key")
+         and not s.get("is_cancelled")),
+        None,
     )
-    return int(ultimo["RoundNumber"])
-
-
-def elenco_round_disputati(anno: int) -> list[int]:
-    """Tutti i round di `anno` già disputati — usato da --all."""
-    calendario = fastf1.get_event_schedule(anno, include_testing=False)
-    adesso = pd.Timestamp.now(tz="UTC")
-    disputati = calendario[
-        _rendi_confrontabile_utc(calendario["EventDate"]).dt.normalize()
-        <= adesso.normalize()
-    ]
-    return sorted(int(r) for r in disputati["RoundNumber"])
+    return gara, quali
 
 
 # ---------------------------------------------------------------------------
-# Caricamento sessioni
+# Piloti (meta.json)
 # ---------------------------------------------------------------------------
 
 
-def carica_sessione(anno: int, round_: int, tipo: str) -> Optional[fastf1.core.Session]:
-    """Carica una sessione (tipo: 'Q' o 'R') con laps+telemetry. Ritorna
-    None (invece di sollevare un'eccezione) se la sessione non esiste o i
-    dati non sono ancora disponibili sui server F1 — capita ad esempio se
-    lo script gira a ridosso della gara e i dati non sono stati ancora
-    pubblicati: meglio saltare quel GP con un avviso che far fallire
-    l'intera esecuzione (specie con --all, dove un solo GP problematico
-    non deve bloccare gli altri)."""
-    try:
-        sessione = fastf1.get_session(anno, round_, tipo)
-    except Exception:
-        log.exception("Impossibile ottenere la sessione %s del round %s/%s", tipo, anno, round_)
-        return None
-
-    # Contesto diagnostico loggato SUBITO, prima di qualunque cosa possa
-    # fallire più sotto: anche se il load()/le verifiche successive si
-    # rompono, il log dice già di quale gara/data si tratta — utile per
-    # correlare con il calendario reale mentre si diagnostica un problema.
-    log.info(
-        "Sessione trovata: %s - %s (%s), data evento %s",
-        sessione.event.get("EventName", "?"), sessione.name,
-        sessione.event.get("Country", "?"), sessione.event.get("EventDate", "?"),
-    )
-
-    try:
-        sessione.load(laps=True, telemetry=True, weather=False, messages=False)
-    except Exception:
-        log.exception("session.load() ha sollevato un'eccezione per %s round %s/%s", tipo, anno, round_)
-        return None
-
-    # session.load() NON solleva un'eccezione se i dati non sono
-    # disponibili per questa sessione (es. self.f1_api_support è False):
-    # si limita a loggare un avviso interno e a lasciare .laps/.results
-    # non impostati. Verifichiamo esplicitamente qui, loggando anche il
-    # valore effettivo di f1_api_support — un log.exception() qui sotto
-    # cattura anche il caso (osservato in produzione) in cui
-    # f1_api_support risulti True ma .laps sollevi comunque
-    # DataNotLoadedError per un altro motivo non ancora chiaro: il
-    # traceback completo dirà da quale riga esatta parte l'eccezione,
-    # cosa che il solo messaggio non rivelava nel log precedente.
-    log.info("f1_api_support per questa sessione: %s", sessione.f1_api_support)
-    try:
-        if not sessione.f1_api_support:
-            raise RuntimeError(
-                "l'API F1 non supporta questa sessione (dati non ancora "
-                "pubblicati o formato non supportato)"
-            )
-        numero_giri = len(sessione.laps)
-        log.info("Giri caricati: %d", numero_giri)
-        if numero_giri == 0:
-            raise RuntimeError("nessun giro caricato per questa sessione")
-        return sessione
-    except Exception:
-        log.exception(
-            "Dati non disponibili per la sessione %s del round %s/%s (f1_api_support=%s)",
-            tipo, anno, round_, sessione.f1_api_support,
-        )
-        return None
+def _indici_piloti_openf1(piloti_of1: list[dict]) -> tuple[dict, dict]:
+    per_codice, per_numero = {}, {}
+    for p in piloti_of1:
+        if p.get("name_acronym"):
+            per_codice[p["name_acronym"]] = p
+        if p.get("driver_number") is not None:
+            per_numero[str(p["driver_number"])] = p
+    return per_codice, per_numero
 
 
-# ---------------------------------------------------------------------------
-# Estrazione dati
-# ---------------------------------------------------------------------------
+def _pilota_openf1(pilota_j: dict, per_codice: dict, per_numero: dict) -> Optional[dict]:
+    """Collega un pilota Jolpica al suo omologo OpenF1: per sigla, altrimenti
+    per numero di gara."""
+    if pilota_j.get("code") in per_codice:
+        return per_codice[pilota_j["code"]]
+    numero = pilota_j.get("permanentNumber")
+    if numero is not None and str(numero) in per_numero:
+        return per_numero[str(numero)]
+    return None
 
 
-def estrai_piloti(sessione: fastf1.core.Session) -> list[dict]:
-    """Elenco piloti con i dettagli utili al frontend (selettori, colori
-    scuderia, badge posizione) — dai risultati ufficiali della sessione."""
+def _codice(pilota_j: dict, of1: Optional[dict]) -> str:
+    return (of1 or {}).get("name_acronym") or pilota_j.get("code") or pilota_j.get("familyName", "???")[:3].upper()
+
+
+def costruisci_piloti(righe_j: list[dict], piloti_of1: list[dict], qualifica: bool = False) -> list[dict]:
+    """Elenco piloti per meta.json: classifica da Jolpica, nome/scuderia/colore
+    da OpenF1 (con ripiego su Jolpica), ordinato per posizione."""
+    per_codice, per_numero = _indici_piloti_openf1(piloti_of1)
+    usati: set = set()
     piloti = []
-    for _, riga in sessione.results.iterrows():
+    for r in righe_j:
+        dj = r.get("Driver", {})
+        of1 = _pilota_openf1(dj, per_codice, per_numero)
+        if of1:
+            usati.add(of1.get("driver_number"))
+        posizione = _int_o_none(r.get("position"))
+        nome = " ".join(x for x in (dj.get("givenName"), dj.get("familyName")) if x)
+        punti = r.get("points")
         piloti.append({
-            "codice": riga["Abbreviation"],
-            "numero": str(riga["DriverNumber"]),
-            "nome": riga["FullName"],
-            "scuderia": riga["TeamName"],
-            "colore_scuderia": f"#{riga['TeamColor']}" if riga["TeamColor"] else "#888888",
-            "posizione": None if pd.isna(riga["Position"]) else int(riga["Position"]),
-            "posizione_griglia": None if pd.isna(riga["GridPosition"]) else int(riga["GridPosition"]),
-            "classificato": riga["ClassifiedPosition"],
-            "punti": None if pd.isna(riga["Points"]) else float(riga["Points"]),
+            "codice": _codice(dj, of1),
+            "numero": str((of1 or {}).get("driver_number", dj.get("permanentNumber", ""))),
+            "nome": nome or (of1 or {}).get("full_name") or _codice(dj, of1),
+            "scuderia": (of1 or {}).get("team_name") or r.get("Constructor", {}).get("name", ""),
+            "colore_scuderia": f"#{of1['team_colour']}" if of1 and of1.get("team_colour") else "#888888",
+            "posizione": posizione,
+            # grid 0 = partenza dalla corsia box: come "non disponibile"
+            "posizione_griglia": None if qualifica else (_int_o_none(r.get("grid")) or None),
+            "classificato": str(posizione) if qualifica else r.get("positionText", ""),
+            "punti": None if qualifica or punti is None else float(punti),
         })
-    # Ordina per posizione (i ritirati/non classificati, senza posizione, in fondo)
-    piloti.sort(key=lambda p: (p["posizione"] is None, p["posizione"]))
+    if not qualifica:
+        # Piloti presenti su OpenF1 ma non nella classifica (es. non partiti):
+        # restano selezionabili per giri/telemetria.
+        for p in piloti_of1:
+            if p.get("driver_number") not in usati and p.get("name_acronym"):
+                piloti.append({
+                    "codice": p["name_acronym"],
+                    "numero": str(p.get("driver_number", "")),
+                    "nome": p.get("full_name") or p["name_acronym"],
+                    "scuderia": p.get("team_name", ""),
+                    "colore_scuderia": f"#{p['team_colour']}" if p.get("team_colour") else "#888888",
+                    "posizione": None, "posizione_griglia": None,
+                    "classificato": "-", "punti": None,
+                })
+    piloti.sort(key=lambda p: (p["posizione"] is None, p["posizione"] or 0))
     return piloti
 
 
-def estrai_giri(sessione: fastf1.core.Session) -> list[dict]:
-    """Tutti i giri di tutti i piloti — tempo, mescola, stint, posizione.
-    Piccolo a sufficienza (poche decine di byte per giro) da includere per
-    intero, a differenza della telemetria completa."""
+def costruisci_classifica_mondiale(righe: list[dict], piloti_of1: list[dict]) -> list[dict]:
+    per_codice, per_numero = _indici_piloti_openf1(piloti_of1)
+    classifica = []
+    for s in righe:
+        dj = s.get("Driver", {})
+        try:
+            classifica.append({
+                "posizione": int(s["position"]),
+                "pilota": _codice(dj, _pilota_openf1(dj, per_codice, per_numero)),
+                "punti": float(s["points"]),
+                "vittorie": int(s.get("wins", 0)),
+            })
+        except (KeyError, ValueError):
+            continue
+    return classifica
+
+
+# ---------------------------------------------------------------------------
+# Giri e gomme (laps.json)
+# ---------------------------------------------------------------------------
+
+
+def _stint_per_giro(stint_pilota: list[dict], numero_giro: int) -> Optional[dict]:
+    for s in stint_pilota:
+        inizio, fine = s.get("lap_start"), s.get("lap_end")
+        if inizio is None or numero_giro < inizio:
+            continue
+        if fine is None or numero_giro <= fine:
+            return s
+    return None
+
+
+def _indice_stint(stints: list[dict]) -> dict[Any, list[dict]]:
+    per_pilota: dict[Any, list[dict]] = {}
+    for s in stints:
+        per_pilota.setdefault(s.get("driver_number"), []).append(s)
+    for lista in per_pilota.values():
+        lista.sort(key=lambda s: s.get("lap_start") or 0)
+    return per_pilota
+
+
+def costruisci_giri(laps: list[dict], stints: list[dict], numero_a_codice: dict) -> list[dict]:
+    """Tutti i giri di tutti i piloti, con mescola e stint associati."""
+    stint_idx = _indice_stint(stints)
+    rientri = {  # (pilota, giro) dei giri di ingresso ai box: il giro dopo è "out lap"
+        (l.get("driver_number"), l["lap_number"] - 1)
+        for l in laps if l.get("is_pit_out_lap") and isinstance(l.get("lap_number"), int)
+    }
     giri = []
-    for _, giro in sessione.laps.iterrows():
+    for l in laps:
+        numero, n_giro = l.get("driver_number"), l.get("lap_number")
+        if numero is None or not isinstance(n_giro, int):
+            continue
+        stint = _stint_per_giro(stint_idx.get(numero, []), n_giro)
+        eta = stint.get("tyre_age_at_start") if stint else None
+        durata = l.get("lap_duration")
         giri.append({
-            "pilota": giro["Driver"],
-            "giro": None if pd.isna(giro["LapNumber"]) else int(giro["LapNumber"]),
-            "tempo_giro_s": td_to_seconds(giro["LapTime"]),
-            "settore1_s": td_to_seconds(giro["Sector1Time"]),
-            "settore2_s": td_to_seconds(giro["Sector2Time"]),
-            "settore3_s": td_to_seconds(giro["Sector3Time"]),
-            "mescola": giro["Compound"],
-            "vita_gomma": None if pd.isna(giro["TyreLife"]) else int(giro["TyreLife"]),
-            "gomma_nuova": bool(giro["FreshTyre"]) if not pd.isna(giro["FreshTyre"]) else None,
-            "stint": None if pd.isna(giro["Stint"]) else int(giro["Stint"]),
-            "posizione": None if pd.isna(giro["Position"]) else int(giro["Position"]),
-            "ai_box_uscita": not pd.isna(giro["PitOutTime"]),
-            "ai_box_entrata": not pd.isna(giro["PitInTime"]),
-            "giro_accurato": bool(giro["IsAccurate"]) if not pd.isna(giro["IsAccurate"]) else None,
+            "pilota": numero_a_codice.get(numero, str(numero)),
+            "giro": n_giro,
+            "tempo_giro_s": round(durata, 3) if isinstance(durata, (int, float)) else None,
+            "settore1_s": l.get("duration_sector_1"),
+            "settore2_s": l.get("duration_sector_2"),
+            "settore3_s": l.get("duration_sector_3"),
+            "mescola": (stint.get("compound") or "").upper() or None if stint else None,
+            "vita_gomma": (eta + (n_giro - stint["lap_start"]) + 1) if stint and isinstance(eta, int) else None,
+            "gomma_nuova": (eta == 0) if isinstance(eta, int) else None,
+            "stint": stint.get("stint_number") if stint else None,
+            "ai_box_uscita": bool(l.get("is_pit_out_lap")),
+            "ai_box_entrata": (numero, n_giro) in rientri,
         })
+    giri.sort(key=lambda g: (g["pilota"], g["giro"]))
     return giri
 
 
-# Canali di telemetria che esportiamo: chiave interna -> nome colonna FastF1.
-# Aggiungerne uno (es. RPM, nGear) richiede solo una riga qui, niente altro
-# da toccare nella funzione sotto.
-CANALI_TELEMETRIA = {
-    "velocita": "Speed",
-    "acceleratore": "Throttle",
-    "freno": "Brake",
-    "drs": "DRS",
-}
+# ---------------------------------------------------------------------------
+# Telemetria (telemetry.json)
+# ---------------------------------------------------------------------------
 
 
-def estrai_telemetria_giro(giro: pd.Series) -> Optional[dict]:
-    """Telemetria di un singolo giro, campionata su Distanza (non Tempo):
-    è quello che serve per sovrapporre due piloti sullo stesso grafico
-    "per metri di pista", indipendentemente da quanto ciascuno ci abbia
-    messo. Ritorna None se il giro non ha telemetria associata (capita per
-    alcuni giri di inizio/fine sessione, in-lap/out-lap ai box, ecc.)."""
-    try:
-        tel = giro.get_car_data().add_distance()
-    except Exception as errore:
-        log.warning("Telemetria non disponibile per %s giro %s: %s", giro["Driver"], giro["LapNumber"], errore)
+def integra_distanza(tempi_s: list[float], velocita_kmh: list[float]) -> list[float]:
+    """Distanza percorsa (m) integrando la velocità nel tempo (trapezi).
+    OpenF1 non fornisce la distanza: si ricava come fa anche FastF1."""
+    distanze = [0.0]
+    for i in range(1, len(tempi_s)):
+        dt = max(tempi_s[i] - tempi_s[i - 1], 0.0)
+        distanze.append(distanze[-1] + (velocita_kmh[i] + velocita_kmh[i - 1]) / 2 / 3.6 * dt)
+    return distanze
+
+
+def traccia_giro(righe: list[dict], inizio: datetime, fine: datetime) -> Optional[dict]:
+    """Da campioni grezzi 'car_data' a una traccia per distanza. None se il
+    giro ha troppo pochi campioni per essere affidabile."""
+    campioni = []
+    for r in righe:
+        try:
+            d = parse_data(r["date"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        if r.get("speed") is None or not (inizio <= d <= fine):
+            continue
+        campioni.append((d, r))
+    campioni.sort(key=lambda c: c[0])
+    if len(campioni) < MIN_CAMPIONI_GIRO:
         return None
-    if tel.empty:
-        return None
-
+    tempi = [(d - inizio).total_seconds() for d, _ in campioni]
+    velocita = [float(r["speed"]) for _, r in campioni]
     return {
-        "distanza_m": [pulisci_float(v, 1) for v in tel["Distance"]],
-        "velocita_kmh": [pulisci_float(v, 1) for v in tel["Speed"]],
-        "acceleratore_pct": [pulisci_float(v, 1) for v in tel["Throttle"]],
-        # Brake in FastF1 è booleano (freno premuto o no, non un valore
-        # percentuale: i sensori ufficiali F1 non espongono la pressione
-        # frenata) — lo esportiamo come 0/100 così il frontend può
-        # disegnarlo con la stessa scala 0-100 dell'acceleratore.
-        "freno_pct": [100 if v else 0 for v in tel["Brake"]],
-        # DRS: 10/12/14 = attivo, tutto il resto = non attivo (inclusi gli
-        # 8 = "rilevato, zona attivabile" — non è DRS aperto).
-        # Fonte: fastf1.api.car_data (commento nel sorgente della libreria).
-        "drs_attivo": [1 if v in (10, 12, 14) else 0 for v in tel["DRS"]],
-        "tempo_s": [pulisci_float(v.total_seconds(), 3) for v in tel["Time"]],
+        "distanza_m": integra_distanza(tempi, velocita),
+        "velocita_kmh": velocita,
+        "acceleratore_pct": [r.get("throttle") for _, r in campioni],
+        # brake: 0/100 su OpenF1. Qualunque valore > 0 vale "freno premuto".
+        "freno_pct": [100 if (r.get("brake") or 0) > 0 else 0 for _, r in campioni],
+        "drs_attivo": [1 if r.get("drs") in DRS_ATTIVO else 0 for _, r in campioni],
+        "tempo_s": tempi,
     }
 
 
-def estrai_telemetria_sessione(sessione: fastf1.core.Session) -> dict:
-    """Il giro più veloce di OGNI pilota (non solo i 3 assoluti — vedi la
-    nota di design in cima al file) più l'elenco dei 3 giri più veloci in
-    assoluto, per l'evidenziazione di default nel frontend."""
-    per_pilota: dict[str, dict] = {}
-    piloti_e_tempi: list[tuple[str, float]] = []
+def normalizza_distanze(tracce: dict[str, dict]) -> None:
+    """Riporta la distanza finale di ogni giro alla mediana della sessione:
+    l'integrazione della velocità accumula piccoli errori (e l'inizio giro
+    OpenF1 è approssimato). Così le curve dei piloti restano sovrapposte."""
+    finali = [t["distanza_m"][-1] for t in tracce.values() if t["distanza_m"][-1] > 0]
+    if len(finali) < 3:
+        return
+    riferimento = statistics.median(finali)
+    for t in tracce.values():
+        fattore = riferimento / t["distanza_m"][-1] if t["distanza_m"][-1] > 0 else 1.0
+        t["distanza_m"] = [d * fattore for d in t["distanza_m"]]
 
-    for codice in sessione.laps["Driver"].unique():
-        giri_pilota = sessione.laps.pick_drivers(codice)
-        giro_veloce = giri_pilota.pick_fastest()
-        # pick_fastest() ritorna None (non un oggetto "vuoto") se nessun
-        # giro del pilota è marcato come personal best in questa sessione
-        # (capita per un pilota ritirato prestissimo, o con tutti i giri
-        # cancellati per track limits) — senza il controllo su None,
-        # .empty da solo avrebbe sollevato AttributeError e fatto fallire
-        # l'intero script per un singolo pilota "sfortunato".
-        if giro_veloce is None or giro_veloce.empty:
+
+def giri_piu_veloci(laps: list[dict]) -> dict[Any, dict]:
+    """Per ogni pilota, il giro cronometrato più veloce."""
+    durate = [l["lap_duration"] for l in laps
+              if isinstance(l.get("lap_duration"), (int, float)) and l["lap_duration"] > 0]
+    if not durate:
+        return {}
+    soglia = statistics.median(durate) * FRAZIONE_MEDIANA_MINIMA
+    migliori: dict[Any, dict] = {}
+    for l in laps:
+        d, n = l.get("lap_duration"), l.get("driver_number")
+        if not isinstance(d, (int, float)) or d < soglia or n is None or not l.get("date_start"):
             continue
+        if n not in migliori or d < migliori[n]["lap_duration"]:
+            migliori[n] = l
+    return migliori
 
-        dati_telemetria = estrai_telemetria_giro(giro_veloce)
-        if dati_telemetria is None:
+
+def _arrotonda(t: dict) -> dict:
+    t["distanza_m"] = [round(v, 1) for v in t["distanza_m"]]
+    t["velocita_kmh"] = [round(v) for v in t["velocita_kmh"]]
+    t["tempo_s"] = [round(v, 3) for v in t["tempo_s"]]
+    return t
+
+
+def costruisci_telemetria(session_key: Any, laps: list[dict], stints: list[dict], numero_a_codice: dict) -> dict:
+    """Telemetria del giro più veloce di OGNI pilota (non solo dei primi tre:
+    così due piloti qualsiasi sono confrontabili), più i 3 giri assoluti più
+    veloci ('top3') per la selezione di default."""
+    stint_idx = _indice_stint(stints)
+    tracce: dict[str, dict] = {}
+    for numero, giro in giri_piu_veloci(laps).items():
+        codice = numero_a_codice.get(numero, str(numero))
+        inizio = parse_data(giro["date_start"])
+        fine = inizio + timedelta(seconds=giro["lap_duration"])
+        try:
+            righe = openf1(
+                "car_data",
+                ("session_key", session_key), ("driver_number", numero),
+                ("date", ">=", formatta_per_query(inizio)), ("date", "<=", formatta_per_query(fine)),
+            )
+        except ErroreRete as errore:  # un pilota mancante non deve far saltare il GP
+            log.warning("Telemetria di %s non scaricata: %s", codice, errore)
             continue
-
-        per_pilota[codice] = {
-            "giro": int(giro_veloce["LapNumber"]),
-            "tempo_giro_s": td_to_seconds(giro_veloce["LapTime"]),
-            "mescola": giro_veloce["Compound"],
-            **dati_telemetria,
-        }
-        tempo_s = td_to_seconds(giro_veloce["LapTime"])
-        if tempo_s is not None:
-            piloti_e_tempi.append((codice, tempo_s))
-
-    top3 = [codice for codice, _ in sorted(piloti_e_tempi, key=lambda x: x[1])[:3]]
-    return {"piloti": per_pilota, "top3": top3}
-
-
-def estrai_contesto_jolpica(anno: int, round_: int) -> dict:
-    """Classifica piloti dopo questo GP, via Jolpica-F1 (fastf1.ergast) —
-    il contesto mondiale che FastF1 da solo non fornisce (FastF1 copre
-    solo i dati di sessione/telemetria, non le classifiche progressive)."""
-    ergast = fastf1.ergast.Ergast()
-    try:
-        risposta = ergast.get_driver_standings(season=anno, round=round_)
-        if not risposta.content:
-            return {"classifica_piloti": []}
-        tabella = risposta.content[0]
-        classifica = [
-            {
-                "posizione": int(riga["position"]),
-                "pilota": riga["driverCode"] if "driverCode" in tabella.columns else riga.get("familyName", ""),
-                "punti": float(riga["points"]),
-                "vittorie": int(riga["wins"]),
-            }
-            for _, riga in tabella.iterrows()
-        ]
-        return {"classifica_piloti": classifica}
-    except Exception as errore:
-        # Il contesto Jolpica è un "di più": se non è disponibile (rate
-        # limit, manutenzione, round troppo recente per essere già in
-        # classifica) il resto dei dati (FastF1) resta comunque valido e
-        # va salvato lo stesso.
-        log.warning("Contesto Jolpica non disponibile per %s round %s: %s", anno, round_, errore)
-        return {"classifica_piloti": []}
+        traccia = traccia_giro(righe, inizio, fine)
+        if traccia is None:
+            log.warning("Telemetria di %s (giro %s) assente o incompleta", codice, giro.get("lap_number"))
+            continue
+        stint = _stint_per_giro(stint_idx.get(numero, []), giro["lap_number"])
+        traccia.update(
+            giro=giro["lap_number"],
+            tempo_giro_s=round(giro["lap_duration"], 3),
+            mescola=((stint.get("compound") or "").upper() or None) if stint else None,
+        )
+        tracce[codice] = traccia
+    normalizza_distanze(tracce)
+    for t in tracce.values():
+        _arrotonda(t)
+    top3 = [c for c, _ in sorted(tracce.items(), key=lambda kv: kv[1]["tempo_giro_s"])[:3]]
+    return {"piloti": tracce, "top3": top3}
 
 
 # ---------------------------------------------------------------------------
-# Elaborazione di un singolo GP
+# Elaborazione di un GP
 # ---------------------------------------------------------------------------
 
 
-def elabora_gp(anno: int, round_: int) -> Optional[dict]:
-    """Scarica ed elabora un GP, scrive i suoi 3 file JSON. Ritorna la voce
-    da aggiungere a data/index.json, o None se il GP non è elaborabile
-    (dati non ancora disponibili)."""
-    log.info("=== Elaboro GP: %s round %s ===", anno, round_)
+def elabora_sessione(sessione: dict) -> tuple[list[dict], list[dict], dict]:
+    """(piloti OpenF1, giri, telemetria) di una sessione."""
+    chiave = sessione["session_key"]
+    piloti_of1 = openf1("drivers", ("session_key", chiave))
+    laps = openf1("laps", ("session_key", chiave))
+    if not laps:
+        raise DatiNonDisponibili(f"nessun giro su OpenF1 per la sessione {chiave}")
+    stints = openf1("stints", ("session_key", chiave))
+    numero_a_codice = {
+        p["driver_number"]: p.get("name_acronym") or str(p["driver_number"])
+        for p in piloti_of1 if p.get("driver_number") is not None
+    }
+    return (
+        piloti_of1,
+        costruisci_giri(laps, stints, numero_a_codice),
+        costruisci_telemetria(chiave, laps, stints, numero_a_codice),
+    )
 
-    sessione_r = carica_sessione(anno, round_, "R")
-    if sessione_r is None:
-        log.error("Salto %s round %s: dati di Gara non disponibili.", anno, round_)
-        return None
-    sessione_q = carica_sessione(anno, round_, "Q")
-    # La Qualifica può mancare (es. weekend Sprint con formato diverso, o
-    # dati non ancora pubblicati) senza che questo impedisca di pubblicare
-    # comunque l'analisi della Gara.
-    if sessione_q is None:
-        log.warning("Qualifica non disponibile per %s round %s, procedo solo con la Gara.", anno, round_)
 
-    evento = sessione_r.event
-    id_gp = f"{anno}_{round_:02d}_{slug(evento['EventName'])}"
-    cartella = DATA_DIR / id_gp
+def id_gp(anno: int, gara: dict) -> str:
+    return f"{anno}_{gara['round']:02d}_{slug(gara['nome'])}"
 
-    # --- meta.json ---
-    meta = {
+
+def elabora_gp(anno: int, gara: dict, sessioni: list[dict]) -> dict:
+    """Scarica ed elabora un GP e scrive i suoi 3 file JSON. Solleva
+    DatiNonDisponibili se i dati non sono ancora pronti."""
+    log.info("=== GP %s round %s: %s (%s) ===", anno, gara["round"], gara["nome"], gara["data"])
+
+    sess_gara, sess_quali = trova_sessioni(sessioni, gara["data"])
+    if sess_gara is None:
+        raise DatiNonDisponibili("sessione di gara non presente su OpenF1")
+
+    numero = gara["round"]
+    risultati = (jolpica(f"{anno}/{numero}/results.json").get("MRData", {}).get("RaceTable", {}).get("Races") or [{}])[0].get("Results", [])
+    if not risultati:
+        raise DatiNonDisponibili("risultati non ancora pubblicati su Jolpica")
+
+    piloti_of1, giri_gara, tel_gara = elabora_sessione(sess_gara)
+    if len(tel_gara["piloti"]) < MIN_PILOTI_CON_TELEMETRIA:
+        raise DatiNonDisponibili(
+            f"telemetria di gara incompleta ({len(tel_gara['piloti'])} piloti su OpenF1): riprovo alla prossima esecuzione"
+        )
+
+    giri_quali, tel_quali, piloti_quali_of1 = [], {"piloti": {}, "top3": []}, piloti_of1
+    if sess_quali is not None:
+        try:
+            piloti_quali_of1, giri_quali, tel_quali = elabora_sessione(sess_quali)
+        except DatiNonDisponibili as errore:
+            log.warning("Qualifica non disponibile: %s (procedo con la sola gara)", errore)
+    else:
+        log.warning("Sessione di qualifica non trovata su OpenF1 (procedo con la sola gara)")
+
+    righe_quali = (jolpica(f"{anno}/{numero}/qualifying.json").get("MRData", {}).get("RaceTable", {}).get("Races") or [{}])[0].get("QualifyingResults", [])
+    classifica = (jolpica(f"{anno}/{numero}/driverstandings.json").get("MRData", {}).get("StandingsTable", {}).get("StandingsLists") or [{}])[0].get("DriverStandings", [])
+
+    identificativo = id_gp(anno, gara)
+    cartella = DATA_DIR / identificativo
+    scrivi_json(cartella / "meta.json", {
         "anno": anno,
-        "round": round_,
-        "nome_evento": evento["EventName"],
-        "paese": evento["Country"],
-        "localita": evento["Location"],
-        "data": evento["EventDate"].strftime("%Y-%m-%d"),
-        "piloti_gara": estrai_piloti(sessione_r),
-        "piloti_qualifica": estrai_piloti(sessione_q) if sessione_q else [],
-        **estrai_contesto_jolpica(anno, round_),
+        "round": numero,
+        "nome_evento": gara["nome"],
+        "paese": gara["paese"],
+        "localita": gara["localita"],
+        "data": gara["data"].isoformat(),
+        "piloti_gara": costruisci_piloti(risultati, piloti_of1),
+        "piloti_qualifica": costruisci_piloti(righe_quali, piloti_quali_of1, qualifica=True) if righe_quali else [],
+        "classifica_piloti": costruisci_classifica_mondiale(classifica, piloti_of1),
         "generato_il": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    }
-    scrivi_json(cartella / "meta.json", meta)
-
-    # --- laps.json ---
-    laps = {
-        "gara": estrai_giri(sessione_r),
-        "qualifica": estrai_giri(sessione_q) if sessione_q else [],
-    }
-    scrivi_json(cartella / "laps.json", laps)
-
-    # --- telemetry.json ---
-    telemetria = {
-        "gara": estrai_telemetria_sessione(sessione_r),
-        "qualifica": estrai_telemetria_sessione(sessione_q) if sessione_q else {"piloti": {}, "top3": []},
-    }
-    scrivi_json(cartella / "telemetry.json", telemetria)
-
+    })
+    scrivi_json(cartella / "laps.json", {"gara": giri_gara, "qualifica": giri_quali})
+    scrivi_json(cartella / "telemetry.json", {"gara": tel_gara, "qualifica": tel_quali})
     return {
-        "id": id_gp,
-        "anno": anno,
-        "round": round_,
-        "nome_evento": evento["EventName"],
-        "paese": evento["Country"],
-        "data": evento["EventDate"].strftime("%Y-%m-%d"),
+        "id": identificativo, "anno": anno, "round": numero,
+        "nome_evento": gara["nome"], "paese": gara["paese"], "data": gara["data"].isoformat(),
     }
 
 
 def aggiorna_indice(nuove_voci: list[dict]) -> None:
-    """Aggiorna data/index.json con le nuove voci, senza perdere quelle già
-    presenti da run precedenti (fondamentale per --all così come per le
-    esecuzioni settimanali che aggiungono un GP alla volta)."""
-    percorso_indice = DATA_DIR / "index.json"
-    indice: list[dict] = []
-    if percorso_indice.exists():
-        with open(percorso_indice, "r", encoding="utf-8") as f:
-            indice = json.load(f)
+    """Aggiorna data/index.json senza perdere le voci di esecuzioni precedenti."""
+    percorso = DATA_DIR / "index.json"
+    voci: dict[str, dict] = {}
+    if percorso.exists():
+        with open(percorso, "r", encoding="utf-8") as f:
+            voci = {v["id"]: v for v in json.load(f)}
+    for v in nuove_voci:
+        voci[v["id"]] = v
+    scrivi_json(percorso, sorted(voci.values(), key=lambda v: (v["anno"], v["round"]), reverse=True))
 
-    per_id = {voce["id"]: voce for voce in indice}
-    for voce in nuove_voci:
-        per_id[voce["id"]] = voce  # sovrascrive se già presente (rigenerazione)
 
-    indice_finale = sorted(per_id.values(), key=lambda v: (v["anno"], v["round"]), reverse=True)
-    scrivi_json(percorso_indice, indice_finale)
+def gia_elaborato(anno: int, gara: dict) -> bool:
+    cartella = DATA_DIR / id_gp(anno, gara)
+    return all((cartella / f).exists() for f in ("meta.json", "laps.json", "telemetry.json"))
 
 
 # ---------------------------------------------------------------------------
@@ -511,40 +628,48 @@ def aggiorna_indice(nuove_voci: list[dict]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--year", type=int, default=datetime.now().year, help="Stagione (default: anno corrente)")
-    parser.add_argument("--round", type=int, default=None, help="Round specifico (default: l'ultimo disputato)")
-    parser.add_argument("--all", action="store_true", help="Rigenera tutti i round già disputati della stagione")
+    parser.add_argument("--year", type=int, default=None, help="Stagione (default: anno corrente, >= 2023)")
+    parser.add_argument("--round", type=int, default=None, help="Solo questo round")
+    parser.add_argument("--rigenera", action="store_true", help="Rielabora anche i GP già presenti")
     args = parser.parse_args()
 
-    configura_ambiente()
+    anno = args.year or datetime.now(timezone.utc).year
+    oggi = datetime.now(timezone.utc).date()
 
-    if args.all:
-        round_da_fare = elenco_round_disputati(args.year)
-        log.info("Rigenero %d round della stagione %s: %s", len(round_da_fare), args.year, round_da_fare)
-    elif args.round is not None:
-        round_da_fare = [args.round]
-    else:
-        round_da_fare = [trova_ultimo_gp_disputato(args.year)]
+    gare = [g for g in calendario_gare(anno) if g["data"] <= oggi]
+    if args.round is not None:
+        gare = [g for g in gare if g["round"] == args.round]
+    if not args.rigenera:
+        gare = [g for g in gare if not gia_elaborato(anno, g)]
+    if not gare:
+        log.info("Nessun GP da elaborare per il %s: è tutto aggiornato.", anno)
+        return 0
+    log.info("GP da elaborare nel %s: %s", anno, [g["round"] for g in gare])
 
-    nuove_voci = []
-    for r in round_da_fare:
+    sessioni = openf1("sessions", ("year", anno))
+    if not sessioni:
+        log.warning("OpenF1 non ha ancora sessioni per il %s: riprovo alla prossima esecuzione.", anno)
+        return 0
+
+    inizio = time.monotonic()
+    nuove_voci, rimandati, errori = [], 0, 0
+    for gara in gare:
+        if (time.monotonic() - inizio) / 60 > BUDGET_MINUTI:
+            log.warning("Tempo massimo raggiunto: i GP rimasti verranno elaborati alla prossima esecuzione.")
+            break
         try:
-            voce = elabora_gp(args.year, r)
-            if voce is not None:
-                nuove_voci.append(voce)
+            nuove_voci.append(elabora_gp(anno, gara, sessioni))
+        except DatiNonDisponibili as motivo:
+            rimandati += 1
+            log.warning("GP %s rimandato: %s", gara["round"], motivo)
         except Exception:
-            # Un GP che fallisce non deve bloccare gli altri quando si usa
-            # --all, né deve far fallire il workflow con uno stacktrace
-            # criptico: logghiamo per intero e andiamo avanti.
-            log.exception("Errore inatteso elaborando %s round %s", args.year, r)
+            errori += 1
+            log.exception("Errore elaborando il GP %s (%s)", gara["round"], gara["nome"])
 
     if nuove_voci:
         aggiorna_indice(nuove_voci)
-        log.info("Fatto: %d GP elaborati con successo.", len(nuove_voci))
-        return 0
-    else:
-        log.error("Nessun GP elaborato con successo.")
-        return 1
+    log.info("Fatto: %d elaborati, %d rimandati (dati non pronti), %d in errore.", len(nuove_voci), rimandati, errori)
+    return 1 if errori else 0
 
 
 if __name__ == "__main__":

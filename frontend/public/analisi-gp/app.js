@@ -98,13 +98,13 @@ async function avvia() {
   } catch (errore) {
     console.error(errore);
     mostraMessaggio(
-      "Non riesco a trovare i dati (data/index.json). Hai già lanciato scripts/update_data.py almeno una volta?"
+      "I dati non sono ancora disponibili: verranno caricati automaticamente dopo il prossimo Gran Premio."
     );
     return;
   }
 
   if (indiceGp.length === 0) {
-    mostraMessaggio("Nessun Gran Premio disponibile ancora: lancia scripts/update_data.py per generare i dati.");
+    mostraMessaggio("Nessun Gran Premio disponibile ancora: i dati vengono caricati automaticamente dopo ogni gara.");
     return;
   }
 
@@ -215,6 +215,13 @@ function pilotaSelezionato(numero) {
   return { codice, colore: info?.colore_scuderia || "#cccccc", nome: info?.nome || codice };
 }
 
+/** Due compagni di squadra hanno lo stesso colore: senza un segno distintivo
+ * le loro linee sarebbero indistinguibili (e confrontare due compagni è il
+ * caso più comune). Se i colori coincidono, il secondo pilota è tratteggiato. */
+function trattoSecondoPilota(pilota1, pilota2) {
+  return pilota1.colore.toLowerCase() === pilota2.colore.toLowerCase() ? "dash" : "solid";
+}
+
 function ridisegnaTutto() {
   disegnaTelemetria();
   disegnaStint();
@@ -268,7 +275,7 @@ function disegnaTelemetria() {
       x: tel2.distanza_m, y: tel2[canale.chiave], name: pilota2.codice,
       legendgroup: pilota2.codice, showlegend: indice === 0,
       xaxis: `x${suffisso}`, yaxis: `y${suffisso}`,
-      line: { color: pilota2.colore, width: 2 }, type: "scattergl", mode: "lines",
+      line: { color: pilota2.colore, width: 2, dash: trattoSecondoPilota(pilota1, pilota2) }, type: "scattergl", mode: "lines",
     });
   });
 
@@ -385,7 +392,7 @@ function disegnaTempiGiro() {
 
   const tracce = [
     { ...serie1, name: pilota1.codice, mode: "lines+markers", line: { color: pilota1.colore, width: 2 }, marker: { size: 4 } },
-    { ...serie2, name: pilota2.codice, mode: "lines+markers", line: { color: pilota2.colore, width: 2 }, marker: { size: 4 } },
+    { ...serie2, name: pilota2.codice, mode: "lines+markers", line: { color: pilota2.colore, width: 2, dash: trattoSecondoPilota(pilota1, pilota2) }, marker: { size: 4 } },
   ];
 
   const layout = layoutBase({
