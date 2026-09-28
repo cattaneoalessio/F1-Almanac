@@ -100,6 +100,7 @@ analisi-gp/scripts/update_data.py     lo script (solo libreria standard)
 frontend/public/analisi-gp/           la pagina statica (index.html, app.js, style.css)
 frontend/public/analisi-gp/data/      i JSON generati — Vite li pubblica così come sono
 .github/workflows/f1-update.yml       l'aggiornamento automatico
+frontend/src/App.jsx                  la voce "Analisi" nel menu del sito (link normale a /analisi-gp/)
 ```
 
 ## Estendere

@@ -45,6 +45,8 @@ body {
   background: linear-gradient(180deg, var(--carbon-1), var(--carbon-0));
 }
 .testata__marchio {
+  color: inherit;
+  text-decoration: none;
   display: flex;
   align-items: center;
   gap: 0.6rem;

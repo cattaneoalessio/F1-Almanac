@@ -99,6 +99,18 @@
   color: var(--accent-red);
   border-bottom-color: var(--accent-red);
 }
+/* Con la voce "Analisi" le voci sono 10 (+ Accedi): sugli schermi medi la
+   spaziatura generosa le farebbe uscire dalla barra. Qui si stringe un po'
+   (solo tra 700 e 1279px: sopra c'è spazio, sotto 700 c'è l'hamburger). */
+@media (min-width: 700px) and (max-width: 1279.98px) {
+  .app-tabs__links {
+    gap: 0.15rem;
+  }
+  .app-tabs__item {
+    padding: 0.5rem 0.4rem;
+    letter-spacing: 0.04em;
+  }
+}
 
 .app-tabs__auth {
   flex-shrink: 0;
