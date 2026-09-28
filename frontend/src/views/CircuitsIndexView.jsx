@@ -4,7 +4,7 @@ import CircuitArt from '../components/CircuitArt.jsx';
 import CircuitIcon from '../components/CircuitIcon.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import PhotoBand from '../components/PhotoBand.jsx';
-import AdSlot from '../components/AdSlot.jsx';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getElencoCircuiti } from '../api/backend.js';
 import fotoTopband from '../assets/topbands/circuiti.jpg';
@@ -68,9 +68,7 @@ export default function CircuitsIndexView() {
         </div>
       </PhotoBand>
 
-      <div className="main--historical__ad">
-        <AdSlot formato="rettangolo" />
-      </div>
+      <SpazioAdv formato="rettangolo" />
 
       {stato === 'pronto' && (
         <label className="circuits-index__search">

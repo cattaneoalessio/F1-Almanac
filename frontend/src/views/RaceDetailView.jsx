@@ -6,7 +6,7 @@ import { SITO } from '../config/sito.js';
 import CircuitArt from '../components/CircuitArt.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import PhotoBand from '../components/PhotoBand.jsx';
-import AdSlot from '../components/AdSlot.jsx';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 import { getRisultatiGara } from '../api/backend.js';
 import { statoGara, formattaDataGara } from '../utils/statoGara.js';
 import fotoTopband from '../assets/topbands/gara.jpg';
@@ -67,9 +67,7 @@ export default function RaceDetailView() {
         </div>
       </PhotoBand>
 
-      <div className="main--historical__ad">
-        <AdSlot formato="rettangolo" />
-      </div>
+      <SpazioAdv formato="rettangolo" />
 
       {gara && (() => {
         // statoQuando: quando si è disputata (o si disputerà) la gara —

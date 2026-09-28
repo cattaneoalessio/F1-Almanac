@@ -321,11 +321,6 @@
   max-width: 900px;
   margin: 0 auto;
 }
-.main--historical__ad {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.6rem;
-}
 .main {
   padding: 1.25rem 1.1rem 4rem;
   max-width: 1100px;

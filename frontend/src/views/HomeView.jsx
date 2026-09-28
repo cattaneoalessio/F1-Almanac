@@ -5,7 +5,7 @@ import GlassPanel from '../components/GlassPanel.jsx';
 import TeamBadge from '../components/TeamBadge.jsx';
 import PreviewBadge from '../components/PreviewBadge.jsx';
 import LoSapeviWidget from '../components/LoSapeviWidget.jsx';
-import AdSlot from '../components/AdSlot.jsx';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 import { ANNO_MASSIMO } from '../components/HistoricalStandings.jsx';
 import heroFoto from '../assets/hero/home-hero.jpg';
 import { CIRCUIT_PHOTOS } from '../data/circuitPhotos.js';
@@ -115,9 +115,7 @@ export default function HomeView() {
         </div>
       </section>
 
-      <section className="home-section home-section--ad">
-        <AdSlot formato="leaderboard" />
-      </section>
+      <SpazioAdv formato="leaderboard" />
 
       {/* ---------- LO SAPEVI CHE (contenuto reale, non mockup) ---------- */}
       <section className="home-section">
@@ -362,9 +360,7 @@ export default function HomeView() {
         </GlassPanel>
       </section>
 
-      <section className="home-section home-section--ad">
-        <AdSlot formato="billboard" />
-      </section>
+      <SpazioAdv formato="billboard" />
 
       {/* ---------- NEWS ---------- */}
       <section className="home-section">

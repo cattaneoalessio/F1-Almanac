@@ -103,3 +103,18 @@
   justify-content: center;
   margin: 2rem 0;
 }
+
+/* ---------- annuncio reale (modalità 'reale') ----------
+   Niente riquadro tratteggiato: solo lo spazio minimo riservato (per non far
+   "saltare" la pagina quando arriva l'annuncio). L'altezza la decide Google. */
+.ad-slot--reale {
+  display: block;
+  height: auto;
+  min-height: var(--ad-h);
+  border: none;
+  background: none;
+}
+/* Se non c'è nessun annuncio da mostrare, lo spazio sparisce invece di restare vuoto. */
+.ad-slot--reale:has(ins[data-ad-status='unfilled']) {
+  display: none;
+}

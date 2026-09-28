@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import CircuitArt from '../components/CircuitArt.jsx';
 import PhotoBand from '../components/PhotoBand.jsx';
-import AdSlot from '../components/AdSlot.jsx';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 import HistoricalStandings, { ANNO_MASSIMO } from '../components/HistoricalStandings.jsx';
 import fotoTopband from '../assets/topbands/archivio.jpg';
 
@@ -36,9 +36,7 @@ export default function HistoricalView() {
         </div>
       </PhotoBand>
 
-      <div className="main--historical__ad">
-        <AdSlot formato="leaderboard" />
-      </div>
+      <SpazioAdv formato="leaderboard" />
 
       <HistoricalStandings anno={anno} onAnnoChange={(nuovoAnno) => navigate(`/archivio/${nuovoAnno}`)} />
     </main>

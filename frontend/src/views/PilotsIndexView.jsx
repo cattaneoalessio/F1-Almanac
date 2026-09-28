@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import DriverAvatar from '../components/DriverAvatar.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import PhotoBand from '../components/PhotoBand.jsx';
-import AdSlot from '../components/AdSlot.jsx';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
 import { getElencoPiloti } from '../api/backend.js';
 import fotoTopband from '../assets/topbands/piloti.jpg';
@@ -61,9 +61,7 @@ export default function PilotsIndexView() {
         </div>
       </PhotoBand>
 
-      <div className="main--historical__ad">
-        <AdSlot formato="rettangolo" />
-      </div>
+      <SpazioAdv formato="rettangolo" />
 
       {stato === 'pronto' && (
         <input

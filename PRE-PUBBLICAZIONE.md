@@ -79,7 +79,40 @@ per pagina serve il pre-rendering. Le pagine dei singoli Gran Premi
       `frontend/src/config/consenso.js`. In alternativa un CMP a pagamento certificato.
 - [ ] Provare il banner da fuori Italia (VPN in Europa e negli USA) e con il browser in
       modalità privata.
-- [ ] Gli spazi "SPAZIO PUBBLICITARIO" sono segnaposto: gli annunci veri arrivano dopo
-      l'approvazione di AdSense (annunci automatici o blocchi con ID).
+- [ ] Annunci veri: vedi la sezione 5 ("Pubblicità").
 - [ ] Google Fonts: i caratteri vengono scaricati dai server di Google al primo caricamento,
       prima di qualsiasi scelta. Per evitarlo, ospitarli sul sito.
+
+## 5. Pubblicità: dagli spazi agli annunci veri
+
+**Stato attuale.** In produzione gli spazi pubblicitari sono **spenti** (modalità `off`):
+nessun riquadro vuoto, il sito appare normale mentre AdSense lo valuta. Gli spazi
+(colonne laterali, banner tra i blocchi e in fondo) restano nel codice e riappaiono
+quando si attiva la modalità giusta. Il pannello AdSense non li "vede" perché sono solo
+spazio riservato: a Google servono le **unità pubblicitarie** (o gli annunci automatici).
+
+**Quando AdSense approva il sito** (scelta consigliata: unità manuali, annunci automatici spenti):
+
+1. In AdSense, sezione *Annunci → Per unità pubblicitaria → Annunci display* (i nomi dei menu
+   possono cambiare) crea **tre unità adattive (responsive)**:
+   - `monoposto-orizzontale` (banner tra i blocchi e in fondo alla pagina);
+   - `monoposto-rettangolo` (rettangoli tra i blocchi);
+   - `monoposto-verticale` (colonne laterali).
+   Per ognuna, nel codice che AdSense mostra, copia il numero indicato in `data-ad-slot="..."`.
+2. Incolla i tre numeri in `frontend/src/config/pubblicita.js`, dentro `UNITA`.
+3. Netlify → *Environment variables* → aggiungi `VITE_PUBBLICITA` = `reale` → nuovo deploy.
+4. In AdSense, sezione *Annunci → Per sito → monoposto.io*: **Annunci automatici spenti**.
+   Motivo: Google aggiungerebbe formati non previsti (anche a schermo intero) che si sovrappongono
+   agli spazi già progettati e al banner dei cookie.
+5. Controllo: apri una pagina, accetta il banner dei cookie, e nell'ispezione elementi cerca
+   `<ins class="adsbygoogle" ... data-adsbygoogle-status="done">`. I primi annunci possono
+   impiegare qualche ora a comparire.
+
+**Come funziona.** Se un'unità manca, gli spazi che la usano scompaiono da soli (senza la
+verticale, per esempio, non ci sono le colonne e la pagina resta centrata). Uno spazio
+senza annunci da mostrare si chiude invece di restare vuoto. Le colonne laterali esistono
+solo dai 1280 px in su. Prima che l'utente scelga nel banner dei cookie, le richieste sono
+in pausa.
+
+**Per vedere il layout con i riquadri** (in sviluppo lo fa già `npm run dev`):
+`VITE_PUBBLICITA=segnaposto npm run build`.
