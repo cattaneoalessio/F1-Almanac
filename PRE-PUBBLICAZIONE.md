@@ -32,8 +32,16 @@ cosa verificare e come "aprirlo" quando sarà il momento. Spunta man mano.
       aggiunge `https://monoposto.io` e `https://www.monoposto.io` all'elenco CORS
       (`backend/api/main.py`). Senza, dal nuovo dominio il sito appare vuoto.
 - [ ] Facoltativo: aggiornare su Render la variabile `NETLIFY_IDENTITY_URL` al nuovo dominio.
-- [ ] AdSense: aggiungere il sito `monoposto.io` nel pannello e verificare che `ads.txt`
-      (`https://monoposto.io/ads.txt`) risponda.
+- [ ] AdSense: aggiungere il sito `monoposto.io` nel pannello. Se il pannello dice "non è
+      stato trovato alcun file ads.txt": il file è in `frontend/public/ads.txt`; controlla da
+      terminale che il sito lo serva davvero (deve stampare la riga `google.com, pub-…, DIRECT, …`):
+      `curl -iL https://monoposto.io/ads.txt` e, per simulare il crawler di Google,
+      `curl -iL -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" https://monoposto.io/ads.txt`.
+      Se risponde correttamente non c'è altro da fare: Google rilegge il file di sua iniziativa,
+      di solito entro 24 ore, a volte qualche giorno (il rapporto del crawler AdSense è settimanale).
+      Il file va controllato sul dominio esatto aggiunto in AdSense (`monoposto.io` e
+      `www.monoposto.io` sono per Google due siti diversi). Il `robots.txt` deve lasciare entrare
+      i crawler di AdSense: la build lo verifica.
 
 ## 3. Aprire il sito ai motori di ricerca (l'interruttore)
 

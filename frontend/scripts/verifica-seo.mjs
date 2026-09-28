@@ -65,6 +65,13 @@ if (robotsTxt && sitemap && llms) {
   } else {
     controlla(/^User-agent: \*\s*\nDisallow: \/\s*$/m.test(robotsTxt), 'sito NON pubblico ma robots.txt non blocca tutto');
     controlla(!/^Sitemap:/m.test(robotsTxt), 'sito NON pubblico ma robots.txt indica una sitemap');
+    // I crawler di AdSense (verifica del sito, ads.txt, valutazione) devono poter entrare
+    // anche a sito non pubblico: non sono motori di ricerca, e senza di loro AdSense
+    // non può approvare il sito e segnala "ads.txt non trovato".
+    for (const bot of ['Mediapartners-Google', 'Google-adstxt', 'Google-Display-Ads-Bot']) {
+      controlla(new RegExp(`^User-agent: ${bot}\\s*\\nAllow: /\\s*$`, 'm').test(robotsTxt), `sito NON pubblico: robots.txt non consente il crawler di AdSense ${bot}`);
+    }
+    controlla(/^Allow: \/ads\.txt\s*$/m.test(robotsTxt), 'sito NON pubblico: robots.txt non consente la lettura di /ads.txt');
     controlla(righeSitemap === 0, `sito NON pubblico ma la sitemap contiene ${righeSitemap} indirizzi`);
     controlla(headers !== null && /X-Robots-Tag:.*noindex/i.test(headers), 'sito NON pubblico ma manca _headers con X-Robots-Tag noindex');
     controlla(/non ancora pubblico/i.test(llms) && !/\]\(https:\/\//.test(llms), 'sito NON pubblico ma llms.txt descrive contenuti come disponibili');

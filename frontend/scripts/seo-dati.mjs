@@ -61,13 +61,20 @@ export function contenutoRobots({ pubblico }) {
 # ============================================================================
 User-agent: *
 Disallow: /
+Allow: /ads.txt
 
 ${BOT_AI.map((bot) => `User-agent: ${bot}\nDisallow: /`).join('\n\n')}
 
-# Crawler di AdSense: NON è un motore di ricerca e non indicizza nulla, ma serve a
-# Google per valutare il sito ai fini della pubblicità. Se lo blocchi, la
-# richiesta di approvazione AdSense non può completarsi.
+# Crawler di AdSense: NON sono motori di ricerca e non indicizzano nulla, ma servono a
+# Google per verificare il sito, leggere ads.txt e valutarne i contenuti. Se li blocchi,
+# la richiesta di approvazione non può completarsi e AdSense segnala "ads.txt non trovato".
 User-agent: Mediapartners-Google
+Allow: /
+
+User-agent: Google-adstxt
+Allow: /
+
+User-agent: Google-Display-Ads-Bot
 Allow: /
 `;
   }
