@@ -1,8 +1,8 @@
 # Analisi GP — sezione di monoposto.ai
 
 Telemetria comparativa tra due piloti, strategie gomme e ritmo gara, Gran
-Premio per Gran Premio. La pagina è statica (`/analisi-gp/`) e legge dei file
-JSON già pronti: nessun server da mantenere.
+Premio per Gran Premio. È una pagina vera del sito (menu → **Analisi**, indirizzo
+`/analisi`) e legge dei file JSON già pronti: nessun server da mantenere.
 
 ## Come funziona (in breve)
 
@@ -88,25 +88,25 @@ python3 analisi-gp/scripts/update_data.py --rigenera     # rielabora anche i GP 
 ```
 
 I file vengono scritti in `frontend/public/analisi-gp/data/` (si cambia con la
-variabile d'ambiente `F1_DATA_DIR`). Per vedere la pagina in locale:
-`cd frontend/public/analisi-gp && python3 -m http.server 8000`, poi apri
-http://127.0.0.1:8000/ (il browser blocca la lettura dei JSON aprendo il file
-direttamente).
+variabile d'ambiente `F1_DATA_DIR`). Per vederli nella pagina, avvia il sito
+come sempre (`cd frontend && npm run dev`) e apri `/analisi`.
 
 ## Struttura
 
 ```
 analisi-gp/scripts/update_data.py     lo script (solo libreria standard)
-frontend/public/analisi-gp/           la pagina statica (index.html, app.js, style.css)
-frontend/public/analisi-gp/data/      i JSON generati — Vite li pubblica così come sono
+frontend/public/analisi-gp/data/      i JSON generati — il sito li serve così come sono
+frontend/src/views/AnalisiView.jsx    la pagina /analisi (selettori e grafici)
+frontend/src/utils/analisiGrafici.js  costruzione dei tre grafici
+frontend/src/components/PlotlyChart.jsx  contenitore dei grafici (Plotly si scarica solo qui)
+frontend/src/App.jsx                  rotta /analisi e voce "Analisi" nel menu
 .github/workflows/f1-update.yml       l'aggiornamento automatico
-frontend/src/App.jsx                  la voce "Analisi" nel menu del sito (link normale a /analisi-gp/)
 ```
 
 ## Estendere
 
 - **Un nuovo canale di telemetria** (es. RPM o marcia; OpenF1 li fornisce):
   aggiungilo in `traccia_giro()` di `update_data.py` e nell'array
-  `CANALI_TELEMETRIA` di `app.js`.
+  `CANALI_TELEMETRIA` di `frontend/src/utils/analisiGrafici.js`.
 - **Weekend Sprint**: oggi si usano Qualifica e Gara. La sessione "Sprint" si
   può aggiungere con la stessa logica di `elabora_sessione()`.

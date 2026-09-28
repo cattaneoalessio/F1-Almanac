@@ -14,6 +14,7 @@ import ScuderiaView from './views/ScuderiaView.jsx';
 import NewsView from './views/NewsView.jsx';
 import ArcadeView from './views/ArcadeView.jsx';
 import IdolsIndexView from './views/IdolsIndexView.jsx';
+import AnalisiView from './views/AnalisiView.jsx';
 import IdolSennaView from './views/IdolSennaView.jsx';
 import IdolSchumacherView from './views/IdolSchumacherView.jsx';
 import IdolHamiltonView from './views/IdolHamiltonView.jsx';
@@ -37,11 +38,7 @@ const TABS = [
   { pattern: '/circuiti', to: '/circuiti', label: 'Circuiti' },
   { pattern: '/news', to: '/news', label: 'News' },
   { pattern: '/live', to: '/live', label: 'Live Timing' },
-  // Pagina statica (HTML/JS a parte, in public/analisi-gp): NON è una rotta di
-  // React, quindi va aperta con un normale <a href> (un <Link> la cercherebbe
-  // tra le rotte del sito e mostrerebbe "pagina non trovata"). La barra finale
-  // è necessaria: i percorsi relativi della pagina funzionano solo con essa.
-  { pattern: '/analisi-gp/', to: '/analisi-gp/', label: 'Analisi', esterno: true },
+  { pattern: '/analisi', to: '/analisi', label: 'Analisi' },
   { pattern: '/arcade', to: '/arcade', label: 'Arcade' },
   { pattern: '/idols', to: '/idols', label: 'Idols' },
 ];
@@ -97,17 +94,13 @@ function BarraNavigazione() {
       <div className="app-tabs__links">
         {TABS.map((tab) => {
           const attiva = isAttiva(tab);
-          const proprieta = {
-            key: tab.pattern,
-            className: `app-tabs__item ${attiva ? 'app-tabs__item--attiva' : ''}`,
-            'aria-current': attiva ? 'page' : undefined,
-          };
-          return tab.esterno ? (
-            <a {...proprieta} href={tab.to}>
-              {tab.label}
-            </a>
-          ) : (
-            <Link {...proprieta} to={tab.to}>
+          return (
+            <Link
+              key={tab.pattern}
+              to={tab.to}
+              className={`app-tabs__item ${attiva ? 'app-tabs__item--attiva' : ''}`}
+              aria-current={attiva ? 'page' : undefined}
+            >
               {tab.label}
             </Link>
           );
@@ -144,17 +137,13 @@ function BarraNavigazione() {
       >
         {TABS.map((tab) => {
           const attiva = isAttiva(tab);
-          const proprieta = {
-            key: tab.pattern,
-            className: `app-tabs__mobile-item ${attiva ? 'app-tabs__mobile-item--attiva' : ''}`,
-            'aria-current': attiva ? 'page' : undefined,
-          };
-          return tab.esterno ? (
-            <a {...proprieta} href={tab.to}>
-              {tab.label}
-            </a>
-          ) : (
-            <Link {...proprieta} to={tab.to}>
+          return (
+            <Link
+              key={tab.pattern}
+              to={tab.to}
+              className={`app-tabs__mobile-item ${attiva ? 'app-tabs__mobile-item--attiva' : ''}`}
+              aria-current={attiva ? 'page' : undefined}
+            >
               {tab.label}
             </Link>
           );
@@ -196,6 +185,7 @@ export default function App() {
           <Route path="/scuderie/:slug" element={<ScuderiaView />} />
           <Route path="/news" element={<NewsView />} />
           <Route path="/live" element={<LiveTimingView />} />
+          <Route path="/analisi" element={<AnalisiView />} />
           <Route path="/arcade" element={<ArcadeView />} />
           <Route path="/idols" element={<IdolsIndexView />} />
           <Route path="/idols/senna" element={<IdolSennaView />} />

@@ -161,7 +161,7 @@
 }
 .home-classifiche__lista li {
   display: grid;
-  grid-template-columns: 1.4rem auto 1fr auto;
+  grid-template-columns: 1.4rem 1fr auto 3.6rem;
   align-items: center;
   gap: 0.6rem;
   padding-bottom: 0.55rem;
@@ -175,7 +175,26 @@
   color: var(--text-gray);
 }
 .home-classifiche__nome {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
   font-size: 0.9rem;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.home-classifiche__nome:hover {
+  color: var(--accent-yellow);
+}
+.home-classifiche__legenda {
+  margin: -0.4rem 0 0.8rem;
+  font-size: 0.72rem;
+  color: var(--text-gray);
+}
+.home-classifiche__vantaggio {
+  text-align: right;
+  font-size: 0.78rem;
+  color: var(--text-gray);
 }
 .home-classifiche__punti {
   font-weight: 700;
@@ -202,13 +221,43 @@
    lascia troppo spazio vuoto attorno a un tracciato sottile (verificato
    via screenshot: object-fit:contain in un box da 220px creava un grande
    vuoto nero attorno alla mappa). */
+.home-focus__mappa {
+  margin: 0;
+  align-self: center;
+}
 .home-focus__foto {
   display: block;
   width: 100%;
   height: auto;
-  align-self: center;
   padding: 1.2rem;
-  background: #05060a;
+  /* Bianco, non scuro: le mappe sono SVG con linee nere su fondo trasparente,
+     illeggibili sul tema scuro del sito. */
+  background: #fff;
+}
+.home-focus__credito {
+  padding: 0.5rem 1.2rem 0;
+  font-size: 0.68rem;
+  color: var(--text-gray);
+}
+.home-focus__credito a {
+  color: inherit;
+}
+.home-focus__vuoto {
+  padding: 1.2rem 1.4rem;
+}
+.home-focus__quando {
+  color: var(--text-primary);
+}
+.home-focus__sprint {
+  margin-left: 0.7rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--accent-gold);
+  border-radius: 3px;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
 }
 .home-focus__corpo {
   padding: 1.4rem 1.6rem 1.6rem;
@@ -289,6 +338,99 @@
   color: var(--accent-yellow);
 }
 .home-calendario__riga--disputato .home-calendario__nome {
+  color: var(--text-gray);
+}
+
+/* ---------- stati, link di sezione, programma weekend ---------- */
+.home-stato {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-gray);
+}
+.home-stato--errore {
+  color: var(--accent-red);
+}
+.home-section__vai {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--accent-yellow);
+}
+.home-focus__dati a {
+  color: var(--text-primary);
+}
+.home-programma {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.home-programma__titolo {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.home-programma__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.home-programma__lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+.home-programma__lista li:last-child .home-programma__nome {
+  color: var(--accent-gold);
+  font-weight: 700;
+}
+.home-programma__ora {
+  color: var(--text-gray);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.home-programma__nota {
+  margin: 0.6rem 0 0;
+  font-size: 0.7rem;
+  color: var(--text-gray);
+}
+
+/* ---------- calendario a due gruppi ---------- */
+.home-calendario__gruppo {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-gray);
+}
+.home-calendario + .home-calendario__gruppo {
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.home-calendario__riga--prossima .home-calendario__nome {
+  color: var(--accent-gold);
+  font-weight: 700;
+}
+.home-calendario__sprint {
+  margin-left: 0.6rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-gray);
 }
 
