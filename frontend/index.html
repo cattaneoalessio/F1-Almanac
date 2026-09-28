@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Google AdSense: DEVE stare nel <head> di OGNI pagina del sito.
+         Il sito è una single-page app: tutte le pagine (anche quelle che si
+         creeranno in futuro) escono da questo unico index.html, quindi basta
+         questo. Se un giorno si aggiunge una pagina HTML separata (es. in
+         public/), va incollato lo stesso snippet anche lì: lo script
+         scripts/verifica-adsense.mjs, eseguito a ogni build, fa fallire la
+         pubblicazione se manca. -->
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8142312526608548"
+      crossorigin="anonymous"
+    ></script>
     <title>Pit Wall — Live Timing</title>
     <meta name="description" content="Pannello live timing e analisi Gran Premi, stile broadcast motorsport." />
     <!-- Favicon: la "M" del logo Monoposto.ai (file sorgente in
