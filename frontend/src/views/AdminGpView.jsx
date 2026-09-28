@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useMetaPagina } from '../hooks/useMetaPagina.js';
 import GlassPanel from '../components/GlassPanel.jsx';
 import { chiudiGp, getElencoCircuiti } from '../api/backend.js';
 import './AdminGpView.css';
@@ -21,6 +22,7 @@ const CHIAVE_SESSIONE = 'monoposto_admin_key_sessione';
  * nell'header X-Admin-Key della singola chiamata a /game/close-gp.
  */
 export default function AdminGpView() {
+  useMetaPagina({ titolo: 'Amministrazione', descrizione: 'Area riservata al gestore del sito Monoposto.io: non è destinata ai visitatori e non viene indicizzata.', robots: 'noindex' });
   const [chiaveAdmin, setChiaveAdmin] = useState('');
   const [ricordaChiave, setRicordaChiave] = useState(false);
 

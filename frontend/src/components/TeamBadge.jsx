@@ -10,7 +10,7 @@ import { colorForTeam, codeForTeam } from '../data/teamColors.js';
  * espone a rischi legali proprio nel momento in cui il sito comincia
  * a generare reddito. Se in futuro ottieni una licenza/partnership,
  * questo componente è il punto giusto dove sostituire il badge con
- * un vero <img>, senza toccare chi lo usa (LiveTimingSidebar, ecc.).
+ * un vero <img>, senza toccare chi lo usa.
  */
 export default function TeamBadge({ team, size = 'md' }) {
   return (

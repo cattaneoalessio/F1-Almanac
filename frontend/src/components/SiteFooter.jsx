@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import GestisciConsenso from './GestisciConsenso.jsx';
+import { SITO } from '../config/sito.js';
 import './SiteFooter.css';
 
 /**
@@ -25,9 +26,14 @@ export default function SiteFooter() {
       </p>
       <nav className="site-footer__legale" aria-label="Informazioni legali">
         <Link to="/privacy">Privacy e cookie</Link>
+        {SITO.instagramUrl && (
+          <a href={SITO.instagramUrl} target="_blank" rel="noreferrer noopener">
+            Instagram
+          </a>
+        )}
         <GestisciConsenso className="site-footer__consenso" />
       </nav>
-      <p className="site-footer__copyright">&copy; {anno} Monoposto.ai. Logo e contenuti del sito, tutti i diritti riservati.</p>
+      <p className="site-footer__copyright">&copy; {anno} {SITO.nome}. Logo e contenuti del sito, tutti i diritti riservati.</p>
     </footer>
   );
 }

@@ -112,7 +112,7 @@ function idDaLink(link) {
 async function scaricaFeed({ lingua, url }) {
   console.log(`Scarico il feed ${lingua}: ${url}`);
   const risposta = await fetch(url, {
-    headers: { 'User-Agent': 'gp-almanac-news-fetcher/1.0 (+https://f1-almanac.netlify.app)' },
+    headers: { 'User-Agent': 'monoposto.io-news-fetcher/1.0 (+https://monoposto.io)' },
   });
   if (!risposta.ok) {
     throw new Error(`Feed ${lingua} non raggiungibile: HTTP ${risposta.status}`);

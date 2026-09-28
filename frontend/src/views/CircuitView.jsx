@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useMetaPagina } from '../hooks/useMetaPagina.js';
+import { accorcia } from '../utils/metaPagina.js';
+import { SITO } from '../config/sito.js';
 import CircuitIcon from '../components/CircuitIcon.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import CircuitPhotoGallery from '../components/CircuitPhotoGallery.jsx';
@@ -18,6 +21,12 @@ import { SpazioAdv } from '../components/AdSlot.jsx';
 export default function CircuitView() {
   const { slug } = useParams();
   const [scheda, setScheda] = useState(null);
+  useMetaPagina({
+    titolo: scheda ? `${scheda.nome}: circuito di Formula 1 — ${SITO.nome}` : undefined,
+    descrizione: scheda
+      ? accorcia(`${scheda.nome}${scheda.localita ? ` (${scheda.localita})` : ''}: ${scheda.lunghezza_km ? `${scheda.lunghezza_km} km, ` : ''}storia, curve, gare di Formula 1 disputate e albo d'oro dei vincitori.`)
+      : undefined,
+  });
   const [stato, setStato] = useState('caricamento'); // caricamento | pronto | vuoto | errore
 
   useEffect(() => {

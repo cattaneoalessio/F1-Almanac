@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
+import { useMetaPagina } from '../hooks/useMetaPagina.js';
 import './IdolView.css';
 
 /**
@@ -20,6 +21,8 @@ const IDOLI = {
 };
 
 export default function IdolView() {
+  // Scheda "in arrivo": senza contenuto proprio, non va indicizzata.
+  useMetaPagina({ titolo: 'Idols', descrizione: 'La scheda approfondita di questo pilota leggendario è in arrivo su Monoposto.io: intanto scopri gli altri Idols.', robots: 'noindex' });
   const { slug } = useParams();
   const idolo = IDOLI[slug];
 
@@ -36,7 +39,10 @@ export default function IdolView() {
           <p className="idol-view__nota">Scheda completa in arrivo.</p>
         </>
       ) : (
-        <p className="idol-view__nota">Idol non trovato.</p>
+        <>
+          <h1 className="idol-view__nome">Idol non trovato</h1>
+          <p className="idol-view__nota">Questa scheda non esiste.</p>
+        </>
       )}
     </main>
   );

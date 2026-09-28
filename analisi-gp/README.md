@@ -1,4 +1,4 @@
-# Analisi GP — sezione di monoposto.ai
+# Analisi GP — sezione di monoposto.io
 
 Telemetria comparativa tra due piloti, strategie gomme e ritmo gara, Gran
 Premio per Gran Premio. È una pagina vera del sito (menu → **Analisi**, indirizzo

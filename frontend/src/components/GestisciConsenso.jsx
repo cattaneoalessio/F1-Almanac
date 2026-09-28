@@ -1,24 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
+import { CONSENSO } from '../config/consenso.js';
+import { useConsenso } from '../consenso/ConsensoContext.jsx';
 
 /**
- * Pulsante "Gestisci consenso cookie": riapre il messaggio di consenso di
- * Google ("Privacy e messaggi" di AdSense) per cambiare o revocare la scelta.
- * È il modo documentato da Google:
- *   googlefc.callbackQueue.push({ CONSENT_DATA_READY: () => googlefc.showRevocationMessage() })
- *
- * Funziona solo se il messaggio è stato creato e pubblicato dal pannello
- * AdSense e lo script di Google è raggiungibile. Altrimenti (script bloccato
- * da un adblock, messaggio non ancora attivo, Paese dove non serve) non
- * succederebbe nulla: dopo un secondo e mezzo lo si dice all'utente invece di
- * lasciarlo con un pulsante che sembra rotto.
+ * Pulsante che riapre la scelta di consenso (piè di pagina e pagina privacy):
+ * la revoca deve essere facile quanto il consenso.
+ *   - Con il banner proprio (CONSENSO.PROPRIO) riapre quello. In USA il testo è
+ *     quello richiesto dalle leggi statali: «Non vendere né condividere i miei
+ *     dati personali».
+ *   - Se un giorno si passa a un sistema di consenso esterno certificato da
+ *     Google (PROPRIO=false), riapre quello di Google col metodo documentato:
+ *       googlefc.callbackQueue.push({ CONSENT_DATA_READY: () => googlefc.showRevocationMessage() })
+ *     e, se il modulo non c'è (adblock, non ancora attivo), lo dice dopo 1,5 s
+ *     invece di restare muto.
  */
 export default function GestisciConsenso({ className = '' }) {
+  const { regione, riapri } = useConsenso();
   const [nonDisponibile, setNonDisponibile] = useState(false);
   const timer = useRef(null);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const apri = () => {
+  const apriEsterno = () => {
     setNonDisponibile(false);
     clearTimeout(timer.current);
     window.googlefc = window.googlefc || {};
@@ -35,10 +38,12 @@ export default function GestisciConsenso({ className = '' }) {
     }, 1500);
   };
 
+  const etichetta = regione === 'us' ? 'Non vendere né condividere i miei dati personali' : 'Gestisci consenso cookie';
+
   return (
     <>
-      <button type="button" className={`gestisci-consenso ${className}`} onClick={apri}>
-        Gestisci consenso cookie
+      <button type="button" className={`gestisci-consenso ${className}`} onClick={CONSENSO.PROPRIO ? riapri : apriEsterno}>
+        {etichetta}
       </button>
       {nonDisponibile && (
         <span className="gestisci-consenso__avviso" role="status">

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useMetaPagina } from '../hooks/useMetaPagina.js';
+import { accorcia } from '../utils/metaPagina.js';
+import { SITO } from '../config/sito.js';
 import GlassPanel from '../components/GlassPanel.jsx';
 import DriverAvatar from '../components/DriverAvatar.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -28,6 +31,12 @@ function formatAnni(dataNascita, dataMorte) {
 export default function DriverView() {
   const { slug } = useParams();
   const [scheda, setScheda] = useState(null);
+  useMetaPagina({
+    titolo: scheda ? `${scheda.pilota}: carriera e statistiche — ${SITO.nome}` : undefined,
+    descrizione: scheda
+      ? accorcia(`${scheda.pilota}, pilota di Formula 1: ${scheda.gare_totali} gare, ${scheda.vittorie_totali} vittorie e ${scheda.punti_totali_carriera} punti in carriera. Statistiche e risultati gara per gara.`)
+      : undefined,
+  });
   const [stato, setStato] = useState('caricamento'); // caricamento | pronto | vuoto | errore
 
   useEffect(() => {

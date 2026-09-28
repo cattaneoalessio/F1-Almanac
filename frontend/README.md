@@ -1,4 +1,4 @@
-# Frontend — "Pit Wall" (React + Vite)
+# Frontend — Monoposto.io (React + Vite)
 
 Struttura React reale, verificata (build, lint e screenshot Playwright
 passati), con **routing vero** (React Router: ogni stagione/gara/pilota/

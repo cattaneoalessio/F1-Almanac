@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useMetaPagina } from '../hooks/useMetaPagina.js';
+import { accorcia } from '../utils/metaPagina.js';
+import { SITO } from '../config/sito.js';
 import CircuitArt from '../components/CircuitArt.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import PhotoBand from '../components/PhotoBand.jsx';
@@ -14,6 +17,12 @@ import './RaceDetailView.css';
 export default function RaceDetailView() {
   const { anno, circuito } = useParams();
   const [gara, setGara] = useState(null);
+  useMetaPagina({
+    titolo: gara ? `${gara.nome_gp} ${gara.anno}: risultati — ${SITO.nome}` : undefined,
+    descrizione: gara
+      ? accorcia(`Ordine d'arrivo e punti del ${gara.nome_gp} ${gara.anno} di Formula 1${gara.commento ? `. ${gara.commento}` : '.'}`)
+      : undefined,
+  });
   const [stato, setStato] = useState('caricamento'); // caricamento | pronto | vuoto | errore (stato di CARICAMENTO della pagina)
 
   useEffect(() => {

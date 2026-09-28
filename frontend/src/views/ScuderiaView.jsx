@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useMetaPagina } from '../hooks/useMetaPagina.js';
+import { accorcia } from '../utils/metaPagina.js';
+import { SITO } from '../config/sito.js';
 import TeamBadge from '../components/TeamBadge.jsx';
 import GlassPanel from '../components/GlassPanel.jsx';
 import { FlagIcon } from '../utils/flags.jsx';
@@ -12,6 +15,12 @@ import { SpazioAdv } from '../components/AdSlot.jsx';
 export default function ScuderiaView() {
   const { slug } = useParams();
   const [scheda, setScheda] = useState(null);
+  useMetaPagina({
+    titolo: scheda ? `${scheda.nome}: storia e risultati in F1 — ${SITO.nome}` : undefined,
+    descrizione: scheda
+      ? accorcia(`${scheda.nome}: ${scheda.gare_totali} gare, ${scheda.vittorie_totali} vittorie e ${scheda.punti_totali} punti nella storia della Formula 1. Piloti e risultati.`)
+      : undefined,
+  });
   const [stato, setStato] = useState('caricamento'); // caricamento | pronto | vuoto | errore
 
   useEffect(() => {

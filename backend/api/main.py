@@ -83,7 +83,7 @@ from schemas import (
 )
 
 app = FastAPI(
-    title="GP Almanac API",
+    title="Monoposto.io API",
     description="API dei risultati storici del progetto (nome di lavoro, non definitivo).",
     version="0.1.0",
 )
@@ -96,6 +96,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://monoposto.io",
+        "https://www.monoposto.io",
         "https://f1-almanac.netlify.app",
         "http://127.0.0.1:5173",
         "http://localhost:5173",

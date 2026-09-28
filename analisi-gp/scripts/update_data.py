@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-update_data.py — Prepara i dati statici della sezione "Analisi GP" di monoposto.ai.
+update_data.py — Prepara i dati statici della sezione "Analisi GP" di monoposto.io.
 
 COSA FA
 -------
@@ -76,7 +76,7 @@ BUDGET_MINUTI = float(os.environ.get("F1_BUDGET_MINUTI", "100"))
 PAUSA_TRA_RICHIESTE_S = float(os.environ.get("F1_PAUSA_S", "0.5"))
 
 # Le API gratuite chiedono di identificarsi e di non esagerare con le richieste.
-USER_AGENT = "monoposto.ai-analisi-gp/2.0 (+https://monoposto.ai)"
+USER_AGENT = "monoposto.io-analisi-gp/2.0 (+https://monoposto.io)"
 TIMEOUT_S = 30
 MAX_TENTATIVI = 5
 CODICI_RIPROVABILI = (429, 500, 502, 503, 504)

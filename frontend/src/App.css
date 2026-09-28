@@ -24,7 +24,7 @@
   min-width: 0;
 }
 
-/* Barra di navigazione tra "Live Timing" e "Archivio storico" (Fase D).
+/* Barra di navigazione principale (Fase D).
    Sticky in alto: su mobile è la prima cosa che l'utente tocca per
    orientarsi, senza dover scorrere il resto della pagina. */
 .app-tabs {
@@ -58,7 +58,7 @@
   width: auto;
   flex-shrink: 0;
 }
-.app-tabs__logo-ai {
+.app-tabs__logo-suffisso {
   color: var(--accent-red);
 }
 .app-tabs__links {
@@ -68,7 +68,7 @@
   /* Visibile solo da 700px in su (sotto quella soglia la sostituisce il
      menu hamburger, vedi .app-tabs__hamburger più sotto). Lo scroll
      orizzontale resta come rete di sicurezza: con 8 voci (Home, Archivio
-     storico, Piloti, Scuderie, Circuiti, News, Live Timing, Arcade) una
+     storico, Piloti, Scuderie, Circuiti, News, Analisi, Arcade) una
      tablet appena sopra i 700px potrebbe non avere spazio per tutte in
      una riga senza andare a capo. */
   overflow-x: auto;
@@ -248,10 +248,6 @@
   color: var(--accent-red);
 }
 
-.page {
-  min-height: 100vh;
-}
-
 /* ---------- Intelaiatura: pagine con/senza pubblicità ----------
    Vedi components/LayoutPagina.jsx. .app-body riempie lo spazio tra menu e
    piè di pagina (così il footer resta in fondo anche con poco contenuto);
@@ -269,11 +265,6 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-}
-.app-content > .page {
-  flex: 1 0 auto;
-  width: 100%;
-  min-width: 0;
 }
 
 /* Banner orizzontale in fondo a ogni pagina con pubblicità. */
@@ -335,13 +326,6 @@
   justify-content: center;
   margin-bottom: 1.6rem;
 }
-@media (min-width: 900px) {
-  .page {
-    display: grid;
-    grid-template-columns: var(--sidebar-w) 1fr;
-  }
-}
-
 .main {
   padding: 1.25rem 1.1rem 4rem;
   max-width: 1100px;

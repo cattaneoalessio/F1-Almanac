@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import './App.css';
 import HomeView from './views/HomeView.jsx';
-import LiveTimingView from './views/LiveTimingView.jsx';
 import HistoricalView, { ANNO_DI_DEFAULT } from './views/HistoricalView.jsx';
 import RaceDetailView from './views/RaceDetailView.jsx';
 import DriverView from './views/DriverView.jsx';
@@ -23,9 +22,14 @@ import ChronoQuizView from './views/ChronoQuizView.jsx';
 import GameChampionshipView from './views/GameChampionshipView.jsx';
 import AdminGpView from './views/AdminGpView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
+import { ConsensoProvider, useConsenso } from './consenso/ConsensoContext.jsx';
+import BannerConsenso from './consenso/BannerConsenso.jsx';
 import { LayoutConAdv, LayoutSenzaAdv } from './components/LayoutPagina.jsx';
 import PrivacyView from './views/PrivacyView.jsx';
-import { titoloPerPercorso } from './utils/titoloPagina.js';
+import { SITO } from './config/sito.js';
+import { applicaMeta } from './utils/meta.js';
+import { metaPerPercorso } from './utils/metaPagina.js';
+import { useMetaPagina } from './hooks/useMetaPagina.js';
 import { AuthProvider, nomeUtente, useAuth } from './auth/AuthContext.jsx';
 import monopostoIcona from './assets/monoposto-nav-icon.png';
 
@@ -39,7 +43,6 @@ const TABS = [
   { pattern: '/scuderie', to: '/scuderie', label: 'Scuderie' },
   { pattern: '/circuiti', to: '/circuiti', label: 'Circuiti' },
   { pattern: '/news', to: '/news', label: 'News' },
-  { pattern: '/live', to: '/live', label: 'Live Timing' },
   { pattern: '/analisi', to: '/analisi', label: 'Analisi' },
   { pattern: '/arcade', to: '/arcade', label: 'Arcade' },
   { pattern: '/idols', to: '/idols', label: 'Idols' },
@@ -88,7 +91,7 @@ function BarraNavigazione() {
     <nav className="app-tabs" aria-label="Sezioni del sito" ref={barraRef}>
       <Link to="/" className="app-tabs__logo">
         <img src={monopostoIcona} alt="" className="app-tabs__logo-icona" aria-hidden="true" />
-        Monoposto<span className="app-tabs__logo-ai">.ai</span>
+        Monoposto<span className="app-tabs__logo-suffisso">.io</span>
       </Link>
 
       {/* Riga orizzontale di link, visibile da tablet in su (≥700px):
@@ -160,24 +163,31 @@ function BarraNavigazione() {
 
 // Pagina "non trovata": non ha contenuto proprio, quindi senza pubblicità.
 function PaginaNonTrovata() {
+  useMetaPagina({ titolo: `Pagina non trovata — ${SITO.nome}`, descrizione: `La pagina cercata non esiste o è stata spostata. Torna alla home di ${SITO.nome} per proseguire.`, robots: 'noindex' });
   return (
     <main className="main main--historical">
+      <h1 style={{ fontSize: '1.4rem' }}>Pagina non trovata</h1>
       <p className="historical-standings__stato">
-        Pagina non trovata. <Link to={`/archivio/${ANNO_DI_DEFAULT}`}>Torna all'archivio storico</Link>.
+        La pagina cercata non esiste. <Link to={`/archivio/${ANNO_DI_DEFAULT}`}>Torna all'archivio storico</Link>.
       </p>
     </main>
   );
 }
 
-export default function App() {
+function ContenutoApp() {
   const { pathname } = useLocation();
-  useEffect(() => {
-    document.title = titoloPerPercorso(pathname);
+  const { bloccante } = useConsenso();
+  // Meta tag di base della pagina (titolo, descrizione, canonical, Open Graph, robots).
+  // useLayoutEffect: scatta PRIMA degli effetti delle pagine, che poi li affinano
+  // con i loro dati (useMetaPagina) senza essere sovrascritti.
+  useLayoutEffect(() => {
+    applicaMeta({ percorso: pathname, ...metaPerPercorso(pathname) });
   }, [pathname]);
 
   return (
-    <AuthProvider>
-      <div className="app-shell">
+    <>
+      {/* inert: mentre il banner è aperto, il sito sotto non è né cliccabile né raggiungibile con Tab. */}
+      <div className="app-shell" inert={bloccante || undefined}>
         <BarraNavigazione />
 
         <Routes>
@@ -199,7 +209,6 @@ export default function App() {
             <Route path="/scuderie" element={<ScuderiesIndexView />} />
             <Route path="/scuderie/:slug" element={<ScuderiaView />} />
             <Route path="/news" element={<NewsView />} />
-            <Route path="/live" element={<LiveTimingView />} />
             <Route path="/analisi" element={<AnalisiView />} />
             <Route path="/arcade" element={<ArcadeView />} />
             <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
@@ -225,6 +234,17 @@ export default function App() {
 
         <SiteFooter />
       </div>
+      <BannerConsenso />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <ConsensoProvider>
+        <ContenutoApp />
+      </ConsensoProvider>
     </AuthProvider>
   );
 }

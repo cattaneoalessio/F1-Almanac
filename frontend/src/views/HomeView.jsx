@@ -10,6 +10,7 @@ import { ANNO_MASSIMO } from '../components/HistoricalStandings.jsx';
 import heroFoto from '../assets/hero/home-hero.jpg';
 import { CIRCUIT_PHOTOS } from '../data/circuitPhotos.js';
 import { MOCK_NEWS } from '../data/homeMock.js';
+import { SITO } from '../config/sito.js';
 import { FlagIcon } from '../utils/flags.jsx';
 import { useStagioneCorrente, useProssimaGara, ordinaCalendario } from '../hooks/useStagioneCorrente.js';
 import {
@@ -100,7 +101,7 @@ export default function HomeView() {
         <img className="home-hero__foto" src={heroFoto} alt="" aria-hidden="true" />
         <div className="home-hero__scrim" />
         <div className="home-hero__content">
-          <p className="home-hero__kicker">GP Almanac — L'almanacco della Formula 1</p>
+          <p className="home-hero__kicker">{SITO.nome} — {SITO.slogan}</p>
           <h1 className="home-hero__titolo">Ogni stagione. Ogni pilota. Ogni circuito.</h1>
           <p className="home-hero__sottotitolo">
             Dalle prime gare del 1950 al mondiale in corso: risultati, classifiche e statistiche di Formula 1
@@ -109,9 +110,6 @@ export default function HomeView() {
           <div className="home-hero__azioni">
             <Link to="/archivio/1950" className="home-hero__cta home-hero__cta--primaria">
               Esplora l'archivio storico
-            </Link>
-            <Link to="/live" className="home-hero__cta">
-              Live timing
             </Link>
           </div>
         </div>

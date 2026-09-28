@@ -1,8 +1,25 @@
 <!doctype html>
-<html lang="it">
+<html lang="{{SITO_LINGUA}}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- INDICIZZAZIONE. Il valore di "robots" dipende dall'interruttore
+         SITO_PUBBLICO (Netlify): finché non è "true" è noindex/nofollow e lo
+         stesso vale per robots.txt, sitemap e intestazioni HTTP. Le singole
+         pagine lo affinano da JavaScript (vedi utils/meta.js). Guida:
+         PRE-PUBBLICAZIONE.md. -->
+    <meta name="robots" content="{{ROBOTS}}" />
+    {{META_GOOGLE_VERIFICA}}
+
+    <!-- CONSENSO ALLA PUBBLICITÀ. Questa riga DEVE stare PRIMA dello snippet
+         AdSense: mette in pausa le richieste di annunci finché l'utente non ha
+         scelto (il banner in src/consenso/ le riattiva). È la procedura
+         indicata da Google per collegare un sistema di consenso. -->
+    <script>
+      (window.adsbygoogle = window.adsbygoogle || []).pauseAdRequests = 1;
+    </script>
+
     <!-- Google AdSense: DEVE stare nel <head> di OGNI pagina del sito.
          Il sito è una single-page app: tutte le pagine (anche quelle che si
          creeranno in futuro) escono da questo unico index.html, quindi basta
@@ -15,9 +32,28 @@
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8142312526608548"
       crossorigin="anonymous"
     ></script>
-    <title>Monoposto.ai — L'almanacco della Formula 1</title>
-    <meta name="description" content="Monoposto.ai: risultati, classifiche, piloti, scuderie e circuiti della Formula 1 dal 1950 a oggi, con analisi di telemetria dei Gran Premi." />
-    <!-- Favicon: la "M" del logo Monoposto.ai (file sorgente in
+
+    <!-- Meta tag di base (valori da src/config/sito.js). Titolo, descrizione,
+         canonical e Open Graph di ogni pagina vengono poi aggiornati da
+         JavaScript a ogni cambio pagina (utils/meta.js). Il canonical NON è qui
+         di proposito: scritto fisso punterebbe ogni pagina alla home. -->
+    <title>{{SITO_NOME}} — {{SITO_SLOGAN}}</title>
+    <meta name="description" content="{{SITO_DESCRIZIONE}}" />
+    <meta name="theme-color" content="#0b0c10" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="{{SITO_NOME}}" />
+    <meta property="og:locale" content="{{SITO_LOCALE}}" />
+    <meta property="og:title" content="{{SITO_NOME}} — {{SITO_SLOGAN}}" />
+    <meta property="og:description" content="{{SITO_DESCRIZIONE}}" />
+    <meta property="og:image" content="{{IMMAGINE_SOCIAL}}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="{{SITO_NOME}} — {{SITO_SLOGAN}}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{SITO_NOME}} — {{SITO_SLOGAN}}" />
+    <meta name="twitter:description" content="{{SITO_DESCRIZIONE}}" />
+    <meta name="twitter:image" content="{{IMMAGINE_SOCIAL}}" />
+    <!-- Favicon: la "M" del logo Monoposto.io (file sorgente in
          public/branding/), ritagliata stretta sul cuore del simbolo per
          restare leggibile alle dimensioni minuscole di un'icona di scheda —
          la versione larga con lo strascico di quadratini decorativi, bella
@@ -29,8 +65,7 @@
     <!-- Font coerenti con le linee guida grafiche del progetto (aggiornate
          2026-09-21, redesign fotografico): Big Shoulders Display per titoli
          e numeri in stile "cronometro", IBM Plex Sans per i testi. Share Tech
-         Mono resta caricato: serve ancora ai tempi/tabellari del live timing
-         (var(--font-mono)), invariato dal redesign. Caricati qui una sola
+         Mono resta caricato per i tempi/tabellari (var(--font-mono)). Caricati qui una sola
          volta per tutta l'app. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -1,12 +1,18 @@
 /**
  * titolare.js — dati del titolare del trattamento mostrati nella pagina
  * Privacy (/privacy). L'informativa privacy DEVE indicare chi è il titolare e
- * come contattarlo: compila qui i due campi prima di pubblicare.
- * Finché sono vuoti, la pagina mostra un avviso evidente "DA COMPLETARE".
+ * come contattarlo.
+ *
+ * DA VERIFICARE prima della pubblicazione (vedi PRE-PUBBLICAZIONE.md): nome e
+ * indirizzo email sono quelli indicati provvisoriamente dal gestore. Se il sito
+ * verrà gestito tramite una ditta, un'associazione o una società, qui va la
+ * denominazione corretta (con sede, P.IVA se dovuta).
  */
+import { SITO } from '../config/sito.js';
+
 export const TITOLARE = {
-  nome: '', // nome e cognome, oppure denominazione se è una ditta/associazione
-  email: '', // indirizzo a cui gli utenti scrivono per esercitare i propri diritti
+  nome: 'Alessio Cattaneo',
+  email: SITO.email,
 };
 
 /** Data dell'ultima revisione del testo: aggiornala quando modifichi la privacy. */

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/verifica-adsense.mjs",
+    "build": "vite build && node scripts/verifica-adsense.mjs && node scripts/verifica-seo.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
