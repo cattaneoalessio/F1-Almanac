@@ -6,6 +6,7 @@ import { FlagIcon } from '../utils/flags.jsx';
 import { getElencoScuderie } from '../api/backend.js';
 import '../components/HistoricalStandings.css';
 import './ScuderiesIndexView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /** Indice di tutte le scuderie nel database: /scuderie */
 export default function ScuderiesIndexView() {
@@ -47,6 +48,8 @@ export default function ScuderiesIndexView() {
           Non riesco a contattare il backend. Verifica che l'API sia avviata e riprova.
         </p>
       )}
+
+      {stato === 'pronto' && <SpazioAdv formato="rettangolo-grande" />}
 
       {stato === 'pronto' && (
         <div className="scuderie-index__grid">

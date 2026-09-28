@@ -3,6 +3,7 @@ import { useState } from 'react';
 import CreditedFigure from '../components/CreditedFigure.jsx';
 import { DRIVER_PHOTOS } from '../data/driverPhotos.js';
 import './IdolHamiltonView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /**
  * IdolHamiltonView (/idols/hamilton) — sottopagina arricchita di Lewis
@@ -276,6 +277,8 @@ export default function IdolHamiltonView() {
 
         <TimelinePercorso />
 
+        <SpazioAdv formato="rettangolo-grande" />
+
         <h2>L&rsquo;equilibrio perfetto tra moda, attivismo e asfalto</h2>
         <p>
           Ciò che rende Hamilton un&rsquo;icona assoluta, capace di trascendere il motorsport come solo Senna
@@ -333,6 +336,8 @@ export default function IdolHamiltonView() {
           <BoxStatistica numero="207" etichetta="podi" nota="record assoluto" />
           <BoxStatistica numero="48" etichetta="gare consecutive a punti" nota="record assoluto, 2018–20" />
         </div>
+
+        <SpazioAdv formato="leaderboard" />
 
         <h2>L&rsquo;eredità: un nuovo paradigma per il futuro</h2>
         <p>

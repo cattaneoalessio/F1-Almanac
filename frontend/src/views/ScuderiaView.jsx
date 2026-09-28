@@ -6,6 +6,7 @@ import { FlagIcon } from '../utils/flags.jsx';
 import { getSchedaScuderia } from '../api/backend.js';
 import '../components/HistoricalStandings.css';
 import './CircuitView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /** Scheda di una scuderia: /scuderie/:slug */
 export default function ScuderiaView() {
@@ -66,6 +67,8 @@ export default function ScuderiaView() {
               </p>
             </div>
           </div>
+
+          <SpazioAdv formato="leaderboard" />
 
           {scheda.gare.length === 0 ? (
             <GlassPanel>

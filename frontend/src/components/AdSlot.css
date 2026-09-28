@@ -1,4 +1,7 @@
 .ad-slot {
+  --ad-w: 300px;
+  --ad-h: 250px;
+  --ad-dim: '300 × 250';
   width: 100%;
   max-width: var(--ad-w);
   height: var(--ad-h);
@@ -18,7 +21,85 @@
   text-transform: uppercase;
   color: var(--text-gray);
 }
+/* La dimensione mostrata segue quella reale (che cambia con lo schermo). */
 .ad-slot__size {
   font-size: 0.68rem;
   color: rgba(255, 255, 255, 0.25);
+}
+.ad-slot__size::before {
+  content: var(--ad-dim) ' · Google AdSense';
+}
+
+/* ---------- formati ---------- */
+.ad-slot--leaderboard {
+  --ad-w: 728px;
+  --ad-h: 90px;
+  --ad-dim: '728 × 90';
+}
+.ad-slot--billboard {
+  --ad-w: 970px;
+  --ad-h: 250px;
+  --ad-dim: '970 × 250';
+}
+.ad-slot--rettangolo {
+  --ad-w: 300px;
+  --ad-h: 250px;
+  --ad-dim: '300 × 250';
+}
+.ad-slot--rettangolo-grande {
+  --ad-w: 336px;
+  --ad-h: 280px;
+  --ad-dim: '336 × 280';
+}
+.ad-slot--colonna {
+  --ad-w: 160px;
+  --ad-h: 600px;
+  --ad-dim: '160 × 600';
+}
+
+/* Adattamento: sotto la larghezza del formato lo spazio non può stare in una
+   riga, quindi si usa il formato mobile equivalente. */
+/* 970px entra solo se il contenuto è largo almeno ~1005px: sotto i 1050px di
+   finestra, e tra 1280 e 1365px (dove le colonne laterali restringono il
+   contenuto), si usa il 728×90. */
+@media (max-width: 1049.98px), (min-width: 1280px) and (max-width: 1364.98px) {
+  .ad-slot--billboard {
+    --ad-w: 728px;
+    --ad-h: 90px;
+    --ad-dim: '728 × 90';
+  }
+}
+@media (max-width: 759.98px) {
+  .ad-slot--leaderboard {
+    --ad-w: 320px;
+    --ad-h: 100px;
+    --ad-dim: '320 × 100';
+  }
+  .ad-slot--billboard {
+    --ad-w: 300px;
+    --ad-h: 250px;
+    --ad-dim: '300 × 250';
+  }
+}
+@media (max-width: 399.98px) {
+  .ad-slot--rettangolo-grande {
+    --ad-w: 300px;
+    --ad-h: 250px;
+    --ad-dim: '300 × 250';
+  }
+}
+@media (min-width: 1800px) {
+  .ad-slot--colonna {
+    --ad-w: 300px;
+    --ad-dim: '300 × 600';
+  }
+}
+
+/* Spazio "tra un blocco e l'altro": margine verticale abbondante, così
+   l'annuncio non finisce mai attaccato a pulsanti o link (le policy di
+   AdSense vietano annunci troppo vicini ai controlli cliccabili). */
+.adv-blocco {
+  display: flex;
+  justify-content: center;
+  margin: 2rem 0;
 }

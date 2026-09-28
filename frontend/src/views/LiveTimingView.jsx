@@ -8,6 +8,7 @@ import CircuitArt from '../components/CircuitArt.jsx';
 import TyrePanel from '../components/TyrePanel.jsx';
 import { TEAM_COLORS } from '../data/teamColors.js';
 import { getTyreStints, SAMPLE_STINTS } from '../api/tires.js';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 // Dati di esempio: nel progetto reale queste righe arrivano da OpenF1
 // (vedi src/api/openf1.js -> getIntervals). Tenerli qui come costanti
@@ -120,6 +121,8 @@ export default function LiveTimingView() {
             ))}
           </div>
         </GlassPanel>
+
+        <SpazioAdv formato="rettangolo-grande" />
 
         <h2 className="section-title">Dallo studio</h2>
         <div className="grid-cards">

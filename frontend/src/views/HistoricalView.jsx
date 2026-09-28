@@ -37,7 +37,7 @@ export default function HistoricalView() {
       </PhotoBand>
 
       <div className="main--historical__ad">
-        <AdSlot width={728} height={90} />
+        <AdSlot formato="leaderboard" />
       </div>
 
       <HistoricalStandings anno={anno} onAnnoChange={(nuovoAnno) => navigate(`/archivio/${nuovoAnno}`)} />

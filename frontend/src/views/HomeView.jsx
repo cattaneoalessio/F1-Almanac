@@ -118,7 +118,7 @@ export default function HomeView() {
       </section>
 
       <section className="home-section home-section--ad">
-        <AdSlot width={728} height={90} />
+        <AdSlot formato="leaderboard" />
       </section>
 
       {/* ---------- LO SAPEVI CHE (contenuto reale, non mockup) ---------- */}
@@ -365,7 +365,7 @@ export default function HomeView() {
       </section>
 
       <section className="home-section home-section--ad">
-        <AdSlot width={970} height={250} />
+        <AdSlot formato="billboard" />
       </section>
 
       {/* ---------- NEWS ---------- */}

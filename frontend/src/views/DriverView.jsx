@@ -12,6 +12,7 @@ import '../components/HistoricalStandings.css';
 import '../components/Pagination.css';
 import './CircuitView.css';
 import './DriverView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 function formatAnni(dataNascita, dataMorte) {
   const anno = (iso) => (iso ? iso.slice(0, 4) : null);
@@ -144,6 +145,8 @@ export default function DriverView() {
               )}
             </GlassPanel>
           </div>
+
+          <SpazioAdv formato="rettangolo-grande" />
 
           <GlassPanel style={{ marginTop: '1.2rem' }}>
             <h2 className="section-title" style={{ marginTop: 0 }}>

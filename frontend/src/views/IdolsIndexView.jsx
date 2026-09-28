@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { DRIVER_PHOTOS } from '../data/driverPhotos.js';
 import './IdolsIndexView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /**
  * IdolsIndexView (/idols) — vetrina editoriale dei piloti leggendari,
@@ -65,6 +66,8 @@ export default function IdolsIndexView() {
           I piloti che hanno ridefinito cosa significa essere veloci. Scegli una leggenda.
         </p>
       </header>
+
+      <SpazioAdv formato="leaderboard" />
 
       <section className="idols-view__griglia" aria-label="Piloti leggendari">
         {IDOLI.map((idolo) => (

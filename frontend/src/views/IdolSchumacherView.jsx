@@ -3,6 +3,7 @@ import { useState } from 'react';
 import CreditedFigure from '../components/CreditedFigure.jsx';
 import { DRIVER_PHOTOS } from '../data/driverPhotos.js';
 import './IdolSchumacherView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /**
  * IdolSchumacherView (/idols/schumacher) — sottopagina arricchita di
@@ -238,6 +239,8 @@ export default function IdolSchumacherView() {
 
         <TimelinePercorso />
 
+        <SpazioAdv formato="rettangolo-grande" />
+
         <h2>L&rsquo;implacabile mentalità del Kaiser</h2>
         <p>
           Ciò che ha reso Schumacher un’icona transgenerazionale non è solo l’incredibile palmares di 7 Titoli
@@ -307,6 +310,8 @@ export default function IdolSchumacherView() {
           licenzaLabel={DRIVER_PHOTOS.schumacher.stileTecnico.licenzaLabel}
           didascalia="Il casco iconico, GP del Bahrein 2010 — gli anni del ritorno in Mercedes"
         />
+
+        <SpazioAdv formato="leaderboard" />
 
         <h2>L&rsquo;eredità: il benchmark del motorsport moderno</h2>
         <p>

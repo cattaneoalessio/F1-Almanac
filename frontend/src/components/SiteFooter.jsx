@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import GestisciConsenso from './GestisciConsenso.jsx';
 import './SiteFooter.css';
 
 /**
@@ -21,6 +23,10 @@ export default function SiteFooter() {
         nomi dei piloti citati appartengono ai rispettivi proprietari e vengono utilizzati esclusivamente
         a scopo descrittivo e informativo.
       </p>
+      <nav className="site-footer__legale" aria-label="Informazioni legali">
+        <Link to="/privacy">Privacy e cookie</Link>
+        <GestisciConsenso className="site-footer__consenso" />
+      </nav>
       <p className="site-footer__copyright">&copy; {anno} Monoposto.ai. Logo e contenuti del sito, tutti i diritti riservati.</p>
     </footer>
   );

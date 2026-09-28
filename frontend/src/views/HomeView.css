@@ -19,8 +19,8 @@
      spazio alle colonne ADS ai lati (vedi .rail-ad in App.css). */
   width: auto;
   max-width: none;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
+  margin-left: var(--bleed-x, calc(50% - 50vw));
+  margin-right: var(--bleed-x, calc(50% - 50vw));
   border-radius: 0;
   padding: 3.2rem 0;
   margin-bottom: 2.4rem;
@@ -62,11 +62,20 @@
      dove inizia la colonna di contenuto normale sotto l'hero, così il
      titolo non parte incollato al bordo della finestra su schermi
      larghi. Approssimato via padding, non serve essere pixel-perfect. */
-  padding-left: max(1.6rem, calc((100vw - 1100px) / 2 + 1.1rem));
+  padding-left: var(--hero-pad-x, max(1.6rem, calc((100vw - 1100px) / 2 + 1.1rem)));
+}
+/* Con le colonne pubblicitarie ai lati (dai 1280px) l'hero non è più a tutta
+   finestra: torna a essere un blocco arrotondato come gli altri. */
+@media (min-width: 1280px) {
+  .app-body--adv .home-hero {
+    border-radius: 8px;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
 }
 @media (min-width: 700px) {
   .home-hero__content {
-    padding-left: max(3rem, calc((100vw - 1100px) / 2 + 2.4rem));
+    padding-left: var(--hero-pad-x, max(3rem, calc((100vw - 1100px) / 2 + 2.4rem)));
   }
 }
 .home-hero__kicker {

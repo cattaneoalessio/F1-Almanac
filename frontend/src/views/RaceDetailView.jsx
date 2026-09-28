@@ -59,7 +59,7 @@ export default function RaceDetailView() {
       </PhotoBand>
 
       <div className="main--historical__ad">
-        <AdSlot width={300} height={250} />
+        <AdSlot formato="rettangolo" />
       </div>
 
       {gara && (() => {

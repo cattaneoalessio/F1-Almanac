@@ -69,7 +69,7 @@ export default function CircuitsIndexView() {
       </PhotoBand>
 
       <div className="main--historical__ad">
-        <AdSlot width={300} height={250} />
+        <AdSlot formato="rettangolo" />
       </div>
 
       {stato === 'pronto' && (

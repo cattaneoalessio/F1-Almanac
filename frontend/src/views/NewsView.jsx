@@ -1,6 +1,7 @@
 import GlassPanel from '../components/GlassPanel.jsx';
 import notizie from '../data/pirelli-news.json';
 import './NewsView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 const FORMATTATORE_DATA = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -47,6 +48,8 @@ export default function NewsView() {
           avvenuta, oppure il feed non era raggiungibile durante l'ultimo aggiornamento.
         </p>
       )}
+
+      {notizieItaliane.length > 0 && <SpazioAdv formato="leaderboard" />}
 
       {notizieItaliane.length > 0 && (
         <div className="news-view__grid">

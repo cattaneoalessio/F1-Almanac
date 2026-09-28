@@ -3,6 +3,7 @@ import { useState } from 'react';
 import CreditedFigure from '../components/CreditedFigure.jsx';
 import { DRIVER_PHOTOS } from '../data/driverPhotos.js';
 import './IdolSennaView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /**
  * IdolSennaView (/idols/senna) — sottopagina arricchita di Ayrton
@@ -336,6 +337,8 @@ export default function IdolSennaView() {
           didascalia="Il debutto: Senna sulla Toleman TG184, GP di Gran Bretagna 1984"
         />
 
+        <SpazioAdv formato="rettangolo-grande" />
+
         <h2>La mistica del Re della Pioggia</h2>
         <CreditedFigure
           src={DRIVER_PHOTOS.senna.pioggia.src}
@@ -419,6 +422,8 @@ export default function IdolSennaView() {
           licenzaLabel={DRIVER_PHOTOS.senna.stileTecnico.licenzaLabel}
           didascalia="Aggressione ai cordoli, GP di Monaco 1991"
         />
+
+        <SpazioAdv formato="leaderboard" />
 
         <h2>L&rsquo;eredità: oltre il cordolo di Imola</h2>
         <p>

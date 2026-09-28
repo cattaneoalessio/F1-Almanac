@@ -109,7 +109,7 @@
 
 /* ---------- CITAZIONE CALLOUT ---------- */
 .idol-senna__citazione {
-  margin: 2.6rem calc(50% - 50vw);
+  margin: 2.6rem var(--bleed-x, calc(50% - 50vw));
   padding: 3rem 1.6rem;
   text-align: center;
   background: var(--bg-card);

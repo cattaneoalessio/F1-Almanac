@@ -12,6 +12,7 @@ import usePagination from '../hooks/usePagination.js';
 import '../components/HistoricalStandings.css';
 import '../components/Pagination.css';
 import './CircuitView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /** Scheda di un circuito: /circuiti/:slug */
 export default function CircuitView() {
@@ -134,6 +135,8 @@ export default function CircuitView() {
               {scheda.storia && <p className="circuit-view__testo">{scheda.storia}</p>}
             </GlassPanel>
           )}
+
+          <SpazioAdv formato="leaderboard" />
 
           <div className="circuit-view__grid">
             <GlassPanel>

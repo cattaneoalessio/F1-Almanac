@@ -7,10 +7,10 @@
 /* Il contenuto (nav + rotte) occupa lo spazio disponibile, così il
    footer con il disclaimer resta ancorato in fondo alla viewport anche
    nelle pagine con poco contenuto, invece di finire a metà schermo. */
-.app-shell > *:not(.site-footer) {
+.app-shell > *:not(.site-footer):not(.app-body) {
   flex: 0 0 auto;
 }
-.app-shell > .main {
+.app-content > .main {
   flex: 1 0 auto;
   /* Bug reale trovato in verifica: da quando .app-shell è diventato un
      flex container (per ancorare il footer in fondo), .main perdeva la
@@ -252,28 +252,75 @@
   min-height: 100vh;
 }
 
-/* Colonne ADS fisse ai lati — dimensione minima "skyscraper" (160×600).
-   Ancorate al bordo della finestra, indipendenti dalla larghezza del
-   contenuto centrale: compaiono solo quando lo schermo è abbastanza
-   largo da ospitarle senza toccare la colonna di contenuto (che resta
-   centrata, vedi .main/.main--historical/.home-view). Sotto quella
-   soglia restano nascoste, coerente con l'impostazione mobile-first
-   del resto del sito. */
-.rail-ad {
+/* ---------- Intelaiatura: pagine con/senza pubblicità ----------
+   Vedi components/LayoutPagina.jsx. .app-body riempie lo spazio tra menu e
+   piè di pagina (così il footer resta in fondo anche con poco contenuto);
+   .app-content è la colonna dei contenuti. */
+.app-body {
+  flex: 1 0 auto;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-content {
+  flex: 1 0 auto;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-content > .page {
+  flex: 1 0 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Banner orizzontale in fondo a ogni pagina con pubblicità. */
+.adv-fondo {
+  padding: 0 1.1rem 2.4rem;
+}
+
+/* Colonne pubblicitarie verticali ai lati. Compaiono dai 1280px: sotto,
+   affiancarle al contenuto lo ridurrebbe troppo (su telefono e tablet gli
+   spazi sono quelli tra i blocchi e in fondo alla pagina). Sono VICINE al
+   contenuto (non incollate ai bordi della finestra, come prima) e "sticky":
+   seguono lo scorrimento restando sempre in vista. Sopra 1800px passano da
+   160 a 300px di larghezza (vedi AdSlot.css). */
+.adv-colonna {
   display: none;
 }
-@media (min-width: 1600px) {
-  .rail-ad {
+@media (min-width: 1280px) {
+  .app-body--adv {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(0, 1100px) minmax(160px, 1fr);
+    column-gap: 1.25rem;
+    /* Sotto i 1280px e nelle pagine senza colonne, gli elementi "a tutta
+       larghezza" (hero della home, strisce foto degli Idols) escono dal
+       contenuto fino ai bordi della finestra. Con le colonne accanto
+       passerebbero sotto gli annunci: qui restano dentro la loro colonna. */
+    --bleed-x: 0px;
+    --hero-pad-x: 3rem;
+  }
+  .adv-colonna {
     display: block;
-    position: fixed;
-    top: 6rem;
-    z-index: 5;
+    /* Larghezza esplicita (non 100%): senza, la colonna si stringe al testo. */
+    width: 160px;
+    position: sticky;
+    top: 5rem;
+    align-self: start;
+    padding-top: 1.25rem;
   }
-  .rail-ad--left {
-    left: 24px;
+  .adv-colonna--sx {
+    justify-self: end;
   }
-  .rail-ad--right {
-    right: 24px;
+  .adv-colonna--dx {
+    justify-self: start;
+  }
+}
+@media (min-width: 1800px) {
+  .adv-colonna {
+    width: 300px;
   }
 }
 

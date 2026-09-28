@@ -6,6 +6,7 @@ import PlotlyChart from '../components/PlotlyChart.jsx';
 import fotoTopband from '../assets/topbands/gara.jpg';
 import { costruisciTelemetria, costruisciStint, costruisciTempiGiro } from '../utils/analisiGrafici.js';
 import './AnalisiView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 // I JSON vengono preparati da analisi-gp/scripts/update_data.py (eseguito
 // da GitHub Actions dopo ogni GP) e stanno in public/, quindi sono file
@@ -238,6 +239,8 @@ export default function AnalisiView() {
                   </p>
                 )}
               </GlassPanel>
+
+              <SpazioAdv formato="leaderboard" />
 
               <GlassPanel className="analisi__pannello">
                 <h2 className="section-title">Strategie gomme (tutti i piloti)</h2>

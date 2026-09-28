@@ -62,7 +62,7 @@ export default function PilotsIndexView() {
       </PhotoBand>
 
       <div className="main--historical__ad">
-        <AdSlot width={300} height={250} />
+        <AdSlot formato="rettangolo" />
       </div>
 
       {stato === 'pronto' && (

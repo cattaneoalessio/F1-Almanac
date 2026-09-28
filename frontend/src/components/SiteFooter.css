@@ -29,3 +29,45 @@
   opacity: 0.75;
   text-align: center;
 }
+
+/* Link legali: privacy e riapertura della scelta di consenso ai cookie. */
+.site-footer__legale {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.4rem 1.4rem;
+  margin: 0.7rem auto 0;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+}
+.site-footer__legale a,
+.gestisci-consenso {
+  color: var(--text-gray);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.site-footer__legale a:hover,
+.gestisci-consenso:hover {
+  color: var(--text-primary);
+}
+.gestisci-consenso {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.gestisci-consenso__avviso {
+  display: block;
+  flex-basis: 100%;
+  max-width: 60ch;
+  margin: 0 auto;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-gray);
+  text-align: center;
+}
+.gestisci-consenso__avviso a {
+  color: inherit;
+}

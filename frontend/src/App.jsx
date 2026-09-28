@@ -23,7 +23,9 @@ import ChronoQuizView from './views/ChronoQuizView.jsx';
 import GameChampionshipView from './views/GameChampionshipView.jsx';
 import AdminGpView from './views/AdminGpView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
-import AdSlot from './components/AdSlot.jsx';
+import { LayoutConAdv, LayoutSenzaAdv } from './components/LayoutPagina.jsx';
+import PrivacyView from './views/PrivacyView.jsx';
+import { titoloPerPercorso } from './utils/titoloPagina.js';
 import { AuthProvider, nomeUtente, useAuth } from './auth/AuthContext.jsx';
 import monopostoIcona from './assets/monoposto-nav-icon.png';
 
@@ -156,55 +158,69 @@ function BarraNavigazione() {
   );
 }
 
+// Pagina "non trovata": non ha contenuto proprio, quindi senza pubblicità.
+function PaginaNonTrovata() {
+  return (
+    <main className="main main--historical">
+      <p className="historical-standings__stato">
+        Pagina non trovata. <Link to={`/archivio/${ANNO_DI_DEFAULT}`}>Torna all'archivio storico</Link>.
+      </p>
+    </main>
+  );
+}
+
 export default function App() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.title = titoloPerPercorso(pathname);
+  }, [pathname]);
+
   return (
     <AuthProvider>
       <div className="app-shell">
         <BarraNavigazione />
 
-        <div className="rail-ad rail-ad--left" aria-hidden="true">
-          <AdSlot width={160} height={600} />
-        </div>
-        <div className="rail-ad rail-ad--right" aria-hidden="true">
-          <AdSlot width={160} height={600} />
-        </div>
-
         <Routes>
-          {/* Fase E: la home è ora una pagina dinamica a sé (hero, classifica
-              stagione in corso, calendario, focus on prossima gara, news),
-              non più un redirect verso l'archivio storico — che resta
-              comunque raggiungibile dal tab "Archivio storico". */}
-          <Route path="/" element={<HomeView />} />
-          <Route path="/archivio/:anno" element={<HistoricalView />} />
-          <Route path="/archivio/:anno/:circuito" element={<RaceDetailView />} />
-          <Route path="/piloti" element={<PilotsIndexView />} />
-          <Route path="/piloti/:slug" element={<DriverView />} />
-          <Route path="/circuiti" element={<CircuitsIndexView />} />
-          <Route path="/circuiti/:slug" element={<CircuitView />} />
-          <Route path="/scuderie" element={<ScuderiesIndexView />} />
-          <Route path="/scuderie/:slug" element={<ScuderiaView />} />
-          <Route path="/news" element={<NewsView />} />
-          <Route path="/live" element={<LiveTimingView />} />
-          <Route path="/analisi" element={<AnalisiView />} />
-          <Route path="/arcade" element={<ArcadeView />} />
-          <Route path="/idols" element={<IdolsIndexView />} />
-          <Route path="/idols/senna" element={<IdolSennaView />} />
-          <Route path="/idols/schumacher" element={<IdolSchumacherView />} />
-          <Route path="/idols/hamilton" element={<IdolHamiltonView />} />
-          <Route path="/idols/:slug" element={<IdolView />} />
-          <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
-          <Route path="/arcade/time-attack" element={<GameChampionshipView />} />
-          <Route path="/admin/chiudi-gp" element={<AdminGpView />} />
-          <Route
-            path="*"
-            element={
-              <main className="main main--historical">
-                <p className="historical-standings__stato">
-                  Pagina non trovata. <Link to={`/archivio/${ANNO_DI_DEFAULT}`}>Torna all'archivio storico</Link>.
-                </p>
-              </main>
-            }
-          />
+          {/* ====================================================================
+              PAGINE CON PUBBLICITÀ — colonne laterali + banner in fondo, in
+              automatico. Ogni nuova pagina di contenuto va aggiunta QUI.
+              ==================================================================== */}
+          <Route element={<LayoutConAdv />}>
+            {/* La home è una pagina dinamica a sé (hero, classifica stagione in
+                corso, calendario, focus sulla prossima gara, news); l'archivio
+                storico resta raggiungibile dal tab "Archivio storico". */}
+            <Route path="/" element={<HomeView />} />
+            <Route path="/archivio/:anno" element={<HistoricalView />} />
+            <Route path="/archivio/:anno/:circuito" element={<RaceDetailView />} />
+            <Route path="/piloti" element={<PilotsIndexView />} />
+            <Route path="/piloti/:slug" element={<DriverView />} />
+            <Route path="/circuiti" element={<CircuitsIndexView />} />
+            <Route path="/circuiti/:slug" element={<CircuitView />} />
+            <Route path="/scuderie" element={<ScuderiesIndexView />} />
+            <Route path="/scuderie/:slug" element={<ScuderiaView />} />
+            <Route path="/news" element={<NewsView />} />
+            <Route path="/live" element={<LiveTimingView />} />
+            <Route path="/analisi" element={<AnalisiView />} />
+            <Route path="/arcade" element={<ArcadeView />} />
+            <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
+            <Route path="/arcade/time-attack" element={<GameChampionshipView />} />
+            <Route path="/idols" element={<IdolsIndexView />} />
+            <Route path="/idols/senna" element={<IdolSennaView />} />
+            <Route path="/idols/schumacher" element={<IdolSchumacherView />} />
+            <Route path="/idols/hamilton" element={<IdolHamiltonView />} />
+          </Route>
+
+          {/* ====================================================================
+              PAGINE SENZA PUBBLICITÀ — solo dove le policy AdSense la vietano:
+              schermate senza contenuto proprio (404, scheda idol "in arrivo"),
+              amministrazione, pagine legali.
+              ==================================================================== */}
+          <Route element={<LayoutSenzaAdv />}>
+            <Route path="/privacy" element={<PrivacyView />} />
+            <Route path="/idols/:slug" element={<IdolView />} />
+            <Route path="/admin/chiudi-gp" element={<AdminGpView />} />
+            <Route path="*" element={<PaginaNonTrovata />} />
+          </Route>
         </Routes>
 
         <SiteFooter />

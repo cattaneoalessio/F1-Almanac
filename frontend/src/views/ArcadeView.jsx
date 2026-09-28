@@ -4,6 +4,7 @@ import GlassPanel from '../components/GlassPanel.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getClassificaArcade, getLivelloPilota, getMioRecordArcade } from '../api/backend.js';
 import './ArcadeView.css';
+import { SpazioAdv } from '../components/AdSlot.jsx';
 
 /**
  * Elenco dei giochi dell'Arcade. Per aggiungere un nuovo gioco basta
@@ -206,6 +207,8 @@ export default function ArcadeView() {
           )}
         </GlassPanel>
       </section>
+
+      <SpazioAdv formato="leaderboard" />
 
       <section className="arcade-view__grid" aria-label="Giochi disponibili">
         {GIOCHI.map((gioco) => (
