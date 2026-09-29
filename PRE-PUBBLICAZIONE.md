@@ -78,15 +78,26 @@ per pagina serve il pre-rendering. Le pagine dei singoli Gran Premi
 
 ## 4. Consenso ai cookie e pubblicità
 
-- [ ] Il banner attuale è **proprio** (`frontend/src/consenso/`). Funziona per gli USA e come
-      base per l'Europa, ma Google richiede un sistema di consenso **certificato e integrato
-      con lo standard TCF** per mostrare annunci *personalizzati* a utenti di UE, Regno Unito
-      e Svizzera (senza, in quelle regioni vengono serviti solo annunci limitati).
-      Strada consigliata: in AdSense → *Privacy e messaggi* creare il messaggio per le
-      "normative europee" (gratuito), poi mettere `PROPRIO: false` in
-      `frontend/src/config/consenso.js`. In alternativa un CMP a pagamento certificato.
-- [ ] Provare il banner da fuori Italia (VPN in Europa e negli USA) e con il browser in
-      modalità privata.
+- [x] **Lato codice: fatto.** `PROPRIO: false` in `frontend/src/config/consenso.js`: il
+      banner fatto in casa non compare più, il pulsante "Gestisci consenso cookie" nel piè
+      di pagina è collegato al sistema di Google.
+- [ ] **Lato AdSense: da fare tu** (serve il tuo accesso, non posso farlo io). Un messaggio
+      "GDPR" creato qui è già riservato di suo agli utenti di SEE e Regno Unito — corretto
+      per un sito solo in italiano come questo, oggi:
+      1. AdSense → **Privacy e messaggi** → **GDPR** → **Crea messaggio**.
+      2. Inserisci l'URL della privacy: `https://monoposto.io/privacy`.
+      3. Scegli la lingua (italiano) e pubblica il messaggio.
+      4. Apri il sito in una finestra anonima (o da un Paese UE/UK) e verifica che compaia
+         il messaggio di Google — non più il nostro banner rosso.
+      Nota da Google: la pagina della privacy non deve avere lo script del messaggio di
+      consenso sopra di sé — già così: `/privacy` è tra le pagine senza banner e senza
+      pubblicità (vedi `ConsensoContext.jsx`, elenco `esente`).
+- [ ] Il resto del mondo (compresi gli USA) per ora non riceve alcun messaggio di consenso:
+      accettabile finché il sito resta in italiano (vedi `FASE-2-INGLESE.md`); da rivedere se
+      cambierà il pubblico. Il banner fatto in casa gestiva anche quel caso: resta nel codice,
+      spento ma pronto (`PROPRIO: true` per riattivarlo).
+- [ ] Provare il messaggio di Google da fuori Italia (VPN in Europa e nel Regno Unito) e con
+      il browser in modalità privata.
 - [ ] Annunci veri: vedi la sezione 5 ("Pubblicità").
 - [ ] Google Fonts: i caratteri vengono scaricati dai server di Google al primo caricamento,
       prima di qualsiasi scelta. Per evitarlo, ospitarli sul sito.
