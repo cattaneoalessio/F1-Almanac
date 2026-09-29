@@ -14,7 +14,7 @@ export const SITO = {
   lingua: 'it',
   locale: 'it_IT',
   immagineSocial: '/og-image.png', // 1200×630: anteprima quando si condivide un link
-  instagramUrl: '', // profilo Instagram: se vuoto, nel sito non compare nessun link
+  instagramUrl: 'https://www.instagram.com/monoposto.io/',
   googleSiteVerification: '', // codice "meta tag HTML" di Search Console: se vuoto, il tag non viene inserito
 };
 
