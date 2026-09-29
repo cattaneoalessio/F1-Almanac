@@ -26,6 +26,7 @@ utilizzabile, semplicemente nessun punteggio verrà mai salvato).
 """
 import json
 import os
+import secrets
 import urllib.error
 import urllib.request
 
@@ -57,13 +58,17 @@ def _utente_netlify_da_token(token):
 def _nome_utente_da_utente_netlify(utente_netlify):
     """Ricava uno username leggibile dai metadati Netlify Identity:
     preferisce user_metadata.full_name (se l'utente l'ha impostato in
-    fase di registrazione), altrimenti la parte locale dell'email."""
+    fase di registrazione). Questo username è PUBBLICO (compare nelle
+    classifiche dei giochi): se l'utente non ne ha scelto uno, la
+    email NON va mai usata, nemmeno solo la parte locale — esporrebbe
+    inavvertitamente un frammento del suo indirizzo. Si genera invece
+    un nome anonimo con un numero casuale (non progressivo: un
+    numero in sequenza rivelerebbe comunque l'ordine di iscrizione)."""
     metadati = utente_netlify.get("user_metadata") or {}
     nome_completo = (metadati.get("full_name") or "").strip()
     if nome_completo:
         return nome_completo
-    email = utente_netlify.get("email") or ""
-    return email.split("@")[0] if email else "Pilota"
+    return f"Pilota-{secrets.randbelow(9000) + 1000}"
 
 
 def utente_da_token(cur, token):

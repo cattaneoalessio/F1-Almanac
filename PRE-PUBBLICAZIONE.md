@@ -16,9 +16,9 @@ cosa verificare e come "aprirlo" quando sarà il momento. Spunta man mano.
       email), va dichiarato nell'informativa (`frontend/src/views/PrivacyView.jsx`).
 - [ ] **Instagram**: inserire l'indirizzo del profilo in `frontend/src/config/sito.js`
       (`instagramUrl`). Finché è vuoto non compare nessun link nel sito.
-- [ ] **Logo con la scritta ".AI"**: il file `frontend/public/branding/monoposto-logo-completo.png`
-      contiene ancora il vecchio nome. Il sito non lo mostra, ma è pubblico a quell'indirizzo:
-      farlo rifare con ".IO" o rimuoverlo.
+- [x] **Logo con la scritta ".AI"**: rifatto. `monoposto-logo-completo.png` ora ha ".IO",
+      scritta ricostruita in Poppins Bold (font già usato per gli altri asset del brand)
+      invece del vecchio font generato dall'AI — nessun testo copiato/rappezzato.
 - [ ] **Immagine di anteprima social** (`frontend/public/og-image.png`): è provvisoria (font
       diverso da quello del sito). Sostituirla con la versione definitiva, 1200×630.
 - [ ] **Username pubblico**: se un utente non imposta un nome, nelle classifiche dei giochi
