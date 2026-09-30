@@ -61,6 +61,11 @@ def id_pilota_del_giorno(cur, giorno: date) -> Optional[int]:
     hash della data come seed su un pool ORDINATO in modo stabile (per
     id) di piloti idonei. Nessuno stato salvato: la stessa data produce
     sempre la stessa scelta, anche da un processo appena riavviato.
+    Esclude i piloti deceduti (p.data_morte): per loro il confronto
+    "età" non avrebbe un valore attuale con cui confrontarsi, e se
+    fosse il misterioso l'intera colonna sarebbe inutile per tutti i
+    tentativi di quel giorno — restano comunque tentabili (la ricerca
+    resta aperta a tutti i piloti dal 1950), solo mai come misterioso.
     None se il pool è vuoto (non dovrebbe succedere con dati reali, ma
     "meglio vuoto che inventato" anche qui: mai un pilota a caso fuori
     dal pool)."""
@@ -77,6 +82,7 @@ def id_pilota_del_giorno(cur, giorno: date) -> Optional[int]:
             GROUP BY r.pilota_id
         ) g ON g.pilota_id = p.id
         WHERE p.data_nascita IS NOT NULL
+          AND p.data_morte IS NULL
           AND p.nazione_id IS NOT NULL
           AND (g.gare_totali >= %(soglia_gare)s OR g.ultimo_anno >= %(soglia_anno)s)
         ORDER BY p.id
@@ -147,7 +153,7 @@ def dati_confronto_pilota(cur, pilota_id: int, titoli: dict[int, int]) -> Option
         SELECT
             p.id, p.codice_riferimento AS slug, p.sigla,
             p.nome || ' ' || p.cognome AS nome,
-            p.data_nascita, p.biografia, p.fonti_sufficienti, p.url_wikipedia,
+            p.data_nascita, p.data_morte, p.biografia, p.fonti_sufficienti, p.url_wikipedia,
             n.codice_iso2 AS nazione_codice, p.nazione_id,
             (SELECT MIN(s2.anno) FROM risultati_gara r2
                 JOIN gran_premi gp2 ON gp2.id = r2.gran_premio_id
@@ -191,7 +197,13 @@ def dati_confronto_pilota(cur, pilota_id: int, titoli: dict[int, int]) -> Option
     squadre = {r["costruttore_id"] for r in cur.fetchall()}
 
     eta = None
-    if riga["data_nascita"] is not None:
+    if riga["data_nascita"] is not None and riga["data_morte"] is None:
+        # Età ATTUALE, ha senso solo per chi è vivo oggi: per un pilota
+        # deceduto darebbe un numero calcolato come se fosse ancora vivo
+        # (es. "110" per un pilota degli anni '50), tecnicamente un
+        # conto giusto ma un fatto senza senso da mostrare in un
+        # confronto — N/D, mai un'invenzione anche se aritmeticamente
+        # corretta.
         oggi = oggi_utc()
         nascita = riga["data_nascita"]
         eta = oggi.year - nascita.year - ((oggi.month, oggi.day) < (nascita.month, nascita.day))
