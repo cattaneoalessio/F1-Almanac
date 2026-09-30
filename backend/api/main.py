@@ -45,6 +45,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from auth import utente_da_token
 from chronoquiz import genera_quiz
 from db import get_connection
+from driverle import (
+    NUMERO_TENTATIVI_MASSIMO,
+    confronta_piloti,
+    dati_confronto_pilota,
+    id_da_slug,
+    id_pilota_del_giorno,
+    mappa_titoli_mondiali,
+    oggi_utc,
+    punti_per_tentativo,
+)
 from game import PUNTI_PER_POSIZIONE, gp_pronto_per_chiusura, valida_tentativo
 from schemas import (
     ClassificaTempiCircuito,
@@ -54,6 +64,8 @@ from schemas import (
     GaraCircuito,
     GaraScuderia,
     GaraStagione,
+    GuessSubmission,
+    GuessResponse,
     InvioTempoGioco,
     RichiestaPunteggio,
     RisultatiGara,
@@ -61,12 +73,15 @@ from schemas import (
     RisultatoStoricoPilota,
     RispostaChiusuraAutomatica,
     RispostaChiusuraGp,
+    RispostaDriverleDaily,
     RispostaGriglia,
     RispostaInvioTempo,
     RispostaLivelloPilota,
     RispostaMioRecord,
     RispostaMioRecordArcade,
+    RispostaPilotaRivelato,
     RispostaPunteggio,
+    RispostaTentativoDriverle,
     SchedaCircuito,
     SchedaPilota,
     SchedaScuderia,
@@ -881,6 +896,242 @@ def mio_record_arcade(gioco: str, authorization: str = Header(default="")):
     return RispostaMioRecordArcade(punti=riga["punti"] if riga is not None else None)
 
 
+# == Driverle (indovina il pilota misterioso del giorno) ==
+# Stessa filosofia di login facoltativo di ChronoQuiz: si gioca sempre,
+# loggati o no. La differenza è che qui, per chi È loggato, la partita
+# del giorno è tracciata lato server (tabella driverle_partite): non si
+# può ricominciare da capo più volte lo stesso giorno. Per chi non è
+# loggato non c'è alcuna persistenza — vedi GuessSubmission in
+# schemas.py per come viene gestito il conteggio dei tentativi in quel
+# caso.
+
+
+def _tentativo_a_risposta(cur, pilota_tentato_id, misterioso, titoli):
+    """Costruisce una RispostaTentativoDriverle confrontando il pilota
+    tentato (per id) col misterioso già caricato. Solleva ValueError se
+    l'id non corrisponde più a un pilota esistente (non dovrebbe mai
+    succedere per un tentativo salvato in passato, ma i dati vanno
+    trattati con sospetto anche quando vengono dal nostro stesso DB)."""
+    tentato = dati_confronto_pilota(cur, pilota_tentato_id, titoli)
+    if tentato is None:
+        raise ValueError(f"pilota {pilota_tentato_id} non trovato")
+    feedback = confronta_piloti(tentato, misterioso)
+    return RispostaTentativoDriverle(
+        pilota_slug=tentato["slug"],
+        pilota_codice=tentato["codice"],
+        pilota_nome=tentato["nome"],
+        nazione=feedback["nazione"],
+        scuderia=feedback["scuderia"],
+        eta=feedback["eta"],
+        numero_gara=feedback["numero_gara"],
+        debutto=feedback["debutto"],
+        titoli_mondiali=feedback["titoli_mondiali"],
+        indovinato=feedback["indovinato"],
+    )
+
+
+def _pilota_rivelato(misterioso) -> RispostaPilotaRivelato:
+    return RispostaPilotaRivelato(
+        slug=misterioso["slug"],
+        nome=misterioso["nome"],
+        nazione_codice=misterioso["nazione_codice"],
+        biografia=misterioso["biografia"],
+        fonti_sufficienti=misterioso["fonti_sufficienti"],
+        url_wikipedia=misterioso["url_wikipedia"],
+    )
+
+
+@app.get("/driverle/daily", response_model=RispostaDriverleDaily)
+def driverle_daily(authorization: str = Header(default="")):
+    """Stato della partita di oggi. Non contiene mai un dato che
+    identifichi il pilota misterioso finché la partita non è conclusa —
+    vedi driverle.py per come viene scelto. Per chi è loggato e ha già
+    tentativi salvati oggi, li restituisce ricalcolando il feedback sui
+    dati ATTUALI del DB (non un feedback salvato: se una biografia viene
+    corretta, un tentativo di ieri resta coerente con l'oggi)."""
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    oggi = oggi_utc()
+    conn = get_connection()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            utente_id, _username = utente_da_token(cur, token)
+
+            misterioso_id = id_pilota_del_giorno(cur, oggi)
+            if misterioso_id is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Impossibile scegliere il pilota del giorno: dati insufficienti nel database.",
+                )
+
+            if utente_id is None:
+                return RispostaDriverleDaily(
+                    data=oggi.isoformat(),
+                    numero_tentativi_massimo=NUMERO_TENTATIVI_MASSIMO,
+                    stato="nuova",
+                )
+
+            cur.execute(
+                """
+                SELECT tentativi, stato, punti
+                FROM driverle_partite
+                WHERE utente_id = %(u)s AND data_puzzle = %(oggi)s
+                """,
+                {"u": utente_id, "oggi": oggi},
+            )
+            partita = cur.fetchone()
+            if partita is None:
+                return RispostaDriverleDaily(
+                    data=oggi.isoformat(),
+                    numero_tentativi_massimo=NUMERO_TENTATIVI_MASSIMO,
+                    stato="nuova",
+                )
+
+            titoli = mappa_titoli_mondiali(cur)
+            misterioso = dati_confronto_pilota(cur, misterioso_id, titoli)
+            tentativi_gia_fatti = [
+                _tentativo_a_risposta(cur, pid, misterioso, titoli) for pid in partita["tentativi"]
+            ]
+    finally:
+        conn.close()
+
+    return RispostaDriverleDaily(
+        data=oggi.isoformat(),
+        numero_tentativi_massimo=NUMERO_TENTATIVI_MASSIMO,
+        stato=partita["stato"],
+        tentativi_gia_fatti=tentativi_gia_fatti,
+        punti_assegnati=partita["punti"],
+        pilota_misterioso=_pilota_rivelato(misterioso) if partita["stato"] != "in_corso" else None,
+    )
+
+
+@app.post("/driverle/guess", response_model=GuessResponse)
+def driverle_guess(payload: GuessSubmission, authorization: str = Header(default="")):
+    """Valuta un tentativo. Il confronto avviene SEMPRE lato server, sui
+    dati veri appena letti dal DB — il client non invia mai nulla sul
+    pilota misterioso, solo lo slug di quello ipotizzato."""
+    token = None
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+
+    oggi = oggi_utc()
+    conn = get_connection()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            utente_id, _username = utente_da_token(cur, token)
+
+            pilota_tentato_id = id_da_slug(cur, payload.pilota_slug)
+            if pilota_tentato_id is None:
+                raise HTTPException(status_code=404, detail="Pilota non trovato.")
+
+            misterioso_id = id_pilota_del_giorno(cur, oggi)
+            if misterioso_id is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Impossibile scegliere il pilota del giorno: dati insufficienti nel database.",
+                )
+
+            titoli = mappa_titoli_mondiali(cur)
+            misterioso = dati_confronto_pilota(cur, misterioso_id, titoli)
+
+            try:
+                risposta_tentativo = _tentativo_a_risposta(cur, pilota_tentato_id, misterioso, titoli)
+            except ValueError:
+                raise HTTPException(status_code=404, detail="Pilota non trovato.")
+
+            if utente_id is None:
+                # Nessuna persistenza: il conteggio dei tentativi lo tiene il
+                # frontend. numero_tentativo_corrente è un'indicazione del
+                # client (mai fidata per punteggi o dati sensibili, qui serve
+                # solo a decidere se rivelare il pilota all'ultimo tentativo).
+                numero_tentativo = payload.numero_tentativo_corrente or 1
+                if risposta_tentativo.indovinato:
+                    stato = "vinta"
+                elif numero_tentativo >= NUMERO_TENTATIVI_MASSIMO:
+                    stato = "persa"
+                else:
+                    stato = "in_corso"
+                return GuessResponse(
+                    tentativo=risposta_tentativo,
+                    numero_tentativo=numero_tentativo,
+                    tentativi_rimasti=max(0, NUMERO_TENTATIVI_MASSIMO - numero_tentativo),
+                    stato=stato,
+                    punti_assegnati=0,
+                    pilota_misterioso=_pilota_rivelato(misterioso) if stato != "in_corso" else None,
+                )
+
+            # Utente loggato: il conteggio autorevole è quello salvato, non
+            # quanto dichiara il client.
+            cur.execute(
+                """
+                SELECT tentativi, stato, punti
+                FROM driverle_partite
+                WHERE utente_id = %(u)s AND data_puzzle = %(oggi)s
+                """,
+                {"u": utente_id, "oggi": oggi},
+            )
+            partita = cur.fetchone()
+            if partita is not None and partita["stato"] != "in_corso":
+                raise HTTPException(status_code=409, detail="Hai già completato la partita di oggi.")
+
+            tentativi_correnti = list(partita["tentativi"]) if partita is not None else []
+            if len(tentativi_correnti) >= NUMERO_TENTATIVI_MASSIMO:
+                # Rete di sicurezza: non dovrebbe accadere (stato sarebbe già
+                # 'persa'), ma non fidarsi mai solo dell'invariante atteso.
+                raise HTTPException(status_code=409, detail="Hai già completato la partita di oggi.")
+
+            tentativi_correnti.append(pilota_tentato_id)
+            numero_tentativo = len(tentativi_correnti)
+
+            if risposta_tentativo.indovinato:
+                nuovo_stato = "vinta"
+                punti_assegnati = punti_per_tentativo(numero_tentativo)
+            elif numero_tentativo >= NUMERO_TENTATIVI_MASSIMO:
+                nuovo_stato = "persa"
+                punti_assegnati = 0
+            else:
+                nuovo_stato = "in_corso"
+                punti_assegnati = 0
+
+            cur.execute(
+                """
+                INSERT INTO driverle_partite
+                    (utente_id, data_puzzle, pilota_misterioso_id, tentativi, stato, punti, aggiornato_il)
+                VALUES (%(u)s, %(oggi)s, %(mid)s, %(tentativi)s, %(stato)s, %(punti)s, now())
+                ON CONFLICT (utente_id, data_puzzle) DO UPDATE SET
+                    tentativi = EXCLUDED.tentativi,
+                    stato = EXCLUDED.stato,
+                    punti = EXCLUDED.punti,
+                    aggiornato_il = now()
+                """,
+                {
+                    "u": utente_id, "oggi": oggi, "mid": misterioso_id,
+                    "tentativi": psycopg2.extras.Json(tentativi_correnti),
+                    "stato": nuovo_stato, "punti": punti_assegnati,
+                },
+            )
+            if nuovo_stato == "vinta":
+                cur.execute(
+                    "INSERT INTO arcade_punteggi (utente_id, gioco, punti) VALUES (%(u)s, 'driverle', %(p)s)",
+                    {"u": utente_id, "p": punti_assegnati},
+                )
+    finally:
+        conn.close()
+
+    return GuessResponse(
+        tentativo=risposta_tentativo,
+        numero_tentativo=numero_tentativo,
+        tentativi_rimasti=max(0, NUMERO_TENTATIVI_MASSIMO - numero_tentativo),
+        stato=nuovo_stato,
+        punti_assegnati=punti_assegnati,
+        pilota_misterioso=_pilota_rivelato(misterioso) if nuovo_stato != "in_corso" else None,
+    )
+
+
 # == Time Attack ("Monoposto Virtual Arena") ==
 # Stessa filosofia di ChronoQuiz: login sempre facoltativo per GIOCARE,
 # ma qui — a differenza di ChronoQuiz — è obbligatorio per SALVARE un
@@ -1246,10 +1497,21 @@ def livello_pilota(authorization: str = Header(default="")):
             )
             riga_campionato = cur.fetchone()
             punti_campionato = riga_campionato["punti_totali"] if riga_campionato else 0
+
+            # Driverle: a differenza di ChronoQuiz (record migliore) si
+            # SOMMANO nel tempo, come il campionato — ogni giorno vinto è
+            # un traguardo a sé (un solo enigma al giorno, non si può
+            # "ritentare" per un punteggio migliore), non un record da
+            # battere. Deciso con l'utente.
+            cur.execute(
+                "SELECT COALESCE(SUM(punti), 0) AS totale FROM arcade_punteggi WHERE utente_id = %(u)s AND gioco = 'driverle'",
+                {"u": utente_id},
+            )
+            punti_driverle = cur.fetchone()["totale"]
     finally:
         conn.close()
 
-    punti_totali = record_chronoquiz + punti_campionato
+    punti_totali = record_chronoquiz + punti_campionato + punti_driverle
     return RispostaLivelloPilota(
         username=username,
         punti_totali=punti_totali,

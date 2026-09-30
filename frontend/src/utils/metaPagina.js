@@ -22,6 +22,7 @@ const FISSE = {
   '/arcade': pagina('Arcade: giochi sulla Formula 1', 'Quiz e sfide a tempo sulla storia della Formula 1: metti alla prova le tue conoscenze e scala le classifiche.'),
   '/arcade/chronoquiz': pagina('ChronoQuiz: il quiz sulla storia della F1', 'Trivia storico a scelta multipla sulla Formula 1: 10 domande, 15 secondi a disposizione. La velocità fa la differenza.'),
   '/arcade/time-attack': pagina('Time Attack: giro cronometrato', 'Guida un giro cronometrato su un circuito reale dell\'archivio, scala la classifica e il Campionato Mondiale Virtuale.'),
+  '/arcade/driverle': pagina('Driverle: indovina il pilota misterioso', 'Indovina il pilota misterioso della Formula 1 in 6 tentativi: nazione, scuderia, età, numero di gara, debutto e titoli mondiali a ogni prova.'),
   '/idols': pagina('Idols: i piloti leggendari', 'Approfondimenti sui piloti che hanno fatto la storia della Formula 1: Ayrton Senna, Michael Schumacher e Lewis Hamilton.'),
   '/idols/senna': pagina('Ayrton Senna: la leggenda', "La genesi, la mistica della pioggia, lo stile di guida e l'eredità di Ayrton Senna, tre volte campione del mondo.", 'article'),
   '/idols/schumacher': pagina('Michael Schumacher: il Kaiser', "La genesi, la mentalità, lo stile di guida e l'eredità di Michael Schumacher, sette volte campione del mondo.", 'article'),

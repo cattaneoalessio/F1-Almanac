@@ -12,7 +12,7 @@ import { SITO, ROBOTS_NON_PUBBLICO } from '../src/config/sito.js';
  * verifica-seo.mjs lo controlla a ogni build. */
 export const ROTTE_SITEMAP = [
   '/', '/piloti', '/scuderie', '/circuiti', '/news', '/analisi', '/arcade', '/arcade/chronoquiz',
-  '/arcade/time-attack', '/idols', '/idols/senna', '/idols/schumacher', '/idols/hamilton', '/privacy',
+  '/arcade/time-attack', '/arcade/driverle', '/idols', '/idols/senna', '/idols/schumacher', '/idols/hamilton', '/privacy',
 ];
 /** Percorsi fissi di App.jsx volutamente FUORI dalla sitemap (amministrazione, ecc.). */
 export const ROTTE_ESCLUSE = ['/admin/chiudi-gp'];

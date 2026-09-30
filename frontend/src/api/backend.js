@@ -232,3 +232,43 @@ export async function chiudiGp(slug, chiaveAdmin) {
   const corpo = await risposta.json().catch(() => null);
   return { ok: risposta.ok, status: risposta.status, corpo };
 }
+
+/** Stato della partita Driverle di oggi. Login facoltativo: senza token
+ * risponde comunque con stato='nuova' (nessuna persistenza per chi non
+ * è loggato — vedi DriverleView.jsx). Se l'utente è loggato e ha già
+ * tentativi salvati oggi, li restituisce già pronti per ricostruire la
+ * griglia dopo un ricaricamento della pagina. */
+export async function getDatiGiornoDriverle(token) {
+  const url = new URL('/driverle/daily', BASE_URL);
+  const risposta = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} chiamando ${url.pathname}`);
+  }
+  return risposta.json();
+}
+
+/** Invia un tentativo Driverle. numeroTentativoCorrente conta SOLO per
+ * chi non è loggato (nessuna partita salvata lato server: serve al
+ * backend solo per sapere se questo è l'ultimo tentativo disponibile,
+ * per decidere se rivelare il pilota — per chi è loggato il conteggio
+ * autorevole è quello salvato, questo parametro viene ignorato).
+ *
+ * Non usa fetchBackend: un 409 ("hai già giocato oggi", solo per utenti
+ * loggati che riprovano dopo aver già concluso) è un esito distinto che
+ * il chiamante deve poter riconoscere, non un'eccezione generica — stesso
+ * criterio già usato da chiudiGp. */
+export async function inviaTentativoDriverle(pilotaSlug, numeroTentativoCorrente, token) {
+  const url = new URL('/driverle/guess', BASE_URL);
+  const risposta = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ pilota_slug: pilotaSlug, numero_tentativo_corrente: numeroTentativoCorrente }),
+  });
+  const corpo = await risposta.json().catch(() => null);
+  return { ok: risposta.ok, status: risposta.status, corpo };
+}

@@ -293,6 +293,33 @@ CREATE TABLE gioco_gp_chiusi (
     chiuso_il    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ---------------------------------------------------------------------
+-- Arcade: Driverle (indovina il pilota misterioso del giorno)
+-- ---------------------------------------------------------------------
+-- Una riga per utente loggato PER GIORNO: il vincolo UNIQUE sotto è
+-- l'anti-replay lato server (un utente loggato non può ricominciare la
+-- partita di oggi con tentativi freschi, es. ricaricando la pagina o
+-- riprovando da un altro dispositivo). Per chi non è loggato non c'è
+-- alcuna persistenza qui — scelta fatta con l'utente, "va bloccato solo
+-- per chi è loggato": più semplice, e senza un'identità stabile non c'è
+-- comunque un modo affidabile di riconoscere "la stessa persona" tra due
+-- richieste. tentativi è l'elenco ordinato dei pilota_id provati finora
+-- (il feedback si ricalcola dai dati veri a ogni lettura, non si salva:
+-- se una biografia o un dato viene corretto nel DB, il tentativo passato
+-- resta coerente col dato attuale). punti è 0 finché stato='in_corso'.
+CREATE TABLE driverle_partite (
+    id                     SERIAL PRIMARY KEY,
+    utente_id              INTEGER NOT NULL REFERENCES utenti(id) ON DELETE CASCADE,
+    data_puzzle            DATE NOT NULL,                    -- giorno UTC del pilota misterioso
+    pilota_misterioso_id   INTEGER NOT NULL REFERENCES piloti(id),
+    tentativi              JSONB NOT NULL DEFAULT '[]',       -- lista ordinata di pilota_id (interi) tentati
+    stato                  VARCHAR(10) NOT NULL DEFAULT 'in_corso',  -- 'in_corso' | 'vinta' | 'persa'
+    punti                  INTEGER NOT NULL DEFAULT 0,
+    creato_il              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    aggiornato_il          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (utente_id, data_puzzle)
+);
+
 COMMIT;
 
 -- =====================================================================

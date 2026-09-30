@@ -19,6 +19,7 @@ import IdolSchumacherView from './views/IdolSchumacherView.jsx';
 import IdolHamiltonView from './views/IdolHamiltonView.jsx';
 import IdolView from './views/IdolView.jsx';
 import ChronoQuizView from './views/ChronoQuizView.jsx';
+import DriverleView from './views/DriverleView.jsx';
 import GameChampionshipView from './views/GameChampionshipView.jsx';
 import AdminGpView from './views/AdminGpView.jsx';
 import SiteFooter from './components/SiteFooter.jsx';
@@ -212,6 +213,7 @@ function ContenutoApp() {
             <Route path="/analisi" element={<AnalisiView />} />
             <Route path="/arcade" element={<ArcadeView />} />
             <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
+            <Route path="/arcade/driverle" element={<DriverleView />} />
             <Route path="/arcade/time-attack" element={<GameChampionshipView />} />
             <Route path="/idols" element={<IdolsIndexView />} />
             <Route path="/idols/senna" element={<IdolSennaView />} />

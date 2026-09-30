@@ -338,3 +338,106 @@ class RispostaGriglia(BaseModel):
     F1 si parte dal fondo, non c'è una posizione da calcolare."""
     posizione: Optional[int] = None
     piloti_totali: int
+
+
+# =============================================================================
+# Driverle — indovina il pilota misterioso del giorno (Arcade)
+# =============================================================================
+
+
+class FeedbackNazione(BaseModel):
+    """Confronto sulla nazionalità: solo corrispondenza esatta ha senso
+    (a differenza di scuderia, non esiste un 'in passato')."""
+    match: bool
+    codice_iso2: Optional[str] = None  # del pilota TENTATO, per la bandierina in griglia
+
+
+class FeedbackScuderia(BaseModel):
+    """'match' = stessa scuderia attuale/ultima del misterioso. 'passato' =
+    scuderie attuali diverse, ma le carriere si sono incrociate in almeno
+    una scuderia in comune in passato. 'diverso' = mai stati compagni di
+    marca."""
+    stato: str  # 'match' | 'passato' | 'diverso'
+    nome: Optional[str] = None  # scuderia attuale/ultima del pilota TENTATO
+
+
+class FeedbackNumerico(BaseModel):
+    """Confronto ordinabile (età, numero di gara, anno di debutto, titoli
+    mondiali): match esatto, oppure la direzione in cui si trova il
+    misterioso rispetto al tentativo. valore=None e direzione=None quando
+    il dato non è noto per il pilota tentato (capita per piloti molto
+    storici: es. numero di gara o data di nascita mancanti) — mostrato
+    come 'N/D', mai una freccia a caso."""
+    match: bool
+    direzione: Optional[str] = None  # 'su' (il misterioso è maggiore) | 'giu' | None
+    valore: Optional[float] = None  # il valore del pilota TENTATO, per mostrarlo in griglia
+
+
+class RispostaTentativoDriverle(BaseModel):
+    """Un tentativo già valutato: il pilota provato + il feedback sui 6
+    attributi. codice/nome sono del pilota TENTATO (per intestare la riga
+    della griglia), mai del misterioso finché non è stato indovinato."""
+    pilota_slug: str
+    pilota_codice: str
+    pilota_nome: str
+    nazione: FeedbackNazione
+    scuderia: FeedbackScuderia
+    eta: FeedbackNumerico
+    numero_gara: FeedbackNumerico
+    debutto: FeedbackNumerico
+    titoli_mondiali: FeedbackNumerico
+    indovinato: bool
+
+
+class GuessSubmission(BaseModel):
+    """Corpo di POST /driverle/guess: lo slug del pilota ipotizzato (lo
+    stesso identificativo usato nell'indirizzo /piloti/{slug} e restituito
+    da GET /piloti per l'autocompletamento — mai un id numerico interno,
+    che il frontend non ha modo di conoscere). numero_tentativo_corrente è
+    usato SOLO per chi non è loggato (nessuna partita salvata lato
+    server, quindi il server non sa a quale tentativo si è arrivati):
+    serve solo a decidere se questo è il tentativo che esaurisce i 6
+    disponibili, per sapere se rivelare il pilota. Per chi è loggato è
+    ignorato: il conteggio autorevole è quello salvato in
+    driverle_partite, non un valore che arriva dal client."""
+    pilota_slug: str
+    numero_tentativo_corrente: Optional[int] = None
+
+
+class RispostaPilotaRivelato(BaseModel):
+    """Il pilota misterioso, mostrato SOLO a fine partita (vinta o
+    tentativi esauriti). biografia è il testo grezzo dal DB: il frontend
+    la spezza in paragrafi con paragrafareBiografia() (stessa utility
+    già usata dalla scheda pilota), non la spezziamo qui per non
+    duplicare quella logica in due posti."""
+    slug: str
+    nome: str
+    nazione_codice: Optional[str] = None
+    biografia: Optional[str] = None
+    fonti_sufficienti: bool
+    url_wikipedia: Optional[str] = None
+
+
+class GuessResponse(BaseModel):
+    """Risposta di POST /driverle/guess."""
+    tentativo: RispostaTentativoDriverle
+    numero_tentativo: int  # 1-6: quale tentativo era questo
+    tentativi_rimasti: int
+    stato: str  # 'in_corso' | 'vinta' | 'persa'
+    punti_assegnati: int = 0  # >0 solo se questo tentativo ha fatto vincere ED è loggato
+    pilota_misterioso: Optional[RispostaPilotaRivelato] = None  # valorizzato solo se stato != 'in_corso'
+
+
+class RispostaDriverleDaily(BaseModel):
+    """GET /driverle/daily. Non contiene MAI un dato che identifichi il
+    pilota misterioso: solo la data (per il conto alla rovescia lato
+    frontend) e, se l'utente è loggato e ha già una partita in corso o
+    conclusa oggi, i suoi tentativi già fatti (per ricostruire la griglia
+    dopo un ricaricamento della pagina) — per chi non è loggato la
+    partita non viene salvata lato server, riparte sempre da zero."""
+    data: str  # 'YYYY-MM-DD', UTC
+    numero_tentativi_massimo: int
+    stato: str  # 'nuova' | 'in_corso' | 'vinta' | 'persa'
+    tentativi_gia_fatti: list[RispostaTentativoDriverle] = []
+    punti_assegnati: int = 0
+    pilota_misterioso: Optional[RispostaPilotaRivelato] = None  # solo se stato vinta/persa

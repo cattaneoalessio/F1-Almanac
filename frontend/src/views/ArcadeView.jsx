@@ -41,7 +41,8 @@ const GIOCHI = [
     descrizione:
       'Indovina il pilota misterioso del giorno. Ricevi indizi statistici su nazionalità, scuderie ed epoca a ogni tentativo.',
     tipo: 'Deduzione Giornaliera',
-    attivo: false,
+    attivo: true,
+    path: '/arcade/driverle',
   },
   {
     slug: 'apexgrid',
