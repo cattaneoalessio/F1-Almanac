@@ -98,7 +98,7 @@ function RigaTentativo({ tentativo }) {
  * persistenza: il conteggio dei tentativi resta solo in questo componente.
  */
 export default function DriverleView() {
-  const { utente, ottieniToken, apriLogin } = useAuth();
+  const { utente, ottieniToken, apriLogin, apriRegistrazione } = useAuth();
 
   const [elencoPiloti, setElencoPiloti] = useState([]);
   const [statoElenco, setStatoElenco] = useState('caricamento'); // caricamento | pronto | errore
@@ -235,8 +235,9 @@ export default function DriverleView() {
         </p>
         {!utente && (
           <p className="driverle-view__nota-login">
-            <button type="button" className="driverle-link-bottone" onClick={apriLogin}>Accedi</button> per salvare i
-            punti nel tuo Livello Pilota e ritrovare la partita se ricarichi la pagina.
+            <button type="button" className="driverle-link-bottone" onClick={apriLogin}>Accedi</button> o{' '}
+            <button type="button" className="driverle-link-bottone" onClick={apriRegistrazione}>registrati</button>{' '}
+            per salvare i punti nel tuo Livello Pilota e ritrovare la partita se ricarichi la pagina.
           </p>
         )}
       </GlassPanel>
@@ -331,8 +332,9 @@ export default function DriverleView() {
               )
             ) : (
               <p className="driverle-view__nota-login">
-                <button type="button" className="driverle-link-bottone" onClick={apriLogin}>Accedi</button> per far
-                contare le prossime vittorie nel tuo Livello Pilota.
+                <button type="button" className="driverle-link-bottone" onClick={apriLogin}>Accedi</button> o{' '}
+                <button type="button" className="driverle-link-bottone" onClick={apriRegistrazione}>registrati</button>{' '}
+                per far contare le prossime vittorie nel tuo Livello Pilota.
               </p>
             )}
 
