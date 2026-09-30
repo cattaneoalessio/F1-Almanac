@@ -920,6 +920,7 @@ def _tentativo_a_risposta(cur, pilota_tentato_id, misterioso, titoli):
         pilota_slug=tentato["slug"],
         pilota_codice=tentato["codice"],
         pilota_nome=tentato["nome"],
+        deceduto=tentato["deceduto"],
         nazione=feedback["nazione"],
         scuderia=feedback["scuderia"],
         eta=feedback["eta"],

@@ -190,6 +190,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.driverle-riga__deceduto {
+  flex: none;
+  color: var(--text-gray);
+  font-weight: 400;
+  cursor: help;
+}
 
 .driverle-cella {
   display: flex;

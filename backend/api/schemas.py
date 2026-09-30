@@ -380,6 +380,7 @@ class RispostaTentativoDriverle(BaseModel):
     pilota_slug: str
     pilota_codice: str
     pilota_nome: str
+    deceduto: bool  # l'età mostrata è alla morte, non attuale — il frontend lo segnala (†)
     nazione: FeedbackNazione
     scuderia: FeedbackScuderia
     eta: FeedbackNumerico

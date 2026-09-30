@@ -71,6 +71,11 @@ function RigaTentativo({ tentativo }) {
       <div className="driverle-riga__pilota" role="cell">
         <DriverAvatar size={30} team={tentativo.scuderia.nome} />
         <span>{tentativo.pilota_nome}</span>
+        {tentativo.deceduto && (
+          <span className="driverle-riga__deceduto" title="Deceduto: l'età mostrata è quella alla scomparsa, non l'età attuale">
+            †
+          </span>
+        )}
       </div>
       {COLONNE.map((c) => (
         <div key={c.chiave} role="cell">
@@ -224,7 +229,9 @@ export default function DriverleView() {
           <span className="driverle-legenda__voce driverle-legenda__voce--match">Ciano</span> = corrisponde,{' '}
           <span className="driverle-legenda__voce driverle-legenda__voce--parziale">giallo</span> = scuderia condivisa
           in passato, <span className="driverle-legenda__voce driverle-legenda__voce--no">rosso</span> = diverso.
-          Le frecce ↑/↓ indicano se il misterioso è rispettivamente maggiore o minore.
+          Le frecce ↑/↓ indicano se il misterioso è rispettivamente maggiore o minore. Il simbolo{' '}
+          <strong>†</strong> accanto a un pilota indica che è deceduto: l'età mostrata è quella alla
+          scomparsa, non un'età attuale.
         </p>
         {!utente && (
           <p className="driverle-view__nota-login">
