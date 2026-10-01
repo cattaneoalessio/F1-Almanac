@@ -27,9 +27,15 @@ export default function AdminContenutiView() {
     setErrore(null);
     (async () => {
       try {
-        const token = utente ? await ottieniToken() : null;
-        const s = await getStatoAdmin(token);
-        if (attivo) setStato(s);
+        // Mai un'attesa infinita: se il login o il server non rispondono entro
+        // 20 s, si mostra un messaggio invece di "Verifica…" per sempre.
+        const entro = (promessa) =>
+          Promise.race([promessa, new Promise((_, ko) => setTimeout(() => ko(new Error('timeout')), 20000))]);
+        const token = utente ? await entro(ottieniToken()) : null;
+        const s = await entro(getStatoAdmin(token));
+        if (!attivo) return;
+        if (!s) setErrore('Il server non conosce ancora il pannello: la nuova versione del backend non è stata pubblicata su Render.');
+        else setStato(s);
       } catch {
         if (attivo) setErrore('Il server non risponde. Se è rimasto inattivo a lungo si sta "svegliando": riprova tra un minuto.');
       }
@@ -171,6 +177,12 @@ function Configurazione({ stato }) {
             (oppure scegli "Immetti codice manualmente" e scrivi il segreto):
             {qr && <img className="admin-c__qr" src={qr} alt="Codice QR per l'app di autenticazione" />}
             <code className="admin-c__segreto">{segreto}</code>
+            <span className="admin-c__azioni-segreto">
+              <button type="button" className="admin-c__btn" onClick={() => navigator.clipboard?.writeText(segreto)}>Copia segreto</button>
+              <a className="admin-c__btn" href={uri}>Apri nell'app di autenticazione</a>
+            </span>
+            <small>Dal telefono: tocca "Apri nell'app"; se non si apre, in Authenticator scegli "Immetti codice manualmente", nome account "Monoposto.io" e incolla il segreto.</small>
+            <br />
             Poi su Render: <code>ADMIN_TOTP_SECRET</code> = lo stesso segreto qui sopra.
             <br />
             <small>Il segreto è generato in questo browser e non viene salvato da nessuna parte: se ricarichi la pagina prima di averlo copiato su Render ne esce uno nuovo (rifai l'inquadratura).</small>

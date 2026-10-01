@@ -120,3 +120,4 @@
   border-top: 1px solid var(--line);
 }
 .admin-c__bottoni { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-left: auto; }
+.admin-c__azioni-segreto { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
