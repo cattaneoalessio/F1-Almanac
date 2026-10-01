@@ -77,7 +77,7 @@ function StatoBlocco({ stato, cosa }) {
  * Quando un dato non è disponibile si dice, non si inventa.
  *
  * Restano di ESEMPIO, segnate <PreviewBadge>, solo le News (fonte da scegliere).
- * "Lo sapevi che" è contenuto reale verificato sul database (loSapevi.js).
+ * "Lo sapevi che" mostra una curiosità al giorno (loSapevi.js).
  */
 export default function HomeView() {
   const { piloti, scuderie, calendario } = useStagioneCorrente(ANNO_IN_CORSO);

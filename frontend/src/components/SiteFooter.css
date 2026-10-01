@@ -59,14 +59,20 @@
   cursor: pointer;
 }
 .gestisci-consenso__avviso {
+  /* Ben visibile: prima era un testo minuscolo grigio che passava inosservato
+     e il pulsante sembrava "non fare nulla". */
   display: block;
   flex-basis: 100%;
   max-width: 60ch;
-  margin: 0 auto;
-  font-size: 0.72rem;
+  margin: 0.75rem auto 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
   line-height: 1.5;
-  color: var(--text-gray);
-  text-align: center;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--accent-gold);
+  border-radius: 6px;
+  text-align: left;
 }
 .gestisci-consenso__avviso a {
   color: inherit;

@@ -178,13 +178,17 @@ export async function raccogliPercorsiDinamici(apiBase, log = console) {
     let riuscito = false;
     for (let tentativo = 1; tentativo <= 3 && !riuscito; tentativo += 1) {
       try {
-        const risposta = await fetch(`${apiBase}${endpoint}`, { signal: AbortSignal.timeout(60000) });
+        // Stessa composizione dell'indirizzo usata dal sito (src/api/backend.js,
+        // new URL): una barra finale in VITE_API_BASE_URL (".../") con la semplice
+        // concatenazione produceva "//piloti" e quindi un 404 dall'API.
+        const url = new URL(endpoint, apiBase);
+        const risposta = await fetch(url, { signal: AbortSignal.timeout(60000) });
         if (!risposta.ok) throw new Error(`HTTP ${risposta.status}`);
         const elenco = await risposta.json();
         for (const voce of elenco) if (voce.slug) percorsi.push(`/${sezione}/${encodeURIComponent(voce.slug)}`);
         riuscito = true;
       } catch (errore) {
-        log.warn(`[seo] ${endpoint}: tentativo ${tentativo}/3 fallito (${errore.message})`);
+        log.warn(`[seo] ${new URL(endpoint, apiBase)}: tentativo ${tentativo}/3 fallito (${errore.message})`);
       }
     }
     if (!riuscito) log.warn(`[seo] ATTENZIONE: la sitemap NON conterrà le pagine di /${sezione}.`);
