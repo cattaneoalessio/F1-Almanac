@@ -164,8 +164,8 @@ export default function PrivacyView() {
         <p>Servono al gestore per pubblicare e aggiornare il sito; non ricevono i dati di navigazione dei visitatori.</p>
         <ul>
           <Fornitore nome="GitHub">
-            custodisce il codice del sito ed esegue gli aggiornamenti automatici dei dati (GitHub Actions), che usano
-            come fonti Jolpica-F1, OpenF1 e il feed stampa di Pirelli.
+            custodisce il codice del sito e le immagini degli articoli, ed esegue gli aggiornamenti automatici dei dati
+            (GitHub Actions), che usano come fonti Jolpica-F1 e OpenF1.
           </Fornitore>
           <Fornitore nome="n8n">piattaforma di automazione dei flussi di lavoro usata dal gestore per attività del sito.</Fornitore>
         </ul>

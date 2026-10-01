@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import './HomeView.css';
 import GlassPanel from '../components/GlassPanel.jsx';
 import TeamBadge from '../components/TeamBadge.jsx';
-import PreviewBadge from '../components/PreviewBadge.jsx';
 import LoSapeviWidget from '../components/LoSapeviWidget.jsx';
+import PrimoPianoWidget from '../components/PrimoPianoWidget.jsx';
+import { SchedaNews } from './NewsView.jsx';
+import { getNews } from '../api/contenuti.js';
 import { SpazioAdv } from '../components/AdSlot.jsx';
 import { ANNO_MASSIMO } from '../components/HistoricalStandings.jsx';
 import heroFoto from '../assets/hero/home-hero.jpg';
 import { CIRCUIT_PHOTOS } from '../data/circuitPhotos.js';
-import { MOCK_NEWS } from '../data/homeMock.js';
 import { SITO } from '../config/sito.js';
 import { FlagIcon } from '../utils/flags.jsx';
 import { useStagioneCorrente, useProssimaGara, ordinaCalendario } from '../hooks/useStagioneCorrente.js';
@@ -76,7 +77,6 @@ function StatoBlocco({ stato, cosa }) {
  *     vecchie in fondo).
  * Quando un dato non è disponibile si dice, non si inventa.
  *
- * Restano di ESEMPIO, segnate <PreviewBadge>, solo le News (fonte da scegliere).
  * "Lo sapevi che" mostra una curiosità al giorno (loSapevi.js).
  */
 export default function HomeView() {
@@ -117,7 +117,10 @@ export default function HomeView() {
 
       <SpazioAdv formato="leaderboard" />
 
-      {/* ---------- LO SAPEVI CHE (contenuto reale, non mockup) ---------- */}
+      {/* ---------- IN PRIMO PIANO (dal pannello /admin/contenuti) ---------- */}
+      <PrimoPianoWidget />
+
+      {/* ---------- LO SAPEVI CHE (una curiosità al giorno) ---------- */}
       <section className="home-section">
         <LoSapeviWidget />
       </section>
@@ -362,25 +365,38 @@ export default function HomeView() {
 
       <SpazioAdv formato="billboard" />
 
-      {/* ---------- NEWS ---------- */}
-      <section className="home-section">
-        <div className="home-section__header">
-          <h2 className="section-title">News</h2>
-          <PreviewBadge>Fonte da definire</PreviewBadge>
-        </div>
-        <div className="home-news__grid">
-          {MOCK_NEWS.map((n) => (
-            <GlassPanel key={n.id} className="home-news__card">
-              <h3 className="home-news__titolo">{n.titolo}</h3>
-              <p className="home-news__estratto">{n.estratto}</p>
-              <p className="home-news__fonte">{n.fonteLabel}</p>
-            </GlassPanel>
-          ))}
-        </div>
-        <Link to="/news" className="home-news__vai-a-news">
-          Vai alla sezione News completa →
-        </Link>
-      </section>
+      {/* ---------- NEWS (ultime 3, dal pannello /admin/contenuti) ---------- */}
+      <UltimeNews />
     </main>
+  );
+}
+
+/** Ultime tre news per la home: se non ce ne sono, la sezione non compare. */
+function UltimeNews() {
+  const [voci, setVoci] = useState([]);
+  useEffect(() => {
+    let attivo = true;
+    getNews(1, 3)
+      .then((r) => attivo && setVoci(r?.voci || []))
+      .catch(() => {});
+    return () => {
+      attivo = false;
+    };
+  }, []);
+  if (voci.length === 0) return null;
+  return (
+    <section className="home-section">
+      <div className="home-section__header">
+        <h2 className="section-title">News</h2>
+      </div>
+      <div className="home-news__grid">
+        {voci.map((v) => (
+          <SchedaNews key={v.id} voce={v} />
+        ))}
+      </div>
+      <Link to="/news" className="home-news__vai-a-news">
+        Vai a tutte le News →
+      </Link>
+    </section>
   );
 }

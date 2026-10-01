@@ -15,7 +15,7 @@ export const ROTTE_SITEMAP = [
   '/arcade/time-attack', '/arcade/driverle', '/idols', '/idols/senna', '/idols/schumacher', '/idols/hamilton', '/privacy',
 ];
 /** Percorsi fissi di App.jsx volutamente FUORI dalla sitemap (amministrazione, ecc.). */
-export const ROTTE_ESCLUSE = ['/admin/chiudi-gp'];
+export const ROTTE_ESCLUSE = ['/admin/chiudi-gp', '/admin/contenuti/*'];
 
 /** Le stagioni dell'archivio: /archivio/1950 … /archivio/<anno in corso>. */
 export function pagineArchivio(annoCorrente = new Date().getFullYear()) {
@@ -26,12 +26,12 @@ export function pagineArchivio(annoCorrente = new Date().getFullYear()) {
 
 /** Sezioni descritte in llms.txt (titolo, percorso, cosa contiene). */
 const SEZIONI_LLMS = [
-  ['Archivio storico', '/archivio/2026', 'Classifiche piloti e costruttori e calendario di ogni stagione dal 1950; risultati di ogni Gran Premio.'],
+  ['Archivio', '/archivio/2026', 'Classifiche piloti e costruttori e calendario di ogni stagione dal 1950; risultati di ogni Gran Premio.'],
   ['Piloti', '/piloti', 'Tutti i piloti della storia della F1: carriera, vittorie, punti e risultati.'],
   ['Scuderie', '/scuderie', 'Le scuderie e i costruttori, con piloti, gare e risultati.'],
   ['Circuiti', '/circuiti', 'I circuiti: tracciato, storia, curve, vincitori e albo d\'oro.'],
   ['Analisi GP', '/analisi', 'Telemetria comparativa, strategie gomme e ritmo gara dei Gran Premi dal 2023.'],
-  ['News', '/news', 'Notizie dal mondo della Formula 1.'],
+  ['News', '/news', 'Articoli, approfondimenti e notizie sulla Formula 1, scritti dalla redazione del sito.'],
   ['Idols', '/idols', 'Approfondimenti sui piloti leggendari.'],
   ['Arcade', '/arcade', 'Giochi e quiz sulla storia della Formula 1.'],
 ];
@@ -168,7 +168,8 @@ export function riempiSegnaposto(html, { pubblico }) {
 /** Scarica da API elenchi che alimentano la sitemap. Mai un'eccezione: se l'API
  * non risponde (es. server gratuito addormentato) ritorna quel che ha e segnala. */
 export async function raccogliPercorsiDinamici(apiBase, log = console) {
-  const fonti = [['/piloti', 'piloti'], ['/circuiti', 'circuiti'], ['/scuderie', 'scuderie']];
+  // [endpoint API, sezione del sito]: /contenuti restituisce gli articoli pubblicati (-> /news/slug).
+  const fonti = [['/piloti', 'piloti'], ['/circuiti', 'circuiti'], ['/scuderie', 'scuderie'], ['/contenuti', 'news']];
   const percorsi = [];
   if (!apiBase) {
     log.warn('[seo] VITE_API_BASE_URL non impostata: la sitemap non conterrà piloti, circuiti e scuderie.');

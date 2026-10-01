@@ -1,37 +1,41 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import GlassPanel from '../components/GlassPanel.jsx';
-import notizie from '../data/pirelli-news.json';
-import './NewsView.css';
+import Pagination from '../components/Pagination.jsx';
 import { SpazioAdv } from '../components/AdSlot.jsx';
+import { getNews } from '../api/contenuti.js';
+import { dataLeggibile } from '../utils/htmlSicuro.js';
+import './NewsView.css';
 
-const FORMATTATORE_DATA = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
-
-function formattaData(iso) {
-  if (!iso) return null;
-  const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return null;
-  return FORMATTATORE_DATA.format(data);
-}
+const PER_PAGINA = 12;
 
 /**
- * News (/news) — notizie tecniche Pirelli, aggiornate ogni notte da
- * scripts/fetch-pirelli.js + la GitHub Action .github/workflows/
- * update-pirelli.yml, che scrivono src/data/pirelli-news.json.
- *
- * Solo testo, di proposito: NON mostra le foto del feed stampa Pirelli
- * (soggette a copyright "tutti i diritti riservati", verificato sulle
- * pagine legali di pirelli.com — nessuna licenza Creative Commons).
- * L'estratto è quello fornito da Pirelli stessa nel feed RSS (pensato
- * per essere ripreso da terzi), non un riassunto riscritto: per questo
- * ogni card ha sempre "Fonte: Pirelli" e il link all'articolo integrale,
- * invece di presentare il testo come nostro.
- *
- * Se in futuro vuoi arricchire una notizia con un post Instagram/X/
- * YouTube ufficiale di Pirelli scelto a mano (non automatico), usa
- * <SocialEmbed> dentro la card: l'immagine/video resta ospitato dalla
- * piattaforma d'origine, non va scaricato qui.
+ * News (/news) — articoli pubblicati dal pannello /admin/contenuti, dal più
+ * recente. Comprende anche i vecchi "In Primo Piano": quando ne esce uno
+ * nuovo, il precedente compare qui da solo.
  */
 export default function NewsView() {
-  const notizieItaliane = notizie.filter((n) => n.lingua === 'it');
+  const [pagina, setPagina] = useState(1);
+  const [dati, setDati] = useState(null);
+  const [stato, setStato] = useState('caricamento');
+
+  useEffect(() => {
+    let attivo = true;
+    setStato('caricamento');
+    getNews(pagina, PER_PAGINA)
+      .then((r) => {
+        if (!attivo) return;
+        setDati(r);
+        setStato('pronto');
+      })
+      .catch(() => attivo && setStato('errore'));
+    return () => {
+      attivo = false;
+    };
+  }, [pagina]);
+
+  const voci = dati?.voci || [];
+  const totalePagine = dati ? Math.max(1, Math.ceil(dati.totale / PER_PAGINA)) : 1;
 
   return (
     <main className="main main--historical">
@@ -39,35 +43,36 @@ export default function NewsView() {
         <div className="topbar__title">
           <h1 style={{ fontSize: '1.4rem' }}>News</h1>
         </div>
-        <div className="topbar__meta">Aggiornate automaticamente ogni notte dal feed stampa Pirelli</div>
       </div>
 
-      {notizieItaliane.length === 0 && (
-        <p className="historical-standings__stato">
-          Nessuna news disponibile al momento: la prima esecuzione automatica del feed non è ancora
-          avvenuta, oppure il feed non era raggiungibile durante l'ultimo aggiornamento.
-        </p>
-      )}
+      {stato === 'caricamento' && <p className="historical-standings__stato">Caricamento…</p>}
+      {stato === 'errore' && <p className="historical-standings__stato">Le news non sono raggiungibili in questo momento. Riprova tra poco.</p>}
+      {stato === 'pronto' && voci.length === 0 && <p className="historical-standings__stato">Nessuna news pubblicata, per ora.</p>}
 
-      {notizieItaliane.length > 0 && <SpazioAdv formato="leaderboard" />}
+      {voci.length > 0 && <SpazioAdv formato="leaderboard" />}
 
-      {notizieItaliane.length > 0 && (
+      {voci.length > 0 && (
         <div className="news-view__grid">
-          {notizieItaliane.map((notizia) => (
-            <GlassPanel key={notizia.id} className="news-view__card">
-              {formattaData(notizia.data) && <p className="news-view__data">{formattaData(notizia.data)}</p>}
-              <h2 className="news-view__titolo">{notizia.titolo}</h2>
-              <p className="news-view__estratto">{notizia.estratto}</p>
-              <p className="news-view__fonte">
-                Fonte: Pirelli —{' '}
-                <a href={notizia.link} target="_blank" rel="noreferrer noopener">
-                  leggi l'articolo originale ↗
-                </a>
-              </p>
-            </GlassPanel>
+          {voci.map((v) => (
+            <SchedaNews key={v.id} voce={v} />
           ))}
         </div>
       )}
+      <Pagination pagina={pagina} totalePagine={totalePagine} onCambiaPagina={(p) => { setPagina(p); window.scrollTo(0, 0); }} />
     </main>
+  );
+}
+
+export function SchedaNews({ voce }) {
+  return (
+    <GlassPanel as={Link} to={`/news/${voce.slug}`} className="news-view__card">
+      {voce.immagine?.src && (
+        <img className="news-view__img" src={voce.immagine.src} alt={voce.immagine.alt || ''} loading="lazy" />
+      )}
+      <p className="news-view__data">{dataLeggibile(voce.data_pubblicazione)}</p>
+      <h2 className="news-view__titolo">{voce.titolo}</h2>
+      {voce.sottotitolo && <p className="news-view__estratto">{voce.sottotitolo}</p>}
+      <span className="news-view__leggi">Leggi →</span>
+    </GlassPanel>
   );
 }

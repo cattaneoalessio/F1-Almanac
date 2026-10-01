@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import './App.css';
 import HomeView from './views/HomeView.jsx';
@@ -22,6 +22,10 @@ import ChronoQuizView from './views/ChronoQuizView.jsx';
 import DriverleView from './views/DriverleView.jsx';
 import GameChampionshipView from './views/GameChampionshipView.jsx';
 import AdminGpView from './views/AdminGpView.jsx';
+
+// Il pannello contenuti (editor compreso) si scarica solo quando serve:
+// i visitatori non pagano il peso dell'editor.
+const AdminContenutiView = lazy(() => import('./views/admin/AdminContenutiView.jsx'));
 import SiteFooter from './components/SiteFooter.jsx';
 import { ConsensoProvider, useConsenso } from './consenso/ConsensoContext.jsx';
 import BannerConsenso from './consenso/BannerConsenso.jsx';
@@ -31,32 +35,30 @@ import { SITO } from './config/sito.js';
 import { applicaMeta } from './utils/meta.js';
 import { metaPerPercorso } from './utils/metaPagina.js';
 import { useMetaPagina } from './hooks/useMetaPagina.js';
-import { AuthProvider, nomeUtente, useAuth } from './auth/AuthContext.jsx';
+import { AuthProvider } from './auth/AuthContext.jsx';
+import MenuUtente from './components/MenuUtente.jsx';
+import ArticoloView from './views/ArticoloView.jsx';
 import monopostoIcona from './assets/monoposto-nav-icon.png';
 
+// Ordine deciso con il gestore (1/10/2026). Niente voce "Home": è già il logo.
 const TABS = [
-  // "/" è un caso speciale: con startsWith() combacerebbe con QUALSIASI
-  // percorso (tutti iniziano per "/"), marcando la Home come attiva anche
-  // altrove. Per questa voce sola serve un confronto esatto (vedi sotto).
-  { pattern: '/', to: '/', label: 'Home', esatto: true },
-  { pattern: '/archivio', to: `/archivio/${ANNO_DI_DEFAULT}`, label: 'Archivio storico' },
-  { pattern: '/piloti', to: '/piloti', label: 'Piloti' },
-  { pattern: '/scuderie', to: '/scuderie', label: 'Scuderie' },
-  { pattern: '/circuiti', to: '/circuiti', label: 'Circuiti' },
-  { pattern: '/news', to: '/news', label: 'News' },
-  { pattern: '/analisi', to: '/analisi', label: 'Analisi' },
-  { pattern: '/arcade', to: '/arcade', label: 'Arcade' },
   { pattern: '/idols', to: '/idols', label: 'Idols' },
+  { pattern: '/piloti', to: '/piloti', label: 'Piloti' },
+  { pattern: '/analisi', to: '/analisi', label: 'Analisi' },
+  { pattern: '/circuiti', to: '/circuiti', label: 'Circuiti' },
+  { pattern: '/scuderie', to: '/scuderie', label: 'Scuderie' },
+  { pattern: '/arcade', to: '/arcade', label: 'Arcade' },
+  { pattern: '/news', to: '/news', label: 'News' },
+  { pattern: '/archivio', to: `/archivio/${ANNO_DI_DEFAULT}`, label: 'Archivio' },
 ];
 
 function BarraNavigazione() {
   const location = useLocation();
-  const { utente, apriLogin, logout } = useAuth();
   const [menuAperto, setMenuAperto] = useState(false);
   const barraRef = useRef(null);
 
   function isAttiva(tab) {
-    return tab.esatto ? location.pathname === tab.pattern : location.pathname.startsWith(tab.pattern);
+    return location.pathname.startsWith(tab.pattern);
   }
 
   // Chiude il menu mobile a ogni cambio di rotta (click su una voce, ma
@@ -111,19 +113,13 @@ function BarraNavigazione() {
             </Link>
           );
         })}
-        <button
-          type="button"
-          className="app-tabs__auth"
-          onClick={utente ? logout : apriLogin}
-          title={utente ? `Esci (${nomeUtente(utente)})` : 'Accedi per salvare i punteggi Arcade in classifica'}
-        >
-          {utente ? `Esci — ${nomeUtente(utente)}` : 'Accedi'}
-        </button>
       </div>
 
       {/* Hamburger, visibile solo sotto i 700px (vedi App.css): apre/chiude
           il pannello qui sotto, che sostituisce la riga orizzontale su
           schermi stretti invece di farla scorrere lateralmente. */}
+      <div className="app-tabs__destra">
+        <MenuUtente />
       <button
         type="button"
         className={`app-tabs__hamburger ${menuAperto ? 'app-tabs__hamburger--aperto' : ''}`}
@@ -136,6 +132,7 @@ function BarraNavigazione() {
         <span className="app-tabs__hamburger-barra" aria-hidden="true" />
         <span className="app-tabs__hamburger-barra" aria-hidden="true" />
       </button>
+      </div>
 
       <div
         id="app-tabs-menu-mobile"
@@ -154,9 +151,6 @@ function BarraNavigazione() {
             </Link>
           );
         })}
-        <button type="button" className="app-tabs__mobile-auth" onClick={utente ? logout : apriLogin}>
-          {utente ? `Esci — ${nomeUtente(utente)}` : 'Accedi'}
-        </button>
       </div>
     </nav>
   );
@@ -210,6 +204,7 @@ function ContenutoApp() {
             <Route path="/scuderie" element={<ScuderiesIndexView />} />
             <Route path="/scuderie/:slug" element={<ScuderiaView />} />
             <Route path="/news" element={<NewsView />} />
+            <Route path="/news/:slug" element={<ArticoloView />} />
             <Route path="/analisi" element={<AnalisiView />} />
             <Route path="/arcade" element={<ArcadeView />} />
             <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />
@@ -230,6 +225,14 @@ function ContenutoApp() {
             <Route path="/privacy" element={<PrivacyView />} />
             <Route path="/idols/:slug" element={<IdolView />} />
             <Route path="/admin/chiudi-gp" element={<AdminGpView />} />
+            <Route
+              path="/admin/contenuti/*"
+              element={
+                <Suspense fallback={<main className="main main--historical"><p className="historical-standings__stato">Caricamento…</p></main>}>
+                  <AdminContenutiView />
+                </Suspense>
+              }
+            />
             <Route path="*" element={<PaginaNonTrovata />} />
           </Route>
         </Routes>

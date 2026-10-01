@@ -43,6 +43,7 @@ from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from auth import utente_da_token
+from contenuti import router as router_contenuti
 from chronoquiz import genera_quiz
 from db import get_connection
 from driverle import (
@@ -119,7 +120,7 @@ app.add_middleware(
         "http://127.0.0.1:4173",
         "http://localhost:4173",
     ],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -130,6 +131,9 @@ app.add_middleware(
 # Se GAME_ADMIN_KEY non è impostata, l'endpoint rifiuta sempre — fail
 # closed, non fail open.
 GAME_ADMIN_KEY = os.environ.get("GAME_ADMIN_KEY", "")
+
+# Articoli "In Primo Piano" e News + pannello di gestione (vedi contenuti.py).
+app.include_router(router_contenuti)
 
 
 @app.get("/")
