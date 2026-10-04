@@ -24,7 +24,7 @@
  * (che sterzano). I dettagli lontani sotto il pixel vengono saltati.
  */
 
-import { LARGHEZZA_PISTA } from './circuito3d.js';
+import { LARGHEZZA_PISTA, LUNGHEZZA_CIRCUITO, LUNGHEZZA_SEGMENTO, NUMERO_SEGMENTI_TOTALE, segmentoA } from './circuito3d.js';
 
 export const FRAZIONE_ORIZZONTE = 0.2;
 const SCALA_AUTO = 1.4;
@@ -202,6 +202,10 @@ function preparaCartellone(crea, variante) {
 const S = SCALA_AUTO;
 const Y_TERRA = -ALTEZZA_CAMERA;
 const RUOTA = { x: 0.8 * S, z: 1.95 * S, r: 0.36 * S, w: 0.38 * S };
+// Specchietti retrovisori (un po' più grandi del reale, per leggibilità).
+// x/z: centro dello specchio; y: altezza da terra del centro; semiL/semiA:
+// mezza larghezza/altezza del vetro.
+const SPECCHIO = { x: 0.62 * S, z: 1.05 * S, y: 0.735, semiL: 0.125 * S, semiA: 0.05 * S };
 
 function strokeTubo(ctx, v, a, b, raggio, colore) {
   const pa = v.p(...a);
@@ -346,20 +350,27 @@ function disegnaAutoDavanti(g, v, livrea) {
 
   // --- Specchietti, su supporti che partono dalle pance
   for (const lato of [-1, 1]) {
-    const cx = lato * 0.6 * S;
-    const z = 1.05 * S;
-    strokeTubo(g, v, [lato * 0.45 * S, t(0.6), 1.05 * S], [cx - lato * 0.04 * S, t(0.7), z], 0.014 * S, livrea.ombra);
+    const cx = lato * SPECCHIO.x;
+    const z = SPECCHIO.z;
+    const yc = SPECCHIO.y;
+    const bordo = 0.014 * S;
+    strokeTubo(g, v, [lato * 0.45 * S, t(0.6), z], [cx - lato * 0.04 * S, t(yc - 0.04), z], 0.014 * S, livrea.ombra);
     g.fillStyle = livrea.base;
-    poligono(g, [v.p(cx - 0.1 * S, t(0.77), z), v.p(cx + 0.1 * S, t(0.77), z), v.p(cx + 0.1 * S, t(0.69), z), v.p(cx - 0.1 * S, t(0.69), z)]);
+    poligono(g, [
+      v.p(cx - SPECCHIO.semiL - bordo, Y_TERRA + yc * S + SPECCHIO.semiA + bordo, z),
+      v.p(cx + SPECCHIO.semiL + bordo, Y_TERRA + yc * S + SPECCHIO.semiA + bordo, z),
+      v.p(cx + SPECCHIO.semiL + bordo, Y_TERRA + yc * S - SPECCHIO.semiA - bordo, z),
+      v.p(cx - SPECCHIO.semiL - bordo, Y_TERRA + yc * S - SPECCHIO.semiA - bordo, z),
+    ]);
     g.fill();
-    const vetro = [v.p(cx - 0.088 * S, t(0.765), z), v.p(cx + 0.088 * S, t(0.765), z), v.p(cx + 0.088 * S, t(0.7), z), v.p(cx - 0.088 * S, t(0.7), z)];
-    const grVetro = g.createLinearGradient(vetro[0][0], vetro[0][1], vetro[2][0], vetro[2][1]);
+    // vetro "spento" (Prove Libere): in Qualifica e Gara ci si disegna sopra la vista posteriore
+    const [x0, y0, x1, y1] = rettangoloVetro(v, lato);
+    const grVetro = g.createLinearGradient(x0, y0, x1, y1);
     grVetro.addColorStop(0, '#b8c8d8');
     grVetro.addColorStop(0.5, '#3b4654');
     grVetro.addColorStop(1, '#6a7b8d');
     g.fillStyle = grVetro;
-    poligono(g, vetro);
-    g.fill();
+    g.fillRect(x0, y0, x1 - x0, y1 - y0);
   }
 
   // --- Halo: tubo in carbonio visto dall'alto (pianta ellittica) + montante centrale
@@ -470,6 +481,128 @@ function disegnaRuota(ctx, v, lato, sterzo) {
   }
 }
 
+/** Rettangolo a schermo del vetro dello specchietto (lato -1 sinistro, +1 destro). */
+function rettangoloVetro(v, lato) {
+  const yc = Y_TERRA + SPECCHIO.y * S;
+  const [xa, ya] = v.p(lato * SPECCHIO.x - SPECCHIO.semiL, yc + SPECCHIO.semiA, SPECCHIO.z);
+  const [xb, yb] = v.p(lato * SPECCHIO.x + SPECCHIO.semiL, yc - SPECCHIO.semiA, SPECCHIO.z);
+  return [Math.round(xa), Math.round(ya), Math.round(xb), Math.round(yb)];
+}
+
+const SEGMENTI_RETRO = 80; // ~560 m alle spalle: abbastanza per vedere chi arriva
+const ALTEZZA_SPECCHIO = SPECCHIO.y * S; // metri da terra
+
+/**
+ * Segmenti ALLE SPALLE della camera, dal più vicino al più lontano: x e y
+ * relativi alla camera, z = distanza all'indietro (positiva).
+ */
+export function segmentiDietro(camera, numero = SEGMENTI_RETRO) {
+  const base = Math.floor(camera.distanza / LUNGHEZZA_SEGMENTO);
+  const out = [];
+  // si parte dal segmento successivo (k = -1, appena davanti): serve come
+  // estremo per tagliare il tratto più vicino senza lasciare buchi
+  for (let k = -1; k < numero; k++) {
+    const assoluto = base - k;
+    const s = segmentoA(assoluto);
+    const giri = Math.floor(assoluto / NUMERO_SEGMENTI_TOTALE);
+    out.push({
+      indiceSegmento: s.indice,
+      x: s.mondoX - camera.mondoX,
+      y: s.mondoY - camera.mondoY,
+      z: camera.distanza - (s.mondoZ + giri * LUNGHEZZA_CIRCUITO),
+    });
+  }
+  return out;
+}
+
+/**
+ * Vista posteriore "essenziale" (cielo, prato, pista, cordoli) disegnata in
+ * un canvas grande quanto il vetro. Riflessa come in uno specchio vero:
+ * ciò che sta alla tua destra, dietro, compare a destra nello specchio.
+ * Un pezzo della propria pancia occupa il bordo interno, come nella realtà.
+ */
+function disegnaVistaPosteriore(g, w, h, dietro, lato, livrea) {
+  const f = w * 0.95;
+  const oy = h * 0.42;
+  const cx = w / 2;
+  const cielo = g.createLinearGradient(0, 0, 0, oy);
+  cielo.addColorStop(0, '#64b5f6');
+  cielo.addColorStop(1, '#d6ebfb');
+  g.fillStyle = cielo;
+  g.fillRect(0, 0, w, Math.ceil(oy) + 1);
+  g.fillStyle = '#4caf50';
+  g.fillRect(0, Math.floor(oy), w, h - oy);
+
+  const dx = lato * SPECCHIO.x; // lo specchio non è al centro dell'auto
+  const VICINO = 3; // il primo tratto alle spalle è coperto dalla propria auto
+  const yRel = ALTEZZA_SPECCHIO - ALTEZZA_CAMERA;
+  const punto = (s, zSp) => {
+    const k = f / zSp;
+    return { s, k, x: cx + (s.x - dx) * k, y: oy - (s.y - yRel) * k };
+  };
+  const P = [];
+  let precedente = null;
+  for (const s of dietro) {
+    const zSpecchio = s.z + SPECCHIO.z; // lo specchio sta più avanti della camera
+    if (zSpecchio < VICINO) {
+      precedente = s;
+      continue;
+    }
+    if (precedente && P.length === 0) {
+      // tratto tagliato esattamente a VICINO: la pista arriva fino al bordo basso
+      const zp = precedente.z + SPECCHIO.z;
+      const t = (VICINO - zp) / (zSpecchio - zp);
+      P.push(punto({ ...precedente, x: precedente.x + (s.x - precedente.x) * t, y: precedente.y + (s.y - precedente.y) * t }, VICINO));
+    }
+    P.push(punto(s, zSpecchio));
+  }
+  const quad = (a, b, x0, x1, colore) => {
+    g.fillStyle = colore;
+    g.beginPath();
+    g.moveTo(a.x + x0 * a.k, a.y);
+    g.lineTo(a.x + x1 * a.k, a.y);
+    g.lineTo(b.x + x1 * b.k, b.y + 0.5);
+    g.lineTo(b.x + x0 * b.k, b.y + 0.5);
+    g.closePath();
+    g.fill();
+  };
+  let accumulato = null;
+  for (let i = P.length - 1; i > 0; i--) {
+    const b = P[i - 1];
+    if (b.y - (accumulato || P[i]).y < 0.8 && i > 1) {
+      if (!accumulato) accumulato = P[i];
+      continue;
+    }
+    const a = accumulato || P[i];
+    accumulato = null;
+    const idx = b.s.indiceSegmento;
+    for (const l of [-1, 1]) quad(a, b, l * SEMI_PISTA, l * (SEMI_PISTA + LARGHEZZA_CORDOLO), idx % 2 ? '#d32f2f' : '#ffffff');
+    quad(a, b, -SEMI_PISTA, SEMI_PISTA, idx % 2 ? '#4b4b4b' : '#474747');
+  }
+
+  // la propria pancia sul bordo interno (in basso verso il centro auto)
+  const interno = lato < 0 ? w : 0;
+  const verso = lato < 0 ? -1 : 1;
+  g.fillStyle = livrea.base;
+  g.beginPath();
+  g.moveTo(interno, h * 0.48);
+  g.quadraticCurveTo(interno + verso * w * 0.12, h * 0.55, interno + verso * w * 0.2, h);
+  g.lineTo(interno, h);
+  g.closePath();
+  g.fill();
+  g.fillStyle = '#141414'; // gomma posteriore
+  g.fillRect(lato < 0 ? w - w * 0.1 : w * 0.02, h * 0.62, w * 0.08, h * 0.38);
+  // riflesso del vetro
+  g.fillStyle = 'rgba(255,255,255,0.12)';
+  g.beginPath();
+  g.moveTo(w * 0.15, 0);
+  g.lineTo(w * 0.32, 0);
+  g.lineTo(w * 0.12, h);
+  g.lineTo(0, h);
+  g.closePath();
+  g.fill();
+}
+
 // ---------------------------------------------------------------------------
 // Renderer
 // ---------------------------------------------------------------------------
@@ -501,6 +634,10 @@ export function creaRendererPov(creaCanvas) {
       sprite,
       dietro,
       davanti,
+      specchi: [-1, 1].map((lato) => {
+        const r = rettangoloVetro(v, lato);
+        return { lato, r, canvas: creaCanvas(Math.max(1, r[2] - r[0]), Math.max(1, r[3] - r[1])) };
+      }),
     };
     return cache;
   }
@@ -511,7 +648,8 @@ export function creaRendererPov(creaCanvas) {
    *   livrea, sterzo (radianti, + = destra), offsetSfondo (pixel di parallasse),
    *   tratti: Map indiceSegmento -> 'tribuna' | 'cartelloni' (dove mettere cosa),
    *   cartelli: Map indiceSegmento -> cartello di velocità,
-   *   fumo: 0..1 (gomme bloccate in frenata), velocita (m/s), dt (s)
+   *   fumo: 0..1 (gomme bloccate in frenata), velocita (m/s), dt (s),
+   *   dietro: output di segmentiDietro(camera), o null per specchietti spenti
    * }
    */
   let cartelliScena = null;
@@ -700,6 +838,15 @@ export function creaRendererPov(creaCanvas) {
     disegnaFumo(ctx, v);
     const y0a = Math.floor(H * 0.36);
     ctx.drawImage(c.davanti, 0, y0a, W, H - y0a, 0, y0a, W, H - y0a);
+
+    // Specchietti con la vista posteriore (solo dove richiesto: Qualifica e Gara)
+    if (scena.dietro) {
+      for (const sp of c.specchi) {
+        const cv = sp.canvas;
+        disegnaVistaPosteriore(cv.getContext('2d'), cv.width, cv.height, scena.dietro, sp.lato, scena.livrea);
+        ctx.drawImage(cv, sp.r[0], sp.r[1]);
+      }
+    }
   }
 
   function disegnaScenario(ctx, c, a, b, idx, tratto, curvaAss) {

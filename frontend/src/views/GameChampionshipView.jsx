@@ -20,7 +20,7 @@ import {
   segmentoA,
   controllaCatturaCheckpointSegmento,
 } from '../game/circuito3d.js';
-import { ALTEZZA_CAMERA, calcolaTratti, creaRendererPov, FRAZIONE_ORIZZONTE, LIVREE, livreaDaId } from '../game/renderPov.js';
+import { ALTEZZA_CAMERA, calcolaTratti, creaRendererPov, FRAZIONE_ORIZZONTE, LIVREE, livreaDaId, segmentiDietro } from '../game/renderPov.js';
 import { avanzaFisica, statoIniziale, VELOCITA_MASSIMA_BASE } from '../game/fisica3d.js';
 import { coloreGiro, estraiCheckpointDelGiro, trovaMigliorGiroValido } from '../game/sessione.js';
 import './GameChampionshipView.css';
@@ -595,6 +595,8 @@ export default function GameChampionshipView() {
         fumo: auto.bloccaggio ? 1 : 0,
         velocita: auto.velocita,
         dt: ultimoDtRef.current,
+        // specchietti con vista posteriore solo in Qualifica e Gara (decisione del 4/10)
+        dietro: tipoSessione === 'prove_libere' ? null : segmentiDietro(camera),
         tratti: TRATTI_SCENARIO,
         cartelli: CARTELLI_CURVA,
       });
