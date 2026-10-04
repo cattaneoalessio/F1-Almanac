@@ -660,6 +660,7 @@ export default function GameChampionshipView() {
         const circolare = tipoSessione === 'qualifica';
         const secondi = (performance.now() - tempoInizioRef.current) / 1000;
         aggiornaAvversari(avversariRef.current, statoAutoRef.current, dt, { tempoGara: secondi, circolare });
+        separaAvversari(avversariRef.current, circolare);
         const giocatore = { ...statoAutoRef.current };
         const esito = interazioniGiocatore(giocatore, avversariRef.current, {
           circolare,

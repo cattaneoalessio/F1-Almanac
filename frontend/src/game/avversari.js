@@ -14,7 +14,8 @@
  *
  * REGOLE DI CONTATTO (decise con il gestore, 4/10/2026):
  * - le auto non si compenetrano;
- * - se il giocatore tampona un'auto da dietro, perde il 90% della velocità;
+ * - se il giocatore tampona un'auto da dietro perde velocità in proporzione
+ *   alla botta (differenza di velocità): nulla sotto 10 km/h, al massimo 60%;
  * - bot e avversari non tamponano MAI il giocatore: rallentano o lo girano attorno;
  * - scia: entro 50 m dietro un'auto si guadagnano fino a 10 km/h (fisica3d.js).
  */
@@ -40,7 +41,19 @@ const SEMI_PISTA = LARGHEZZA_PISTA / 2;
 const X_MAX_IN_PISTA = SEMI_PISTA - LARGHEZZA_AUTO / 2; // auto interamente sull'asfalto
 const DISTANZA_GRIGLIA = 8; // metri tra una fila e l'altra
 const X_GRIGLIA = 2.4;
-const PERDITA_TAMPONAMENTO = 0.9; // -90% di velocità
+// Tamponamento (deciso col gestore, 4/10/2026): la perdita dipende dalla
+// DIFFERENZA di velocità con l'auto colpita. Sotto 10 km/h nessuna perdita
+// (si sfiora soltanto); poi cresce in proporzione fino al 60% massimo,
+// raggiunto con 150 km/h di differenza. In ogni caso non si "attraversa"
+// l'auto davanti: dopo il contatto non si va più veloci di lei.
+const SOGLIA_TAMPONAMENTO = 10 / 3.6;
+const DIFFERENZA_PERDITA_MASSIMA = 150 / 3.6;
+const PERDITA_MASSIMA = 0.6;
+export function perditaTamponamento(differenza) {
+  if (differenza < SOGLIA_TAMPONAMENTO) return 0;
+  const f = (differenza - SOGLIA_TAMPONAMENTO) / (DIFFERENZA_PERDITA_MASSIMA - SOGLIA_TAMPONAMENTO);
+  return PERDITA_MASSIMA * Math.min(1, f);
+}
 const SCIA_LARGHEZZA = 2.5; // metri di disallineamento laterale ancora "in scia"
 
 // Nomi inventati per i bot (nessun pilota reale) e livree dei bot.
@@ -402,17 +415,22 @@ export function interazioniGiocatore(giocatore, avversari, { circolare = false, 
     if (d > 0 && d < SCIA_DISTANZA && Math.abs(dx) < SCIA_LARGHEZZA) scia = 1;
     if (!sovrapposti) continue;
     if (d > LUNGHEZZA_AUTO * 0.5 && d < LUNGHEZZA_AUTO) {
-      // tamponamento: -90% di velocità (una volta per contatto) e niente compenetrazione
-      if (adesso - ultimoTamponamento > 1) {
-        giocatore.velocita *= 1 - PERDITA_TAMPONAMENTO;
+      // tamponamento: perdita proporzionale alla botta (una volta per contatto) e niente compenetrazione
+      const perdita = perditaTamponamento(giocatore.velocita - a.velocita);
+      if (perdita > 0 && adesso - ultimoTamponamento > 1) {
+        giocatore.velocita *= 1 - perdita;
         tamponamento = true;
       }
       giocatore.velocita = Math.min(giocatore.velocita, a.velocita);
       giocatore.distanza -= LUNGHEZZA_AUTO - d;
     } else if (Math.abs(d) <= LUNGHEZZA_AUTO * 0.5) {
-      // affiancati e sovrapposti: ci si separa di lato, senza perdere velocità
-      const spinta = (LARGHEZZA_AUTO - Math.abs(dx)) * (dx > 0 ? -1 : 1);
-      giocatore.x += spinta;
+      // affiancati e sovrapposti: ci si separa di lato (metà a testa), senza perdere velocità
+      const verso = dx > 0 ? -1 : 1; // direzione in cui si sposta il giocatore
+      const sovrapposizione = LARGHEZZA_AUTO - Math.abs(dx);
+      const xAvversario = limitaX(a.x - (verso * sovrapposizione) / 2);
+      const spostamentoAvversario = Math.abs(xAvversario - a.x);
+      a.x = xAvversario;
+      giocatore.x += verso * (sovrapposizione - spostamentoAvversario);
     } else if (d < -LUNGHEZZA_AUTO * 0.5 && d > -LUNGHEZZA_AUTO) {
       // un avversario addosso da dietro (es. hai frenato di colpo): è lui a cedere
       // prima prova a scansarti di lato, se c'è spazio; altrimenti arretra
