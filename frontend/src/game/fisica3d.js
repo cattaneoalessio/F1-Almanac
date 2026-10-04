@@ -13,9 +13,44 @@
  * di sistema, testabile in isolamento con Node.
  */
 
-export const VELOCITA_MASSIMA_BASE = 350 / 3.6; // ≈ 97.2 m/s = 350 km/h (richiesta esplicita dell'utente, era 324 km/h)
-export const ACCELERAZIONE = 25; // m/s^2 (0 a velocità massima in ~3.6s in pista libera)
-export const FRENO = 40; // m/s^2
+export const VELOCITA_MASSIMA_BASE = 350 / 3.6; // ≈ 97.2 m/s = 350 km/h, tetto assoluto
+
+// --- Motore e aerodinamica (2026-10-04, richiesta: 350 solo in fondo ai
+// rettilinei lunghi, mai in curva) ---
+// Accelerazione = il minimo tra la trazione (da fermi le gomme non scaricano
+// più di tanto) e la spinta del motore, che cala col quadrato della velocità
+// per la resistenza dell'aria e tende a VELOCITA_ASINTOTICA senza mai
+// raggiungerla. Risultato: 0-100 ≈ 2,5 s, 0-200 ≈ 5 s; da 200 km/h servono
+// circa 475 m di rettilineo per toccare i 350 (verificato con una
+// simulazione del giro lanciato: i 350 si toccano solo sui due rettilinei
+// da ~600 m, a 100-150 m dalla staccata; sugli altri si resta a 250-300).
+const VELOCITA_ASINTOTICA = 375 / 3.6;
+const ACCELERAZIONE_TRAZIONE = 11; // m/s²
+const ACCELERAZIONE_MOTORE = 20; // m/s² a velocità nulla, prima della resistenza dell'aria
+// Freno: come in una F1, morde di più ad alta velocità (più carico
+// aerodinamico sulle gomme): ~42 m/s² a 350 km/h, ~17 m/s² a 100 km/h.
+const FRENO_BASE = 14;
+const FRENO_AERO = 30;
+// Gas rilasciato: rallenta da sola (aria + freno motore), ~6 m/s² a 350 km/h.
+const DECELERAZIONE_RILASCIO_BASE = 0.8;
+const DECELERAZIONE_RILASCIO_AERO = 5.5;
+
+// --- Sottosterzo: ogni curva ha una velocità oltre la quale le gomme non
+// tengono. Formula allineata ai cartelli (circuito3d.js: 230 − 34·curva
+// all'apice), con 20 km/h di margine: chi rispetta i cartelli non scivola.
+export function velocitaAderenza(curvatura) {
+  const kmh = Math.max(70, 250 - Math.abs(curvatura) * 34);
+  return kmh / 3.6;
+}
+const SPINTA_SOTTOSTERZO = 25; // m/s laterali per ogni 100% oltre l'aderenza
+const SPINTA_SOTTOSTERZO_MASSIMA = 20;
+const ATTRITO_SOTTOSTERZO = 40; // m/s² di velocità persa per ogni 100% oltre l'aderenza
+const ATTRITO_SOTTOSTERZO_MASSIMO = 15;
+
+// Fumo dalle gomme: una frenata iniziata sopra i 300 km/h blocca le
+// anteriori finché non si scende sotto i 150 o si rilascia il freno.
+const SOGLIA_BLOCCAGGIO = 300 / 3.6;
+const FINE_BLOCCAGGIO = 150 / 3.6;
 
 export const LARGHEZZA_AUTO = 3; // metri, dato dall'utente
 export const SEMI_LARGHEZZA_AUTO = LARGHEZZA_AUTO / 2;
@@ -40,7 +75,8 @@ export const EFFETTO_CENTRIFUGO = 1.4; // quanto la curvatura del segmento "tira
  * - completamente in pista: nessuna riduzione
  * - almeno una ruota sul cordolo (bordo esterno o interno dell'auto
  *   oltre il bordo pista, ma non oltre il cordolo): -20% al secondo
- * - oltre il cordolo, sull'erba: -40% al secondo
+ * - oltre il cordolo, sull'erba: -50% al secondo (era -40%, portato a 50
+ *   su richiesta del 2026-10-04)
  */
 export function statoPosizioneLaterale(xMetri, semiLarghezzaPista) {
   const distanzaCentro = Math.abs(xMetri);
@@ -54,7 +90,7 @@ export function statoPosizioneLaterale(xMetri, semiLarghezzaPista) {
   if (bordoVicino <= bordoCordolo) {
     return { zona: 'cordolo', fattoreRiduzione: 0.2 };
   }
-  return { zona: 'erba', fattoreRiduzione: 0.4 };
+  return { zona: 'erba', fattoreRiduzione: 0.5 };
 }
 
 /** L'auto non può mai superare lateralmente il muro di contenimento:
@@ -66,7 +102,7 @@ export function limitaXAiMuri(xMetri, semiLarghezzaPista) {
 }
 
 export function statoIniziale() {
-  return { distanza: 0, x: 0, velocita: 0 };
+  return { distanza: 0, x: 0, velocita: 0, bloccaggio: false };
 }
 
 /**
@@ -79,53 +115,51 @@ export function statoIniziale() {
  * l'attrito passivo non portano mai la velocità sotto 0, si fermano lì.
  */
 export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLarghezzaPista) {
-  let { velocita, x } = stato;
+  let { velocita, x, bloccaggio = false } = stato;
   const { distanza } = stato;
+  const quadratoVelocita = (velocita / VELOCITA_ASINTOTICA) ** 2;
 
-  if (input.accelera) {
-    velocita += ACCELERAZIONE * dt;
+  if (input.accelera && !input.frena) {
+    const spinta = Math.min(ACCELERAZIONE_TRAZIONE, ACCELERAZIONE_MOTORE * (1 - quadratoVelocita));
+    velocita += Math.max(0, spinta) * dt;
   } else if (input.frena) {
-    velocita = Math.max(0, velocita - FRENO * dt);
+    if (!bloccaggio && velocita >= SOGLIA_BLOCCAGGIO) bloccaggio = true;
+    velocita = Math.max(0, velocita - (FRENO_BASE + FRENO_AERO * quadratoVelocita) * dt);
+  } else {
+    velocita = Math.max(0, velocita - (DECELERAZIONE_RILASCIO_BASE + DECELERAZIONE_RILASCIO_AERO * quadratoVelocita) * dt);
   }
-  // Nessun input: la velocità resta ESATTAMENTE costante (nessuna
-  // decelerazione passiva/attrito) — richiesta esplicita dell'utente,
-  // sostituisce il comportamento precedente che rallentava da solo.
-  velocita = Math.min(velocita, VELOCITA_MASSIMA_BASE); // tetto assoluto — era sparito per errore insieme al vecchio tetto fisso di cordolo/erba, permettendo di accelerare ben oltre (segnalato dall'utente: fino a 500 km/h)
+  if (!input.frena || velocita < FINE_BLOCCAGGIO) bloccaggio = false;
+  velocita = Math.min(velocita, VELOCITA_MASSIMA_BASE);
+
+  // Sottosterzo: oltre la velocità di aderenza della curva l'auto allarga
+  // (spinta verso l'esterno) e le gomme che strisciano la rallentano.
+  let eccessoAderenza = 0;
+  if (Math.abs(curvaturaSegmentoCorrente) > 0.3) {
+    eccessoAderenza = Math.max(0, velocita / velocitaAderenza(curvaturaSegmentoCorrente) - 1);
+    if (eccessoAderenza > 0) {
+      const attrito = Math.min(ATTRITO_SOTTOSTERZO_MASSIMO, eccessoAderenza * ATTRITO_SOTTOSTERZO);
+      velocita = Math.max(0, velocita - attrito * dt);
+      const spinta = Math.min(SPINTA_SOTTOSTERZO_MASSIMA, eccessoAderenza * SPINTA_SOTTOSTERZO);
+      x += Math.sign(curvaturaSegmentoCorrente) * -spinta * dt;
+    }
+  }
 
   const { zona, fattoreRiduzione } = statoPosizioneLaterale(x, semiLarghezzaPista);
   if (fattoreRiduzione > 0) {
-    // Riduzione proporzionale CONTINUA alla velocità attuale, non un
-    // tetto massimo fisso (richiesta esplicita dell'utente — con un
-    // tetto fisso, ci si trovava bloccati esattamente a quel valore,
-    // es. 65 km/h sull'erba, invece di rallentare "e basta" da lì).
-    // (1-fattoreRiduzione)^dt: dopo un secondo pieno sulla superficie,
-    // la velocità è scesa esattamente di quella percentuale rispetto a
-    // quella con cui vi si è entrati, indipendentemente dal framerate.
+    // Perdita proporzionale CONTINUA (non un tetto fisso): dopo un secondo
+    // sulla superficie la velocità è scesa di quella percentuale.
     velocita *= (1 - fattoreRiduzione) ** dt;
   }
-  velocita = Math.max(velocita, 0); // ridondante con i Math.max sopra, ma esplicito: mai negativa
+  velocita = Math.max(velocita, 0);
 
-  // Lo sterzo è proporzionale alla velocità attuale (da fermi girare
-  // il volante non sposta la macchina), ma con un minimo garantito:
-  // senza, sull'erba (dove la velocità cala progressivamente) sterzare
-  // sarebbe via via meno efficace proprio mentre serve di più per
-  // rientrare in pista — ci si restava bloccati (segnalato
-  // dall'utente: "a fatica si rimette al centro").
+  // Sterzo proporzionale alla velocità, con un minimo garantito per poter
+  // rientrare in pista anche piano.
   const frazioneVelocita = velocita / VELOCITA_MASSIMA_BASE;
   const frazioneVelocitaSterzo = Math.max(0.35, frazioneVelocita);
   if (input.sterzaSinistra) x -= VELOCITA_STERZO_LATERALE * dt * frazioneVelocitaSterzo;
   if (input.sterzaDestra) x += VELOCITA_STERZO_LATERALE * dt * frazioneVelocitaSterzo;
 
-  // Effetto centrifugo: la curva del tracciato tira l'auto verso
-  // l'esterno, più forte quanto più si va veloci. Il segno era
-  // invertito: spingeva verso l'INTERNO della curva (nella stessa
-  // direzione in cui si sterza istintivamente entrando in curva) — i
-  // due effetti si sommavano invece di contrastarsi, mandando l'auto
-  // dritta sul muro esterno e bloccandocela (segnalato dall'utente:
-  // "premendo la direzione l'auto lampeggia... si fissa a 65km/h").
-  // Verificato: con curva=-3,98 (sinistra) e sterzo a sinistra tenuto,
-  // x restava fissa esattamente al muro (-16, il limite assoluto) per
-  // tutta la curva.
+  // Effetto centrifugo: la curva tira l'auto verso l'esterno.
   x -= curvaturaSegmentoCorrente * frazioneVelocita * dt * EFFETTO_CENTRIFUGO;
 
   x = limitaXAiMuri(x, semiLarghezzaPista);
@@ -135,5 +169,7 @@ export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLa
     x,
     velocita,
     zona,
+    bloccaggio,
+    sottosterzo: eccessoAderenza > 0.05,
   };
 }

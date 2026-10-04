@@ -152,6 +152,7 @@ export default function GameChampionshipView() {
   const ultimoAggiornamentoHudRef = useRef(0);
   const angoloVolanteRef = useRef(0);
   const offsetSfondoRef = useRef(0);
+  const ultimoDtRef = useRef(0); // per le particelle di fumo, che vivono nel renderer
   const rendererRef = useRef(null);
   if (rendererRef.current === null && typeof document !== 'undefined') {
     rendererRef.current = creaRendererPov((w, h) => {
@@ -591,6 +592,9 @@ export default function GameChampionshipView() {
         livrea: livreaDaId(livreaRef.current),
         sterzo: angoloVolanteRef.current * 0.4,
         offsetSfondo: offsetSfondoRef.current * (W / 1000),
+        fumo: auto.bloccaggio ? 1 : 0,
+        velocita: auto.velocita,
+        dt: ultimoDtRef.current,
         tratti: TRATTI_SCENARIO,
         cartelli: CARTELLI_CURVA,
       });
@@ -613,6 +617,7 @@ export default function GameChampionshipView() {
       const dt = Math.min((timestamp - ultimoTimestamp) / 1000, 0.05);
       ultimoTimestamp = timestamp;
 
+      ultimoDtRef.current = viaRef.current ? dt : 0;
       if (!viaRef.current) {
         disegna();
         requestIdRef.current = requestAnimationFrame(fotogramma);
@@ -698,6 +703,7 @@ export default function GameChampionshipView() {
           giro: giroCorrenteRef.current,
           velocitaKmh: Math.round(statoAutoRef.current.velocita * 3.6),
           zona: statoAutoRef.current.zona,
+          sottosterzo: Boolean(statoAutoRef.current.sottosterzo),
         });
       }
 
@@ -943,6 +949,9 @@ export default function GameChampionshipView() {
               <span className="tab-num">{hud.velocitaKmh} km/h</span>
               {hud.zona !== 'pista' && (
                 <span className="game-championship-view__zona-avviso">{ETICHETTA_ZONA[hud.zona]}</span>
+              )}
+              {hud.sottosterzo && hud.zona === 'pista' && (
+                <span className="game-championship-view__zona-avviso">SOTTOSTERZO</span>
               )}
             </div>
           )}

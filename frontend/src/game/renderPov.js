@@ -509,10 +509,59 @@ export function creaRendererPov(creaCanvas) {
    * scena = {
    *   segmenti: output di calcolaSegmentiVisibili (x,y,z relativi alla camera),
    *   livrea, sterzo (radianti, + = destra), offsetSfondo (pixel di parallasse),
-   *   tratti: Map indiceSegmento -> 'tribuna' | 'cartelloni' (dove mettere cosa)
+   *   tratti: Map indiceSegmento -> 'tribuna' | 'cartelloni' (dove mettere cosa),
+   *   cartelli: Map indiceSegmento -> cartello di velocità,
+   *   fumo: 0..1 (gomme bloccate in frenata), velocita (m/s), dt (s)
    * }
    */
   let cartelliScena = null;
+  // Fumo delle gomme in frenata: particelle nello spazio della camera.
+  const fumo = [];
+  const MAX_FUMO = 90;
+
+  function aggiornaFumo(dt, intensita, velocita) {
+    for (let i = fumo.length - 1; i >= 0; i--) {
+      const p = fumo[i];
+      p.vita += dt;
+      if (p.vita >= p.durata) {
+        fumo.splice(i, 1);
+        continue;
+      }
+      p.z -= p.vz * dt;
+      p.y += 1.1 * S * dt;
+      p.x += p.vx * dt;
+      p.r += 0.9 * S * dt;
+    }
+    if (intensita <= 0) return;
+    const nuove = Math.min(6, Math.ceil(intensita * 60 * dt * 3));
+    for (let k = 0; k < nuove && fumo.length < MAX_FUMO; k++) {
+      const lato = k % 2 ? 1 : -1;
+      fumo.push({
+        // tra asfalto e gomma, sul lato esterno della ruota, appena dietro il contatto
+        x: lato * (RUOTA.x + RUOTA.w * (0.2 + Math.random() * 0.4)),
+        y: Y_TERRA + 0.05 * S,
+        z: RUOTA.z - RUOTA.r * (0.2 + Math.random() * 0.5),
+        vx: lato * (0.4 + Math.random() * 0.6) * S,
+        vz: Math.min(5, velocita * 0.05) + Math.random() * 1.5, // scivola indietro, verso la camera
+        r: 0.1 * S,
+        vita: 0,
+        durata: 0.3 + Math.random() * 0.2,
+      });
+    }
+  }
+
+  function disegnaFumo(ctx, v) {
+    for (const p of fumo) {
+      if (p.z < 1.2) continue;
+      const [x, y] = v.p(p.x, p.y, p.z);
+      const r = Math.min(v.W * 0.07, (v.f * p.r) / p.z);
+      const alfa = 0.5 * (1 - p.vita / p.durata);
+      ctx.fillStyle = `rgba(235,235,235,${alfa.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.ellipse(x, y - r * 0.3, r, r * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   function disegna(ctx, W, H, scena) {
     const c = prepara(W, H, scena.livrea);
@@ -647,6 +696,8 @@ export function creaRendererPov(creaCanvas) {
     const sterzo = scena.sterzo || 0;
     disegnaRuota(ctx, v, -1, sterzo);
     disegnaRuota(ctx, v, 1, sterzo);
+    aggiornaFumo(scena.dt || 0, scena.fumo || 0, scena.velocita || 0);
+    disegnaFumo(ctx, v);
     const y0a = Math.floor(H * 0.36);
     ctx.drawImage(c.davanti, 0, y0a, W, H - y0a, 0, y0a, W, H - y0a);
   }
