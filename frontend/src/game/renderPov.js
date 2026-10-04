@@ -537,11 +537,32 @@ export function creaRendererPov(creaCanvas) {
 
     const seg = scena.segmenti;
     // proiezione dei bordi di ogni segmento (una sola volta)
+    // Il primo segmento comincia fino a 7 m DIETRO la camera: saltarlo
+    // lasciava scoperta (prato di base) la fascia più vicina, e il suo bordo
+    // saltava avanti e indietro a ogni segmento: era il verde che sfarfallava
+    // in basso. Ora il tratto più vicino è tagliato esattamente a z = VICINO.
+    const VICINO = 0.5;
     const P = [];
+    let precedente = null;
     for (const s of seg) {
-      if (s.z <= 0.5) continue;
-      const k = f / s.z;
-      P.push({ s, k, x: cx + s.x * k, y: oy - s.y * k });
+      const q = s;
+      if (s.z <= VICINO) {
+        precedente = s;
+        continue;
+      }
+      if (precedente && P.length === 0) {
+        const t = (VICINO - precedente.z) / (s.z - precedente.z);
+        const tagliato = {
+          ...precedente,
+          x: precedente.x + (s.x - precedente.x) * t,
+          y: precedente.y + (s.y - precedente.y) * t,
+          z: VICINO,
+        };
+        const kt = f / VICINO;
+        P.push({ s: tagliato, k: kt, x: cx + tagliato.x * kt, y: oy - tagliato.y * kt });
+      }
+      const k = f / q.z;
+      P.push({ s: q, k, x: cx + q.x * k, y: oy - q.y * k });
     }
 
     const limite = W * 4;
@@ -575,7 +596,7 @@ export function creaRendererPov(creaCanvas) {
       const alto = b.y - a.y; // pixel di altezza del tratto
 
       // prato a bande alternate
-      if (alto > 0.6) quad(a, b, -90, 90, Math.floor(idx / 2) % 2 ? '#43a047' : '#4caf50');
+      if (alto > 0.6) quad(a, b, -90, 90, Math.floor(idx / 2) % 2 ? '#48a94c' : '#4caf50'); // contrasto lieve: da vicino bande forti lampeggiano
 
       // barriera/muro ai bordi
       if (alto > 0.4 && b.s.z < 700) {
