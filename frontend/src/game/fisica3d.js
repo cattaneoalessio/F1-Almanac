@@ -47,6 +47,21 @@ const SPINTA_SOTTOSTERZO_MASSIMA = 20;
 const ATTRITO_SOTTOSTERZO = 40; // m/s² di velocità persa per ogni 100% oltre l'aderenza
 const ATTRITO_SOTTOSTERZO_MASSIMO = 15;
 
+// Scia: dietro un'altra auto, entro SCIA_DISTANZA metri, si guadagnano
+// fino a 10 km/h di velocità (meno resistenza dell'aria, tetto più alto).
+export const SCIA_DISTANZA = 50;
+const SCIA_BONUS = 10 / 3.6;
+
+/** Accelerazione massima in pieno gas a una data velocità (anche per i bot). */
+export function accelerazioneMassima(velocita, scia = 0) {
+  const asintoto = VELOCITA_ASINTOTICA + SCIA_BONUS * scia;
+  return Math.max(0, Math.min(ACCELERAZIONE_TRAZIONE, ACCELERAZIONE_MOTORE * (1 - (velocita / asintoto) ** 2)));
+}
+/** Decelerazione in frenata piena a una data velocità (anche per i bot). */
+export function frenataMassima(velocita) {
+  return FRENO_BASE + FRENO_AERO * (velocita / VELOCITA_ASINTOTICA) ** 2;
+}
+
 // Fumo dalle gomme: una frenata iniziata sopra i 300 km/h blocca le
 // anteriori finché non si scende sotto i 150 o si rilascia il freno.
 const SOGLIA_BLOCCAGGIO = 300 / 3.6;
@@ -119,9 +134,9 @@ export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLa
   const { distanza } = stato;
   const quadratoVelocita = (velocita / VELOCITA_ASINTOTICA) ** 2;
 
+  const scia = input.scia || 0;
   if (input.accelera && !input.frena) {
-    const spinta = Math.min(ACCELERAZIONE_TRAZIONE, ACCELERAZIONE_MOTORE * (1 - quadratoVelocita));
-    velocita += Math.max(0, spinta) * dt;
+    velocita += accelerazioneMassima(velocita, scia) * dt;
   } else if (input.frena) {
     if (!bloccaggio && velocita >= SOGLIA_BLOCCAGGIO) bloccaggio = true;
     velocita = Math.max(0, velocita - (FRENO_BASE + FRENO_AERO * quadratoVelocita) * dt);
@@ -129,7 +144,7 @@ export function avanzaFisica(stato, input, dt, curvaturaSegmentoCorrente, semiLa
     velocita = Math.max(0, velocita - (DECELERAZIONE_RILASCIO_BASE + DECELERAZIONE_RILASCIO_AERO * quadratoVelocita) * dt);
   }
   if (!input.frena || velocita < FINE_BLOCCAGGIO) bloccaggio = false;
-  velocita = Math.min(velocita, VELOCITA_MASSIMA_BASE);
+  velocita = Math.min(velocita, VELOCITA_MASSIMA_BASE + SCIA_BONUS * scia);
 
   // Sottosterzo: oltre la velocità di aderenza della curva l'auto allarga
   // (spinta verso l'esterno) e le gomme che strisciano la rallentano.

@@ -489,6 +489,7 @@ function rettangoloVetro(v, lato) {
   return [Math.round(xa), Math.round(ya), Math.round(xb), Math.round(yb)];
 }
 
+const LUNGHEZZA_PROPRIA_AUTO = 3; // metri di auto alle spalle della camera
 const SEGMENTI_RETRO = 80; // ~560 m alle spalle: abbastanza per vedere chi arriva
 const ALTEZZA_SPECCHIO = SPECCHIO.y * S; // metri da terra
 
@@ -521,7 +522,7 @@ export function segmentiDietro(camera, numero = SEGMENTI_RETRO) {
  * ciò che sta alla tua destra, dietro, compare a destra nello specchio.
  * Un pezzo della propria pancia occupa il bordo interno, come nella realtà.
  */
-function disegnaVistaPosteriore(g, w, h, dietro, lato, livrea) {
+function disegnaVistaPosteriore(g, w, h, dietro, lato, livrea, auto = [], spriteFronte = null) {
   const f = w * 0.95;
   const oy = h * 0.42;
   const cx = w / 2;
@@ -580,6 +581,17 @@ function disegnaVistaPosteriore(g, w, h, dietro, lato, livrea) {
     quad(a, b, -SEMI_PISTA, SEMI_PISTA, idx % 2 ? '#4b4b4b' : '#474747');
   }
 
+  // avversari alle spalle (visti di fronte), dal più lontano al più vicino
+  if (spriteFronte && auto && auto.length) {
+    const dietroAuto = auto
+      .filter((a) => a.dz < -LUNGHEZZA_PROPRIA_AUTO && a.dz > -560)
+      .map((a) => ({ ...a, z: -a.dz + SPECCHIO.z, nome: null }))
+      .sort((p1, p2) => p2.z - p1.z);
+    // nello specchio la x della strada è già relativa allo specchio: P[].s.x - dx
+    const Pspecchio = P.map((q) => ({ ...q, s: { ...q.s, x: q.s.x - dx, y: q.s.y - yRel, z: q.s.z + SPECCHIO.z } }));
+    disegnaAutoNelTratto(g, dietroAuto, Pspecchio, f, cx, oy, spriteFronte, LARGHEZZA_AUTO_SPRITE, false);
+  }
+
   // la propria pancia sul bordo interno (in basso verso il centro auto)
   const interno = lato < 0 ? w : 0;
   const verso = lato < 0 ? -1 : 1;
@@ -601,6 +613,149 @@ function disegnaVistaPosteriore(g, w, h, dietro, lato, livrea) {
   g.lineTo(0, h);
   g.closePath();
   g.fill();
+}
+
+// ---------------------------------------------------------------------------
+// Avversari: sprite visti da dietro (strada davanti) e da davanti (specchietti)
+// ---------------------------------------------------------------------------
+const SPRITE_W = 256;
+const SPRITE_H = 120; // 3 m di larghezza x ~1,4 m di altezza
+export const LARGHEZZA_AUTO_SPRITE = 3; // metri: come la larghezza dell'auto in fisica3d.js
+
+function rr(g, x, y, w, h, r) {
+  g.beginPath();
+  if (g.roundRect) g.roundRect(x, y, w, h, r);
+  else g.rect(x, y, w, h);
+  g.fill();
+}
+
+function preparaAutoRetro(crea, liv) {
+  const c = crea(SPRITE_W, SPRITE_H);
+  const g = c.getContext('2d');
+  const W = SPRITE_W;
+  const H = SPRITE_H;
+  // gomme posteriori
+  g.fillStyle = '#121212';
+  rr(g, W * 0.02, H * 0.42, W * 0.2, H * 0.58, W * 0.03);
+  rr(g, W * 0.78, H * 0.42, W * 0.2, H * 0.58, W * 0.03);
+  // fondo/diffusore
+  g.fillStyle = '#1b1b1d';
+  g.fillRect(W * 0.2, H * 0.72, W * 0.6, H * 0.24);
+  g.strokeStyle = '#3a3a3e';
+  g.lineWidth = 2;
+  for (let i = 1; i < 6; i++) {
+    g.beginPath();
+    g.moveTo(W * (0.2 + i * 0.1), H * 0.74);
+    g.lineTo(W * (0.2 + i * 0.1), H * 0.96);
+    g.stroke();
+  }
+  // carrozzeria: cofano motore e pance
+  const gr = g.createLinearGradient(0, H * 0.3, 0, H * 0.8);
+  gr.addColorStop(0, liv.luce);
+  gr.addColorStop(0.5, liv.base);
+  gr.addColorStop(1, liv.ombra);
+  g.fillStyle = gr;
+  g.beginPath();
+  g.moveTo(W * 0.22, H * 0.74);
+  g.lineTo(W * 0.3, H * 0.5);
+  g.lineTo(W * 0.42, H * 0.38);
+  g.lineTo(W * 0.58, H * 0.38);
+  g.lineTo(W * 0.7, H * 0.5);
+  g.lineTo(W * 0.78, H * 0.74);
+  g.closePath();
+  g.fill();
+  // luce posteriore
+  g.fillStyle = '#ff1a1a';
+  g.fillRect(W * 0.47, H * 0.66, W * 0.06, H * 0.08);
+  // ala posteriore: piloni, piano principale, paratie
+  g.fillStyle = '#18181b';
+  g.fillRect(W * 0.47, H * 0.14, W * 0.06, H * 0.3);
+  g.fillStyle = liv.base;
+  g.fillRect(W * 0.14, H * 0.06, W * 0.72, H * 0.12);
+  g.fillStyle = liv.accento;
+  g.fillRect(W * 0.14, H * 0.06, W * 0.72, H * 0.035);
+  g.fillStyle = '#18181b';
+  g.fillRect(W * 0.12, H * 0.02, W * 0.035, H * 0.36);
+  g.fillRect(W * 0.845, H * 0.02, W * 0.035, H * 0.36);
+  return c;
+}
+
+function preparaAutoFronte(crea, liv) {
+  const c = crea(SPRITE_W, SPRITE_H);
+  const g = c.getContext('2d');
+  const W = SPRITE_W;
+  const H = SPRITE_H;
+  g.fillStyle = '#121212';
+  rr(g, W * 0.04, H * 0.38, W * 0.18, H * 0.58, W * 0.03);
+  rr(g, W * 0.78, H * 0.38, W * 0.18, H * 0.58, W * 0.03);
+  // pance e telaio
+  g.fillStyle = liv.ombra;
+  g.fillRect(W * 0.22, H * 0.52, W * 0.56, H * 0.24);
+  const gr = g.createLinearGradient(0, H * 0.2, 0, H * 0.8);
+  gr.addColorStop(0, liv.luce);
+  gr.addColorStop(1, liv.base);
+  g.fillStyle = gr;
+  g.beginPath();
+  g.moveTo(W * 0.4, H * 0.82);
+  g.lineTo(W * 0.43, H * 0.4);
+  g.lineTo(W * 0.57, H * 0.4);
+  g.lineTo(W * 0.6, H * 0.82);
+  g.closePath();
+  g.fill();
+  // halo e casco
+  g.strokeStyle = '#18181b';
+  g.lineWidth = H * 0.06;
+  g.beginPath();
+  g.moveTo(W * 0.36, H * 0.42);
+  g.quadraticCurveTo(W * 0.5, H * 0.12, W * 0.64, H * 0.42);
+  g.stroke();
+  g.fillStyle = liv.accento;
+  g.beginPath();
+  g.arc(W * 0.5, H * 0.36, H * 0.08, 0, Math.PI * 2);
+  g.fill();
+  // alettone anteriore, basso e largo
+  g.fillStyle = '#26272b';
+  g.fillRect(W * 0.08, H * 0.84, W * 0.84, H * 0.1);
+  g.fillStyle = liv.base;
+  g.fillRect(W * 0.08, H * 0.8, W * 0.84, H * 0.05);
+  return c;
+}
+
+/** Disegna le auto con z (profondità) nel tratto [zMin, zMax) — chiamato dal ciclo pista, dal lontano al vicino. */
+function disegnaAutoNelTratto(ctx, lista, P, f, cx, oy, sprite, larghezzaMondo, nome) {
+  for (const auto of lista) {
+    // posizione della strada alla profondità dell'auto (P è ordinato per z crescente)
+    let j = 1;
+    while (j < P.length && P[j].s.z < auto.z) j++;
+    if (j >= P.length) continue;
+    const a = P[j - 1];
+    const b = P[j];
+    const t = (auto.z - a.s.z) / (b.s.z - a.s.z);
+    const xs = a.s.x + (b.s.x - a.s.x) * t;
+    const ys = a.s.y + (b.s.y - a.s.y) * t;
+    const k = f / auto.z;
+    const w = larghezzaMondo * k;
+    if (w < 2) continue;
+    const h = (w * SPRITE_H) / SPRITE_W;
+    const x = cx + (xs + auto.x) * k;
+    const y = oy - ys * k;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(x, y, w * 0.5, Math.max(1, w * 0.06), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.drawImage(sprite(auto.livrea), x - w / 2, y - h, w, h);
+    if (nome && auto.nome && auto.z < 70 && w > 30) {
+      ctx.font = `700 ${Math.round(Math.max(11, w * 0.11))}px "Big Shoulders Display", "Arial Narrow", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      const testo = auto.nome.toUpperCase();
+      const tw = ctx.measureText(testo).width + 8;
+      ctx.fillStyle = 'rgba(11,12,16,0.7)';
+      ctx.fillRect(x - tw / 2, y - h - w * 0.2, tw, w * 0.15);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(testo, x, y - h - w * 0.06);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -653,6 +808,16 @@ export function creaRendererPov(creaCanvas) {
    * }
    */
   let cartelliScena = null;
+  const spriteRetro = new Map();
+  const spriteFronte = new Map();
+  const retro = (liv) => {
+    if (!spriteRetro.has(liv.base)) spriteRetro.set(liv.base, preparaAutoRetro(creaCanvas, liv));
+    return spriteRetro.get(liv.base);
+  };
+  const fronte = (liv) => {
+    if (!spriteFronte.has(liv.base)) spriteFronte.set(liv.base, preparaAutoFronte(creaCanvas, liv));
+    return spriteFronte.get(liv.base);
+  };
   // Fumo delle gomme in frenata: particelle nello spazio della camera.
   const fumo = [];
   const MAX_FUMO = 90;
@@ -765,6 +930,18 @@ export function creaRendererPov(creaCanvas) {
       ctx.fill();
     };
 
+    // avversari davanti (z = metri avanti alla camera), dal più lontano al più vicino
+    const autoDavanti = (scena.auto || [])
+      .filter((a) => a.dz > 1 && a.dz < 1500)
+      .map((a) => ({ ...a, z: a.dz }))
+      .sort((p1, p2) => p2.z - p1.z);
+    let prossimaAuto = 0;
+    const disegnaAutoFinoA = (zLimite) => {
+      const gruppo = [];
+      while (prossimaAuto < autoDavanti.length && autoDavanti[prossimaAuto].z >= zLimite) gruppo.push(autoDavanti[prossimaAuto++]);
+      if (gruppo.length) disegnaAutoNelTratto(ctx, gruppo, P, f, cx, oy, retro, LARGHEZZA_AUTO_SPRITE, true);
+    };
+
     let accumulato = null; // tratti lontani sotto il pixel: si uniscono in un'unica striscia
     for (let i = P.length - 1; i > 0; i--) {
       const b = P[i - 1]; // vicino
@@ -776,6 +953,7 @@ export function creaRendererPov(creaCanvas) {
       if (b.y - (accumulato || P[i]).y < 1 && i > 1) {
         if (!accumulato) accumulato = P[i];
         if (b.s.z < 900) disegnaScenario(ctx, c, P[i], b, idx, scena.tratti.get(idx), Math.abs(b.s.curva));
+        disegnaAutoFinoA(b.s.z);
         continue;
       }
       const a = accumulato || P[i]; // lontano
@@ -825,7 +1003,9 @@ export function creaRendererPov(creaCanvas) {
 
       // scenario (dal più lontano al più vicino, insieme alla pista)
       if (b.s.z < 900) disegnaScenario(ctx, c, a, b, idx, scena.tratti.get(idx), Math.abs(b.s.curva));
+      disegnaAutoFinoA(b.s.z);
     }
+    disegnaAutoFinoA(0);
 
     // monoposto: dietro -> ruote -> davanti
     // copia solo la fascia dello schermo occupata da ciascun livello
@@ -843,7 +1023,7 @@ export function creaRendererPov(creaCanvas) {
     if (scena.dietro) {
       for (const sp of c.specchi) {
         const cv = sp.canvas;
-        disegnaVistaPosteriore(cv.getContext('2d'), cv.width, cv.height, scena.dietro, sp.lato, scena.livrea);
+        disegnaVistaPosteriore(cv.getContext('2d'), cv.width, cv.height, scena.dietro, sp.lato, scena.livrea, scena.auto, fronte);
         ctx.drawImage(cv, sp.r[0], sp.r[1]);
       }
     }

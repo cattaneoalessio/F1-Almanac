@@ -190,6 +190,18 @@ export async function getMioRecord(slug, token) {
   return risposta.json();
 }
 
+/** Le migliori gare registrate da altri utenti sul circuito (max 19), con
+ * i tempi ai checkpoint: diventano gli avversari della Gara. Login
+ * facoltativo (serve solo a escludere la propria gara). */
+export async function getAvversariGara(slug, token) {
+  const url = new URL(`/game/avversari-gara/${encodeURIComponent(slug)}`, BASE_URL);
+  const risposta = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!risposta.ok) {
+    throw new Error(`Errore ${risposta.status} chiamando ${url.pathname}`);
+  }
+  return risposta.json();
+}
+
 /** Posizione di partenza in griglia per la Gara, basata sulla classifica
  * Qualifica del circuito. Login facoltativo: senza token o senza un
  * tempo di qualifica lì, posizione è null (si parte comunque, dal

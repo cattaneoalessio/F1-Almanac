@@ -636,3 +636,26 @@ body.gioco-fullscreen-pagina-intera {
   overflow: hidden;
 }
 .game-championship-view__livrea-campione span { position: absolute; left: 42%; top: 0; bottom: 0; width: 16%; }
+
+/* --- Avversari: scia, posizione in gara, arrivo --- */
+.game-championship-view__scia {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(63, 208, 255, 0.85);
+  color: #0b0c10;
+  text-shadow: none;
+}
+.game-championship-view__posizione {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(11, 12, 16, 0.75);
+  color: var(--accent-gold);
+  font-size: 1.05rem;
+}
+.game-championship-view__riepilogo-posizione {
+  display: block;
+  margin-top: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--accent-gold);
+}

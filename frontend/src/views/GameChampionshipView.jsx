@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import {
   getClassificaCampionato,
   getClassificaTempiCircuito,
+  getAvversariGara,
   getGrigliaPartenza,
   getMioRecord,
   inviaTempoGioco,
@@ -15,11 +16,21 @@ import {
   FORMA_MINIMAPPA,
   indiciCheckpoint,
   LARGHEZZA_PISTA,
+  LUNGHEZZA_CIRCUITO,
   LUNGHEZZA_SEGMENTO,
   NUMERO_SEGMENTI_TOTALE,
   segmentoA,
   controllaCatturaCheckpointSegmento,
 } from '../game/circuito3d.js';
+import {
+  aggiornaAvversari,
+  creaBotQualifica,
+  creaGriglia,
+  interazioniGiocatore,
+  posizioneInGara,
+  separaAvversari,
+  tempoFinaleStimato,
+} from '../game/avversari.js';
 import { ALTEZZA_CAMERA, calcolaTratti, creaRendererPov, FRAZIONE_ORIZZONTE, LIVREE, livreaDaId, segmentiDietro } from '../game/renderPov.js';
 import { avanzaFisica, statoIniziale, VELOCITA_MASSIMA_BASE } from '../game/fisica3d.js';
 import { coloreGiro, estraiCheckpointDelGiro, trovaMigliorGiroValido } from '../game/sessione.js';
@@ -152,6 +163,10 @@ export default function GameChampionshipView() {
   const ultimoAggiornamentoHudRef = useRef(0);
   const angoloVolanteRef = useRef(0);
   const offsetSfondoRef = useRef(0);
+  const avversariRef = useRef([]); // bot (Qualifica) o griglia (Gara); vuoto in Prove Libere
+  const sciaRef = useRef(0);
+  const ultimoTamponamentoRef = useRef(-Infinity);
+  const [posizioneGara, setPosizioneGara] = useState(null);
   const ultimoDtRef = useRef(0); // per le particelle di fumo, che vivono nel renderer
   const rendererRef = useRef(null);
   if (rendererRef.current === null && typeof document !== 'undefined') {
@@ -597,6 +612,11 @@ export default function GameChampionshipView() {
         dt: ultimoDtRef.current,
         // specchietti con vista posteriore solo in Qualifica e Gara (decisione del 4/10)
         dietro: tipoSessione === 'prove_libere' ? null : segmentiDietro(camera),
+        auto: avversariRef.current.map((a) => {
+          let dz = a.distanza - auto.distanza;
+          if (tipoSessione === 'qualifica') dz = ((((dz + LUNGHEZZA_CIRCUITO / 2) % LUNGHEZZA_CIRCUITO) + LUNGHEZZA_CIRCUITO) % LUNGHEZZA_CIRCUITO) - LUNGHEZZA_CIRCUITO / 2;
+          return { dz, x: a.x, livrea: a.livrea, nome: a.tipo === 'fantasma' ? a.nome : null };
+        }),
         tratti: TRATTI_SCENARIO,
         cartelli: CARTELLI_CURVA,
       });
@@ -627,7 +647,30 @@ export default function GameChampionshipView() {
       }
 
       const segmentoAttuale = segmentoA(Math.floor(statoAutoRef.current.distanza / LUNGHEZZA_SEGMENTO));
-      statoAutoRef.current = avanzaFisica(statoAutoRef.current, inputRef.current, dt, segmentoAttuale.curva, SEMI_LARGHEZZA_PISTA);
+      statoAutoRef.current = avanzaFisica(
+        statoAutoRef.current,
+        { ...inputRef.current, scia: sciaRef.current },
+        dt,
+        segmentoAttuale.curva,
+        SEMI_LARGHEZZA_PISTA
+      );
+
+      // Avversari: si muovono, poi contatti e scia col giocatore.
+      if (avversariRef.current.length > 0) {
+        const circolare = tipoSessione === 'qualifica';
+        const secondi = (performance.now() - tempoInizioRef.current) / 1000;
+        aggiornaAvversari(avversariRef.current, statoAutoRef.current, dt, { tempoGara: secondi, circolare });
+        const giocatore = { ...statoAutoRef.current };
+        const esito = interazioniGiocatore(giocatore, avversariRef.current, {
+          circolare,
+          ultimoTamponamento: ultimoTamponamentoRef.current,
+          adesso: secondi,
+        });
+        separaAvversari(avversariRef.current, circolare);
+        statoAutoRef.current = { ...statoAutoRef.current, distanza: giocatore.distanza, x: giocatore.x, velocita: giocatore.velocita };
+        sciaRef.current = esito.scia;
+        if (esito.tamponamento) ultimoTamponamentoRef.current = secondi;
+      }
 
       // Parallasse delle montagne: in curva lo sfondo scorre in senso opposto alla piega.
       offsetSfondoRef.current += segmentoAttuale.curva * statoAutoRef.current.velocita * dt * 0.35;
@@ -641,6 +684,11 @@ export default function GameChampionshipView() {
       if (nuovoAtteso !== checkpointAttesoRef.current) {
         const tSessione = adesso - tempoInizioRef.current;
         telemetriaRef.current.push({ giro: giroCorrenteRef.current, indice: checkpointAttesoRef.current, t: tSessione });
+
+        if (tipoSessione === 'gara' && avversariRef.current.length > 0) {
+          // posizione aggiornata ai passaggi sugli intermedi (e al traguardo)
+          setPosizioneGara(posizioneInGara(statoAutoRef.current.distanza, avversariRef.current));
+        }
 
         if (checkpointAttesoRef.current < 3) {
           // S1/S2/S3 di QUESTO giro (indice 3 è il traguardo, gestito
@@ -706,6 +754,8 @@ export default function GameChampionshipView() {
           velocitaKmh: Math.round(statoAutoRef.current.velocita * 3.6),
           zona: statoAutoRef.current.zona,
           sottosterzo: Boolean(statoAutoRef.current.sottosterzo),
+          contatto: (performance.now() - tempoInizioRef.current) / 1000 - ultimoTamponamentoRef.current < 1.2,
+          scia: sciaRef.current > 0,
         });
       }
 
@@ -747,17 +797,32 @@ export default function GameChampionshipView() {
       })
       .catch((errore) => console.error('Errore nel caricare il mio record personale:', errore));
 
+    avversariRef.current = [];
+    sciaRef.current = 0;
+    ultimoTamponamentoRef.current = -Infinity;
+    setPosizioneGara(null);
+    if (tipo === 'qualifica') avversariRef.current = creaBotQualifica(10);
+
     if (tipo === 'gara') {
+      // griglia provvisoria di soli bot (si parte dal fondo), sostituita appena
+      // arrivano griglia e gare registrate, se arrivano prima del via
+      const applica = (griglia) => {
+        avversariRef.current = griglia.avversari;
+        statoAutoRef.current = { ...statoAutoRef.current, x: griglia.xGiocatore };
+        setPosizioneGara(griglia.posto);
+        setGrigliaInfo({ posizione: griglia.posto, piloti_totali: 20 });
+      };
+      applica(creaGriglia([], null));
       setStatoGriglia('caricamento');
       ottieniToken()
-        .then((token) => getGrigliaPartenza(CIRCUITO_SLUG, token))
-        .then((dati) => {
-          setGrigliaInfo(dati);
+        .then((token) => Promise.all([getGrigliaPartenza(CIRCUITO_SLUG, token), getAvversariGara(CIRCUITO_SLUG, token).catch(() => [])]))
+        .then(([dati, registrati]) => {
+          if (!viaRef.current) applica(creaGriglia(registrati, dati.posizione));
           setStatoGriglia('pronto');
         })
         .catch((errore) => {
           console.error('Errore nel caricare la griglia di partenza:', errore);
-          setStatoGriglia('errore');
+          setStatoGriglia('pronto'); // si corre comunque, dal fondo, contro i bot
         });
     } else {
       setGrigliaInfo(null);
@@ -857,7 +922,10 @@ export default function GameChampionshipView() {
 
   function concludiGara(tempoTotaleSecondi) {
     const telemetria = [...telemetriaRef.current];
-    setRisultatoFinale({ tempoTotale: tempoTotaleSecondi });
+    const distanzaGara = GIRI_GARA * LUNGHEZZA_CIRCUITO;
+    const posizioneFinale =
+      1 + avversariRef.current.filter((a) => tempoFinaleStimato(a, tempoTotaleSecondi, distanzaGara) < tempoTotaleSecondi).length;
+    setRisultatoFinale({ tempoTotale: tempoTotaleSecondi, posizione: avversariRef.current.length ? posizioneFinale : null });
     setFase('riepilogo');
     inviaERicaricaClassifica(tempoTotaleSecondi, telemetria);
   }
@@ -955,6 +1023,9 @@ export default function GameChampionshipView() {
               {hud.sottosterzo && hud.zona === 'pista' && (
                 <span className="game-championship-view__zona-avviso">SOTTOSTERZO</span>
               )}
+              {hud.contatto && <span className="game-championship-view__zona-avviso">CONTATTO</span>}
+              {hud.scia && !hud.contatto && <span className="game-championship-view__scia">SCIA</span>}
+              {tipoSessione === 'gara' && posizioneGara && <span className="tab-num game-championship-view__posizione">P{posizioneGara}/20</span>}
             </div>
           )}
 
@@ -1090,6 +1161,11 @@ export default function GameChampionshipView() {
             <span className="game-championship-view__riepilogo-tempo tab-num">
               {formattaTempo(risultatoFinale?.tempoTotale)}
             </span>
+            {risultatoFinale?.posizione && (
+              <span className="game-championship-view__riepilogo-posizione">
+                Arrivo: P{risultatoFinale.posizione} su 20
+              </span>
+            )}
 
             {statoInvio === 'nessun-tempo' && (
               <p className="game-championship-view__esito">Nessun giro completato entro il tempo limite &mdash; riprova.</p>

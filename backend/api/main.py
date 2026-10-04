@@ -35,6 +35,7 @@ Poi apri http://127.0.0.1:8000/docs per la documentazione interattiva
 generata automaticamente da FastAPI.
 """
 from datetime import date, datetime, timezone
+import json
 import os
 from typing import Optional
 
@@ -1562,6 +1563,59 @@ def mio_record(slug: str, authorization: str = Header(default="")):
         conn.close()
 
     return RispostaMioRecord(**valori)
+
+
+@app.get("/game/avversari-gara/{slug}")
+def avversari_gara(slug: str, authorization: str = Header(default="")):
+    """Le migliori gare registrate su questo circuito (max 19), per far
+    correre il giocatore contro di esse: username, tempo totale, tempo di
+    qualifica (per l'ordine in griglia, può essere null) e checkpoint
+    (3 intermedi + traguardo per giro). Login facoltativo: se il token è
+    valido, la propria gara viene esclusa (non si corre contro se stessi).
+    Dati già pubblici nella classifica; la telemetria contiene solo tempi."""
+    token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else None
+    conn = get_connection()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            circuito = _circuito_da_slug(cur, slug)
+            if circuito is None:
+                raise HTTPException(status_code=404, detail="Circuito non trovato.")
+            utente_id, _username = utente_da_token(cur, token) if token else (None, None)
+            cur.execute(
+                """
+                SELECT u.username, g.tempo_totale, g.telemetria_json, q.tempo_totale AS tempo_qualifica
+                FROM gioco_tempi g
+                JOIN utenti u ON u.id = g.utente_id
+                LEFT JOIN gioco_tempi q
+                  ON q.utente_id = g.utente_id AND q.circuito_id = g.circuito_id AND q.tipo_sessione = 'qualifica'
+                WHERE g.circuito_id = %(c)s AND g.tipo_sessione = 'gara'
+                  AND (%(u)s::int IS NULL OR g.utente_id <> %(u)s::int)
+                ORDER BY g.tempo_totale ASC
+                LIMIT 19
+                """,
+                {"c": circuito["id"], "u": utente_id},
+            )
+            righe = cur.fetchall()
+    finally:
+        conn.close()
+
+    risultato = []
+    for r in righe:
+        telemetria = r["telemetria_json"]
+        if isinstance(telemetria, str):
+            telemetria = json.loads(telemetria)
+        if not isinstance(telemetria, list) or len(telemetria) != 40:
+            continue  # gara senza telemetria completa: non ricostruibile
+        risultato.append(
+            {
+                "username": r["username"],
+                "tempo_totale": float(r["tempo_totale"]),
+                "tempo_qualifica": float(r["tempo_qualifica"]) if r["tempo_qualifica"] is not None else None,
+                "checkpoint": [{"giro": int(c["giro"]), "indice": int(c["indice"]), "t": float(c["t"])} for c in telemetria],
+            }
+        )
+    return risultato
 
 
 @app.get("/game/griglia/{slug}", response_model=RispostaGriglia)
