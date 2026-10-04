@@ -17,10 +17,10 @@ import {
   LARGHEZZA_PISTA,
   LUNGHEZZA_SEGMENTO,
   NUMERO_SEGMENTI_TOTALE,
-  proietta,
   segmentoA,
   controllaCatturaCheckpointSegmento,
 } from '../game/circuito3d.js';
+import { ALTEZZA_CAMERA, calcolaTratti, creaRendererPov, FRAZIONE_ORIZZONTE, LIVREE, livreaDaId } from '../game/renderPov.js';
 import { avanzaFisica, statoIniziale, VELOCITA_MASSIMA_BASE } from '../game/fisica3d.js';
 import { coloreGiro, estraiCheckpointDelGiro, trovaMigliorGiroValido } from '../game/sessione.js';
 import './GameChampionshipView.css';
@@ -51,18 +51,13 @@ const NUMERO_SEGMENTI_VISIBILI = 300; // ~2100m di pista visibile (7m/segmento) 
 // Telecamera in terza persona, dietro e sopra l'auto (cambio deciso
 // insieme all'utente dopo aver visto un riferimento fotografico: non
 // più la vista "dentro l'abitacolo" della prima stesura).
-const DISTANZA_CAMERA_DIETRO = 10; // metri dietro l'auto lungo il tracciato
-const ALTEZZA_CAMERA_SOPRA = 3.4; // metri sopra il piano stradale del punto in cui si trova la telecamera — alzata (era 2.3): con la telecamera bassa l'auto in primo piano copriva troppa pista, rendendo difficile capire quando curvare (segnalato dall'utente, confrontato con foto di riferimento di viste POV reali)
-const FATTORE_SEGUI_LATERALE = 0.7; // quanto la telecamera insegue lo scarto laterale dell'auto (0=fissa sul centro pista, 1=insegue in pieno, annullando ogni feedback visivo dello sterzo)
-const LARGHEZZA_AUTO_MONDO = 3; // metri, stessa larghezza di fisica3d.js (LARGHEZZA_AUTO)
-const CAMPO_VISIVO_GRADI = 100;
-const PROFONDITA_CAMERA = 1 / Math.tan((CAMPO_VISIVO_GRADI / 2) * (Math.PI / 180));
-// Inclinazione della visuale verso l'orizzonte: alza la prospettiva
-// per vedere le curve in anticipo (richiesta esplicita dell'utente,
-// verificata col segno giusto tramite screenshot prima di integrarla).
-const INCLINAZIONE_CAMERA_GRADI = 30; // richiesto ancora 15 gradi in piu' oltre ai 15 precedenti
-const INCLINAZIONE_CAMERA_RADIANTI = (INCLINAZIONE_CAMERA_GRADI * Math.PI) / 180;
-const SEGMENTI_PER_STRISCIA_CORDOLO = 4;
+// Visuale ONBOARD (camera sopra l'halo): proiezione, monoposto e scenario
+// sono in game/renderPov.js. La camera segue in pieno lo scarto laterale
+// dell'auto: è il pilota a guardare, la pista scorre ai lati.
+const PIXEL_RATIO_MASSIMO = 1.5; // oltre, su telefoni ad alta densità, si paga in fps senza vedere differenze
+const CHIAVE_LIVREA = 'monoposto_livrea';
+// Tribune sui rettilinei lunghi: calcolate una volta per tutto il tracciato.
+const TRATTI_SCENARIO = calcolaTratti(NUMERO_SEGMENTI_TOTALE, (i) => segmentoA(i).curva);
 const SEMI_LARGHEZZA_PISTA = LARGHEZZA_PISTA / 2;
 
 /**
@@ -156,6 +151,37 @@ export default function GameChampionshipView() {
   const mioRecordRef = useRef({ qualifica: null, gara: null });
   const ultimoAggiornamentoHudRef = useRef(0);
   const angoloVolanteRef = useRef(0);
+  const offsetSfondoRef = useRef(0);
+  const rendererRef = useRef(null);
+  if (rendererRef.current === null && typeof document !== 'undefined') {
+    rendererRef.current = creaRendererPov((w, h) => {
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      return c;
+    });
+  }
+  const [livrea, setLivrea] = useState(() => {
+    try {
+      return livreaDaId(window.localStorage.getItem(CHIAVE_LIVREA)).id;
+    } catch {
+      return LIVREE[0].id;
+    }
+  });
+  const livreaRef = useRef(livrea);
+  useEffect(() => {
+    livreaRef.current = livrea;
+    try {
+      window.localStorage.setItem(CHIAVE_LIVREA, livrea);
+    } catch {
+      /* navigazione privata: la scelta vale solo per questa visita */
+    }
+  }, [livrea]);
+  // I cartelloni usano Big Shoulders Display: quando il font è pronto si
+  // ridisegnano gli elementi preparati in anticipo, così non restano col font di ripiego.
+  useEffect(() => {
+    document.fonts?.ready?.then(() => rendererRef.current?.invalida());
+  }, []);
   // Tempi intermedi (S1/S2/S3) del giro IN CORSO, per la minimappa —
   // aggiornati solo quando un checkpoint viene catturato, non ad ogni
   // fotogramma (vedi il punto in cui telemetriaRef viene aggiornato).
@@ -290,8 +316,9 @@ export default function GameChampionshipView() {
       const larghezzaCss = canvas.clientWidth;
       const altezzaCss = canvas.clientHeight;
       if (larghezzaCss === 0 || altezzaCss === 0) return;
-      canvas.width = Math.round(larghezzaCss * rapportoPixel);
-      canvas.height = Math.round(altezzaCss * rapportoPixel);
+      const rapportoPista = Math.min(rapportoPixel, PIXEL_RATIO_MASSIMO);
+      canvas.width = Math.round(larghezzaCss * rapportoPista);
+      canvas.height = Math.round(altezzaCss * rapportoPista);
 
       const minimappa = minimappaRef.current;
       if (minimappa && minimappa.clientWidth > 0 && minimappa.clientHeight > 0) {
@@ -343,17 +370,6 @@ export default function GameChampionshipView() {
     let ultimoTimestamp = null;
     let fermo = false;
 
-    function disegnaSfondo(ctx, larghezza, altezza) {
-      const orizzonte = altezza * 0.42;
-      const cielo = ctx.createLinearGradient(0, 0, 0, orizzonte);
-      cielo.addColorStop(0, '#0b0c10');
-      cielo.addColorStop(1, '#3a2e1a');
-      ctx.fillStyle = cielo;
-      ctx.fillRect(0, 0, larghezza, orizzonte);
-      ctx.fillStyle = '#16241a';
-      ctx.fillRect(0, orizzonte, larghezza, altezza - orizzonte);
-    }
-
     /**
      * 7 LED del cambio (shift lights), sempre in cima al canvas: 3
      * verdi, 2 rossi, 2 ciano lampeggianti vicino alla velocità
@@ -385,30 +401,41 @@ export default function GameChampionshipView() {
       }
     }
 
-    /** Display digitale: marcia virtuale (1-8, proporzionale alla
-     * velocità) e velocità numerica in monospace. */
+    /** Display digitale in cima al cielo: marcia (ciano) e velocità (oro)
+     * in Big Shoulders Display, su un riquadro scuro arrotondato. */
     function disegnaDisplay(ctx, larghezza, velocitaKmh, frazioneVelocita) {
-      const larghezzaBox = Math.max(70, larghezza * 0.13);
-      const altezzaBox = larghezzaBox * 0.4;
+      const larghezzaBox = Math.max(120, larghezza * 0.17);
+      const altezzaBox = larghezzaBox * 0.36;
       const x = larghezza / 2 - larghezzaBox / 2;
-      const y = larghezzaBox * 0.42;
+      const y = larghezzaBox * 0.2;
 
-      ctx.fillStyle = '#000';
-      ctx.fillRect(x, y, larghezzaBox, altezzaBox);
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, y, larghezzaBox, altezzaBox);
+      ctx.fillStyle = 'rgba(11,12,16,0.78)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, larghezzaBox, altezzaBox, altezzaBox * 0.22);
+      else ctx.rect(x, y, larghezzaBox, altezzaBox);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(63,208,255,0.45)';
+      ctx.lineWidth = Math.max(1, larghezza * 0.0012);
+      ctx.stroke();
 
       const marcia = Math.max(1, Math.min(8, Math.ceil(frazioneVelocita * 8)));
-      ctx.textAlign = 'center';
+      const font = '"Big Shoulders Display", "Share Tech Mono", monospace';
       ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
       ctx.fillStyle = '#3fd0ff';
-      ctx.font = `700 ${Math.round(altezzaBox * 0.6)}px monospace`;
-      ctx.fillText(String(marcia), x + larghezzaBox * 0.2, y + altezzaBox * 0.52);
-
+      ctx.font = `800 ${Math.round(altezzaBox * 0.78)}px ${font}`;
+      ctx.fillText(String(marcia), x + larghezzaBox * 0.17, y + altezzaBox * 0.54);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(x + larghezzaBox * 0.32, y + altezzaBox * 0.2, Math.max(1, larghezza * 0.001), altezzaBox * 0.6);
+      ctx.textAlign = 'right';
       ctx.fillStyle = '#d9a441';
-      ctx.font = `600 ${Math.round(altezzaBox * 0.3)}px monospace`;
-      ctx.fillText(`${Math.round(velocitaKmh)} km/h`, x + larghezzaBox * 0.65, y + altezzaBox * 0.52);
+      ctx.font = `800 ${Math.round(altezzaBox * 0.62)}px ${font}`;
+      ctx.fillText(String(Math.round(velocitaKmh)), x + larghezzaBox * 0.78, y + altezzaBox * 0.54);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = `700 ${Math.round(altezzaBox * 0.26)}px ${font}`;
+      ctx.fillText('KM/H', x + larghezzaBox * 0.8, y + altezzaBox * 0.6);
+      ctx.textBaseline = 'alphabetic';
     }
 
     /**
@@ -482,7 +509,7 @@ export default function GameChampionshipView() {
     function disegnaLineeVento(ctx, larghezza, altezza, velocitaKmh, adesso) {
       if (velocitaKmh < 200) return;
       const centroX = larghezza / 2;
-      const centroY = altezza * 0.42;
+      const centroY = altezza * FRAZIONE_ORIZZONTE;
       const numeroLinee = 14;
       const ciclo = 800;
 
@@ -508,187 +535,6 @@ export default function GameChampionshipView() {
         ctx.lineTo(puntoB.x, puntoB.y);
         ctx.stroke();
       }
-    }
-
-    function disegnaScenarioLato(ctx, xBase, yBase, scala, larghezzaSchermo, indiceSegmento, curva, lato) {
-      // Bug corretto: mancava la moltiplicazione per larghezzaSchermo
-      // (come fa l'auto con LARGHEZZA_AUTO_MONDO) — senza, "scala" da
-      // sola è un numero minuscolo (~0.001-0.01) e la dimensione finiva
-      // sempre sul minimo, rendendo lo scenario di fatto invisibile
-      // oltre pochissimi metri. ~6m: altezza plausibile di un albero o
-      // una gradinata bassa.
-      const dimensione = Math.max(3, scala * 6 * larghezzaSchermo);
-      if (dimensione < 3.5) return;
-      const x = xBase + lato * dimensione * 2.2;
-      if (Math.abs(curva) > 1.2) {
-        ctx.fillStyle = '#1d3a1f';
-        ctx.beginPath();
-        ctx.moveTo(x, yBase - dimensione * 1.7);
-        ctx.lineTo(x - dimensione * 0.55, yBase);
-        ctx.lineTo(x + dimensione * 0.55, yBase);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = '#5c3d24';
-        ctx.fillRect(x - dimensione * 0.08, yBase, dimensione * 0.16, dimensione * 0.3);
-      } else {
-        ctx.fillStyle = '#23262c';
-        ctx.fillRect(x - dimensione * 0.65, yBase - dimensione * 0.9, dimensione * 1.3, dimensione * 0.9);
-        if (indiceSegmento % 3 === 0) {
-          ctx.fillStyle = 'rgba(217,164,65,0.55)';
-          ctx.fillRect(x - dimensione * 0.65, yBase - dimensione * 0.9, dimensione * 1.3, dimensione * 0.22);
-        }
-      }
-    }
-
-    function disegnaCartelloCurva(ctx, xBase, yBase, scala, larghezzaSchermo, cartello) {
-      // Stesso bug di disegnaScenarioLato: mancava ×larghezzaSchermo,
-      // il cartello non si disegnava MAI (verificato: a 400-500m,
-      // "70*scala" restava sempre sotto la soglia minima). ~5.5m:
-      // dimensione scelta per essere ben leggibile già alla distanza
-      // di comparsa prevista (i cartelli iniziano a ~400-500m prima
-      // della curva), non solo quando l'auto è già vicina.
-      const dimensione = Math.max(4, scala * 5.5 * larghezzaSchermo);
-      if (dimensione < 5) return; // troppo lontano/piccolo per essere leggibile
-      const x = xBase - dimensione * 3.4; // fisso sul lato sinistro della pista, oltre lo scenario (2.2), niente sovrapposizioni
-      const yBaseCartello = yBase - dimensione * 0.9;
-      const largh = dimensione * 1.5;
-      const alt = dimensione * 1.05;
-
-      // Palo di sostegno
-      ctx.strokeStyle = '#4a4d54';
-      ctx.lineWidth = Math.max(1, dimensione * 0.08);
-      ctx.beginPath();
-      ctx.moveTo(x, yBase);
-      ctx.lineTo(x, yBaseCartello + alt / 2);
-      ctx.stroke();
-
-      // Tabellone: sfondo chiaro, bordo scuro — leggibile come un vero
-      // cartello di velocità consigliata a bordo pista.
-      ctx.fillStyle = '#f4f1e8';
-      ctx.fillRect(x - largh / 2, yBaseCartello - alt / 2, largh, alt);
-      ctx.strokeStyle = '#1a1a1a';
-      ctx.lineWidth = Math.max(1, dimensione * 0.05);
-      ctx.strokeRect(x - largh / 2, yBaseCartello - alt / 2, largh, alt);
-
-      // Numero (velocità consigliata)
-      ctx.fillStyle = '#c0392b';
-      ctx.font = `bold ${Math.round(alt * 0.62)}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(cartello.velocita), x, yBaseCartello - alt * 0.08);
-
-      // Freccina di direzione sotto il numero
-      ctx.fillStyle = '#1a1a1a';
-      const puntaX = x + cartello.direzione * largh * 0.22;
-      const codaX = x - cartello.direzione * largh * 0.22;
-      const yFreccia = yBaseCartello + alt * 0.28;
-      ctx.beginPath();
-      ctx.moveTo(puntaX, yFreccia);
-      ctx.lineTo(codaX, yFreccia - alt * 0.1);
-      ctx.lineTo(codaX, yFreccia + alt * 0.1);
-      ctx.closePath();
-      ctx.fill();
-      ctx.textAlign = 'start';
-      ctx.textBaseline = 'alphabetic';
-    }
-
-    function disegnaCavalcavia(ctx, proiettati) {
-      // Punto in cui la pista è più alta (la curva in salita del tratto
-      // 4 in circuito3d.js): decorazione con piloni verticali, dà
-      // l'impressione di un cavalcavia senza richiedere un vero
-      // incrocio geometrico auto-intersecante del tracciato.
-      for (const p of proiettati) {
-        if (p.y_mondo > 6 && p.scala > 0.05) {
-          const semiLarghezza = p.larghezzaProiettata / 2;
-          ctx.strokeStyle = '#4a4d54';
-          ctx.lineWidth = Math.max(1, 4 * p.scala);
-          ctx.beginPath();
-          ctx.moveTo(p.x - semiLarghezza * 1.3, p.y);
-          ctx.lineTo(p.x - semiLarghezza * 1.3, p.y + 40 * p.scala);
-          ctx.moveTo(p.x + semiLarghezza * 1.3, p.y);
-          ctx.lineTo(p.x + semiLarghezza * 1.3, p.y + 40 * p.scala);
-          ctx.stroke();
-        }
-      }
-    }
-
-    /**
-     * La monoposto vista da dietro, proiettata alla sua posizione nel
-     * mondo (non più fissa in basso allo schermo come il vecchio
-     * abitacolo in prima persona). `punto` viene da proietta(): usa
-     * scala per dimensionarla coerentemente con la pista sotto di
-     * essa. `angolo` è una leggera rotazione (radianti) che segue lo
-     * sterzo, per dare l'impressione che l'auto stia girando.
-     */
-    function disegnaAuto(ctx, punto, larghezzaSchermo, angolo) {
-      // Scala visiva ridotta (0.72) solo per il disegno: l'auto a piena
-      // scala copriva troppa pista in primo piano, rendendo difficile
-      // vedere la curva in anticipo (segnalato dall'utente, confrontato
-      // con foto di riferimento) — non tocca la fisica/collisioni,
-      // solo l'ingombro a schermo.
-      const larghezzaAuto = punto.scala * LARGHEZZA_AUTO_MONDO * larghezzaSchermo * 0.72;
-      if (larghezzaAuto < 4) return; // troppo lontana/piccola per valere la pena
-      const altezzaAuto = larghezzaAuto * 0.42;
-
-      // Ombra: un'ellisse scura sotto l'auto, ancora al terreno (non
-      // ruota con l'auto) — evita la sensazione che galleggi sull'asfalto.
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.beginPath();
-      ctx.ellipse(punto.x, punto.y + altezzaAuto * 0.06, larghezzaAuto * 0.42, altezzaAuto * 0.16, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.save();
-      ctx.translate(punto.x, punto.y);
-      // Non una rotazione rigida (sembrava un'inclinazione orizzontale
-      // irrealistica, come una moto in piega — segnalato dall'utente):
-      // una leggera deformazione a taglio, che sposta la parte alta
-      // (ala/muso) lateralmente rispetto alle ruote, che restano
-      // ancorate a terra — dà l'idea di vedere un po' la fiancata in
-      // curva invece di un banking innaturale.
-      ctx.transform(1, 0, angolo * 0.8, 1, 0, 0);
-
-      // Gomme posteriori
-      ctx.fillStyle = '#111214';
-      const largGomma = larghezzaAuto * 0.2;
-      const altGomma = altezzaAuto * 1.05;
-      ctx.fillRect(-larghezzaAuto * 0.58, -altGomma, largGomma, altGomma);
-      ctx.fillRect(larghezzaAuto * 0.38, -altGomma, largGomma, altGomma);
-
-      // Fiancate: collegano il corpo centrale al bordo interno delle
-      // gomme, altrimenti resta un vuoto visibile tra loro (segnalato
-      // dall'utente) — dal bordo gomma (±0.38) al bordo corpo (±0.28),
-      // nessuno spazio scoperto in mezzo.
-      ctx.fillStyle = '#17191d';
-      ctx.fillRect(-larghezzaAuto * 0.38, -altezzaAuto * 0.68, larghezzaAuto * 0.1, altezzaAuto * 0.68);
-      ctx.fillRect(larghezzaAuto * 0.28, -altezzaAuto * 0.68, larghezzaAuto * 0.1, altezzaAuto * 0.68);
-
-      // Diffusore (sotto il corpo, tra le gomme)
-      ctx.strokeStyle = '#3a3d44';
-      ctx.lineWidth = Math.max(1, larghezzaAuto * 0.012);
-      for (let i = -2; i <= 2; i++) {
-        ctx.beginPath();
-        ctx.moveTo(i * larghezzaAuto * 0.07, -altezzaAuto * 0.18);
-        ctx.lineTo(i * larghezzaAuto * 0.07, 0);
-        ctx.stroke();
-      }
-
-      // Corpo/pancia centrale
-      ctx.fillStyle = '#1a1d22';
-      ctx.fillRect(-larghezzaAuto * 0.28, -altezzaAuto * 0.75, larghezzaAuto * 0.56, altezzaAuto * 0.75);
-
-      // Fanalino posteriore
-      ctx.fillStyle = '#ff2a2a';
-      ctx.fillRect(-larghezzaAuto * 0.05, -altezzaAuto * 0.42, larghezzaAuto * 0.1, altezzaAuto * 0.1);
-
-      // Ala posteriore: barra + endplate ai due lati + pilone centrale
-      const yAla = -altezzaAuto * 1.45;
-      ctx.fillStyle = '#0d0e10';
-      ctx.fillRect(-larghezzaAuto * 0.56, yAla, larghezzaAuto * 1.12, altezzaAuto * 0.13);
-      ctx.fillRect(-larghezzaAuto * 0.6, yAla, larghezzaAuto * 0.06, altezzaAuto * 0.55);
-      ctx.fillRect(larghezzaAuto * 0.54, yAla, larghezzaAuto * 0.06, altezzaAuto * 0.55);
-      ctx.fillRect(-larghezzaAuto * 0.03, yAla + altezzaAuto * 0.1, larghezzaAuto * 0.06, altezzaAuto * 0.45);
-
-      ctx.restore();
     }
 
     /**
@@ -729,129 +575,35 @@ export default function GameChampionshipView() {
       const H = canvas.height;
       if (W === 0 || H === 0) return;
 
-      disegnaSfondo(ctx, W, H);
-
       const auto = statoAutoRef.current;
       const frazioneVelocitaHud = Math.min(1, auto.velocita / VELOCITA_MASSIMA_BASE);
       const velocitaKmhHud = auto.velocita * 3.6;
+
+      // Camera onboard: dove si trova l'auto, all'altezza dell'halo.
+      const posizioneAutoMondo = posizioneMondoInterpolata(auto.distanza);
+      const camera = {
+        distanza: auto.distanza,
+        mondoX: posizioneAutoMondo.mondoX + auto.x,
+        mondoY: posizioneAutoMondo.mondoY + ALTEZZA_CAMERA,
+      };
+      rendererRef.current.disegna(ctx, W, H, {
+        segmenti: calcolaSegmentiVisibili(camera, NUMERO_SEGMENTI_VISIBILI),
+        livrea: livreaDaId(livreaRef.current),
+        sterzo: angoloVolanteRef.current * 0.4,
+        offsetSfondo: offsetSfondoRef.current * (W / 1000),
+        tratti: TRATTI_SCENARIO,
+        cartelli: CARTELLI_CURVA,
+      });
+
+      disegnaLineeVento(ctx, W, H, velocitaKmhHud, performance.now());
       disegnaLedCambio(ctx, W, frazioneVelocitaHud, performance.now());
-      disegnaDisplay(ctx, W, velocitaKmhHud, frazioneVelocitaHud);
+      if (viaRef.current) disegnaDisplay(ctx, W, velocitaKmhHud, frazioneVelocitaHud); // durante il semaforo quel posto è delle luci
 
       const minimappa = minimappaRef.current;
       if (minimappa && minimappa.width > 0 && minimappa.height > 0) {
         const ctxMinimappa = minimappa.getContext('2d');
         const segmentoAutoFrazionale = auto.distanza / LUNGHEZZA_SEGMENTO;
         disegnaMinimappa(ctxMinimappa, minimappa.width, minimappa.height, segmentoAutoFrazionale);
-      }
-
-      const posizioneAutoMondo = posizioneMondoInterpolata(auto.distanza);
-      const distanzaCamera = auto.distanza - DISTANZA_CAMERA_DIETRO;
-      const posizioneCameraMondo = posizioneMondoInterpolata(distanzaCamera);
-      const camera = {
-        distanza: distanzaCamera,
-        mondoX: posizioneCameraMondo.mondoX + auto.x * FATTORE_SEGUI_LATERALE,
-        mondoY: posizioneCameraMondo.mondoY + ALTEZZA_CAMERA_SOPRA,
-      };
-
-      const segmenti = calcolaSegmentiVisibili(camera, NUMERO_SEGMENTI_VISIBILI);
-      const proiettati = [];
-      for (const s of segmenti) {
-        const p = proietta(s, PROFONDITA_CAMERA, W, H, INCLINAZIONE_CAMERA_RADIANTI);
-        if (p) proiettati.push({ ...s, ...p, y_mondo: s.y });
-      }
-
-      // Niente più camera shake: anche smorzato, restava percepito come
-      // uno sfarfallio/salto d'immagine (soprattutto in curva) invece
-      // che come una vibrazione — rimosso del tutto su richiesta
-      // esplicita dell'utente, non solo attenuato.
-
-      for (let i = proiettati.length - 1; i > 0; i--) {
-        const lontano = proiettati[i];
-        const vicino = proiettati[i - 1];
-        // Larghezza minima garantita: senza questo, un segmento molto
-        // lontano diventa sub-pixel e la pista sparisce visivamente
-        // nel verde ai lati (segnalato dall'utente: "si vede poco in
-        // lontananza") — con il minimo, resta sempre tracciabile fino
-        // al punto di fuga.
-        const semiL = Math.max(lontano.larghezzaProiettata / 2, 1.5);
-        const semiV = Math.max(vicino.larghezzaProiettata / 2, 1.5);
-        const LIMITE_SEMI_LARGHEZZA = W * 1.3;
-        const semiLDisegno = Math.min(semiL, LIMITE_SEMI_LARGHEZZA);
-        const semiVDisegno = Math.min(semiV, LIMITE_SEMI_LARGHEZZA);
-
-        if (vicino.z < 900) {
-          // Oltre una certa distanza lo scenario laterale (alberi,
-          // gradinate) non aggiunge quasi nulla visivamente (diventa
-          // minuscolo) ma costa comunque due disegni extra a segmento —
-          // con la distanza di rendering ora molto più lunga, tagliarlo
-          // presto aiuta le prestazioni senza perdita percepibile.
-          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, W, vicino.indiceSegmento, vicino.curva, -1);
-          disegnaScenarioLato(ctx, vicino.x, vicino.y, vicino.scala, W, vicino.indiceSegmento, vicino.curva, 1);
-        }
-        const cartello = CARTELLI_CURVA.get(vicino.indiceSegmento);
-        if (cartello && vicino.z < 1400) {
-          // I cartelli di velocità restano leggibili (e utili per
-          // sapere quando rallentare) da più lontano dello scenario
-          // puramente decorativo.
-          disegnaCartelloCurva(ctx, vicino.x, vicino.y, vicino.scala, W, cartello);
-        }
-
-        ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2f4a2f' : '#28422c';
-        ctx.beginPath();
-        ctx.moveTo(lontano.x - semiLDisegno * 1.6, lontano.y);
-        ctx.lineTo(lontano.x + semiLDisegno * 1.6, lontano.y);
-        ctx.lineTo(vicino.x + semiVDisegno * 1.6, vicino.y);
-        ctx.lineTo(vicino.x - semiVDisegno * 1.6, vicino.y);
-        ctx.closePath();
-        ctx.fill();
-
-        const coloreCordolo = Math.floor(vicino.indiceSegmento / SEGMENTI_PER_STRISCIA_CORDOLO) % 2 === 0 ? '#c0392b' : '#e8e8e8';
-        ctx.fillStyle = coloreCordolo;
-        ctx.beginPath();
-        ctx.moveTo(lontano.x - semiLDisegno * 1.15, lontano.y);
-        ctx.lineTo(lontano.x + semiLDisegno * 1.15, lontano.y);
-        ctx.lineTo(vicino.x + semiVDisegno * 1.15, vicino.y);
-        ctx.lineTo(vicino.x - semiVDisegno * 1.15, vicino.y);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = vicino.indiceSegmento % 2 === 0 ? '#2a2d33' : '#25282e';
-        ctx.beginPath();
-        ctx.moveTo(lontano.x - semiLDisegno, lontano.y);
-        ctx.lineTo(lontano.x + semiLDisegno, lontano.y);
-        ctx.lineTo(vicino.x + semiVDisegno, vicino.y);
-        ctx.lineTo(vicino.x - semiVDisegno, vicino.y);
-        ctx.closePath();
-        ctx.fill();
-
-        if (vicino.indiceSegmento % 6 < 3) {
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          ctx.beginPath();
-          ctx.moveTo(lontano.x - semiLDisegno * 0.02, lontano.y);
-          ctx.lineTo(lontano.x + semiLDisegno * 0.02, lontano.y);
-          ctx.lineTo(vicino.x + semiVDisegno * 0.02, vicino.y);
-          ctx.lineTo(vicino.x - semiVDisegno * 0.02, vicino.y);
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
-
-      disegnaLineeVento(ctx, W, H, velocitaKmhHud, performance.now());
-      disegnaCavalcavia(ctx, proiettati);
-
-      const puntoAuto = proietta(
-        {
-          x: posizioneAutoMondo.mondoX + auto.x - camera.mondoX,
-          y: posizioneAutoMondo.mondoY - camera.mondoY,
-          z: auto.distanza - camera.distanza,
-        },
-        PROFONDITA_CAMERA,
-        W,
-        H,
-        INCLINAZIONE_CAMERA_RADIANTI
-      );
-      if (puntoAuto) {
-        disegnaAuto(ctx, puntoAuto, W, angoloVolanteRef.current * 0.3);
       }
     }
 
@@ -869,6 +621,9 @@ export default function GameChampionshipView() {
 
       const segmentoAttuale = segmentoA(Math.floor(statoAutoRef.current.distanza / LUNGHEZZA_SEGMENTO));
       statoAutoRef.current = avanzaFisica(statoAutoRef.current, inputRef.current, dt, segmentoAttuale.curva, SEMI_LARGHEZZA_PISTA);
+
+      // Parallasse delle montagne: in curva lo sfondo scorre in senso opposto alla piega.
+      offsetSfondoRef.current += segmentoAttuale.curva * statoAutoRef.current.velocita * dt * 0.35;
 
       const angoloTarget = (inputRef.current.sterzaDestra ? 1 : 0) - (inputRef.current.sterzaSinistra ? 1 : 0);
       angoloVolanteRef.current += (angoloTarget * 0.6 - angoloVolanteRef.current) * Math.min(1, dt * 8);
@@ -1410,6 +1165,31 @@ export default function GameChampionshipView() {
                   onClick={() => setTipoSessione(tipo)}
                 >
                   {ETICHETTA_SESSIONE[tipo]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="game-championship-view__campo">
+            <span>Livrea</span>
+            <div className="game-championship-view__livree" role="radiogroup" aria-label="Livrea della monoposto">
+              {LIVREE.map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={livrea === l.id}
+                  className={`game-championship-view__livrea ${livrea === l.id ? 'game-championship-view__livrea--attiva' : ''}`}
+                  onClick={() => setLivrea(l.id)}
+                >
+                  <span
+                    className="game-championship-view__livrea-campione"
+                    style={{ background: `linear-gradient(135deg, ${l.luce} 0%, ${l.base} 45%, ${l.ombra} 100%)`, borderColor: l.accento }}
+                    aria-hidden="true"
+                  >
+                    <span style={{ background: l.accento }} />
+                  </span>
+                  {l.nome}
                 </button>
               ))}
             </div>

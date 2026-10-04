@@ -255,7 +255,9 @@ body.gioco-fullscreen-pagina-intera {
    (lascia libera la fascia centrale/bassa) né l'abitacolo in fondo. --- */
 .game-championship-view__semaforo-overlay-pov {
   position: absolute;
-  top: 0.8rem;
+  /* Nella fascia del cielo: sotto il display di marcia/velocità, sopra
+     l'orizzonte (20% dell'altezza) e lontano da halo e musetto. */
+  top: 6%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -273,8 +275,8 @@ body.gioco-fullscreen-pagina-intera {
   border-radius: 6px;
 }
 .game-championship-view__luce-pov {
-  width: 14px;
-  height: 14px;
+  width: clamp(16px, 2.6vw, 30px);
+  height: clamp(16px, 2.6vw, 30px);
   border-radius: 50%;
   background: rgba(232, 67, 46, 0.15);
   border: 1px solid rgba(232, 67, 46, 0.4);
@@ -606,3 +608,31 @@ body.gioco-fullscreen-pagina-intera {
 .game-championship-view__torna-arcade a:hover {
   color: var(--accent-cyan);
 }
+
+/* --- Scelta della livrea --- */
+.game-championship-view__livree { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.game-championship-view__livrea {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem 0.45rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.game-championship-view__livrea--attiva { border-color: var(--accent-gold); box-shadow: 0 0 0 1px var(--accent-gold) inset; }
+.game-championship-view__livrea-campione {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid;
+  overflow: hidden;
+}
+.game-championship-view__livrea-campione span { position: absolute; left: 42%; top: 0; bottom: 0; width: 16%; }
