@@ -34,6 +34,7 @@ import {
   separaAvversari,
   tempoFinaleStimato,
 } from '../game/avversari.js';
+import { traccia } from '../utils/analytics.js';
 import { ALTEZZA_CAMERA, calcolaTratti, creaRendererPov, FRAZIONE_ORIZZONTE, LIVREE, livreaDaId, segmentiDietro } from '../game/renderPov.js';
 import { avanzaFisica, statoIniziale, VELOCITA_MASSIMA_BASE } from '../game/fisica3d.js';
 import { coloreGiro, estraiCheckpointDelGiro, trovaMigliorGiroValido } from '../game/sessione.js';
@@ -116,6 +117,7 @@ export default function GameChampionshipView() {
   const grigliaMultiRef = useRef(null); // griglia ricevuta dal server, usata da iniziaSessione
   const semeSemaforoRef = useRef(null); // stesso semaforo per tutti gli utenti della stessa gara
   const ultimoInvioPosRef = useRef(0);
+  const inizioAttesaRef = useRef(0);
   const cronometroRef = useRef(null); // istante del primo passaggio sulla linea: da lì parte il cronometro
 
   const [risultatoFinale, setRisultatoFinale] = useState(null);
@@ -796,6 +798,7 @@ export default function GameChampionshipView() {
                 : `Giro ${numeroGiroCompletato} · ${formattaTempo(tempoGiroSecondi)}`,
             id: adesso,
           });
+          traccia('giro_completato', { sessione: tipoSessione, giro: numeroGiroCompletato, tempo_s: Math.round(tempoGiroSecondi * 10) / 10 });
           giriCompletatiRef.current = [
             ...giriCompletatiRef.current,
             { numero: numeroGiroCompletato, tempo: tempoGiroSecondi, valido: true, checkpoint: checkpointDiQuestoGiro },
@@ -873,6 +876,11 @@ export default function GameChampionshipView() {
     setPulsantiPremuti({});
 
     setTipoSessione(tipo);
+    traccia('sessione_gioco_iniziata', {
+      sessione: tipo,
+      avversari: tipo === 'gara' ? (grigliaMultiRef.current ? 'utenti' : 'bot') : tipo === 'qualifica' ? 'bot' : 'nessuno',
+      livrea: livreaRef.current,
+    });
     setStatoInvio('inattivo');
     setMotivoRifiuto(null);
     setNuovoRecord(false);
@@ -953,6 +961,7 @@ export default function GameChampionshipView() {
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
+    traccia('sessione_abbandonata', { sessione: tipoSessione });
     chiudiConnessione();
     setFase('selezione');
   }
@@ -964,6 +973,9 @@ export default function GameChampionshipView() {
   async function avviaGaraInRete() {
     chiudiConnessione();
     setArrivi([]);
+    inizioAttesaRef.current = performance.now();
+    const modalita = modoGara === '1v1' ? '1v1' : attendiGrigliaCompleta ? 'multi_completa' : 'multi';
+    traccia('ricerca_avversari', { modalita });
     setAttesa({ stato: 'sveglia' });
     setFase('attesa');
     const base = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
@@ -977,6 +989,7 @@ export default function GameChampionshipView() {
       }
     }
     if (!sveglio) {
+      traccia('server_gioco_non_raggiungibile');
       setAttesa({ stato: 'errore' });
       return;
     }
@@ -1015,6 +1028,11 @@ export default function GameChampionshipView() {
       else if (m.tipo === 'partenza') {
         mioIdRef.current = m.tuo_id;
         grigliaMultiRef.current = { griglia: m.griglia, seme: m.seme };
+        traccia('gara_rete_partita', {
+          modalita,
+          utenti_in_gara: m.griglia.length,
+          attesa_s: Math.round((performance.now() - inizioAttesaRef.current) / 1000),
+        });
         semeSemaforoRef.current = m.seme;
         setTipoSessione('gara');
         iniziaSessione('gara');
@@ -1028,6 +1046,10 @@ export default function GameChampionshipView() {
   }
 
   function annullaAttesa() {
+    traccia('ricerca_avversari_annullata', {
+      modalita: modoGara === '1v1' ? '1v1' : attendiGrigliaCompleta ? 'multi_completa' : 'multi',
+      attesa_s: Math.round((performance.now() - inizioAttesaRef.current) / 1000),
+    });
     chiudiConnessione();
     setAttesa(null);
     setFase('selezione');
@@ -1123,12 +1145,22 @@ export default function GameChampionshipView() {
     const posizioneFinale =
       1 + avversariRef.current.filter((a) => tempoFinaleStimato(a, tempoTotaleSecondi, distanzaGara) < tempoTotaleSecondi).length;
     setRisultatoFinale({ tempoTotale: tempoTotaleSecondi, posizione: avversariRef.current.length ? posizioneFinale : null });
+    traccia('gara_conclusa', {
+      tempo_s: Math.round(tempoTotaleSecondi),
+      posizione: avversariRef.current.length ? posizioneFinale : 0,
+      avversari: grigliaMultiRef.current ? 'utenti' : 'bot',
+      utenti_in_gara: grigliaMultiRef.current ? grigliaMultiRef.current.griglia.length : 1,
+    });
     setFase('riepilogo');
     inviaERicaricaClassifica(tempoTotaleSecondi, telemetria);
   }
 
   function concludiQualifica() {
     const migliore = trovaMigliorGiroValido(giriCompletatiRef.current);
+    traccia('qualifica_conclusa', {
+      giri: giriCompletatiRef.current.length,
+      miglior_tempo_s: migliore ? Math.round(migliore.tempo * 10) / 10 : 0,
+    });
     setFase('riepilogo');
     if (migliore === null) {
       setRisultatoFinale({ tempoTotale: null });

@@ -81,6 +81,27 @@ export default function PrivacyView() {
         </p>
       </GlassPanel>
 
+      <GlassPanel className="privacy-view__pannello" id="statistiche">
+        <h2>Statistiche di visita (Google Analytics)</h2>
+        <p>
+          Con il tuo consenso usiamo Google Analytics 4 per capire come viene usato il sito: quali pagine si leggono,
+          da che tipo di dispositivo, da quale paese o città approssimativa, e come si usano i giochi dell&rsquo;Arcade
+          (per esempio sessioni iniziate, giri completati, gare concluse, ricerche di avversari). Servono a migliorare
+          il sito, non a mostrarti pubblicità.
+        </p>
+        <p>
+          <strong>Senza il tuo consenso Google Analytics non viene nemmeno caricato</strong> e non parte alcun dato,
+          neanche anonimo. Il consenso è quello che dai nella finestra di Google per la privacy (vedi sotto): puoi
+          ritirarlo quando vuoi dallo stesso pulsante. Google Analytics usa cookie propri (per esempio «_ga»), riduce
+          l&rsquo;indirizzo IP prima di conservarlo e tratta i dati come nostro responsabile secondo i suoi termini;
+          maggiori informazioni su{' '}
+          <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noreferrer noopener">
+            policies.google.com/technologies/partner-sites
+          </a>
+          .
+        </p>
+      </GlassPanel>
+
       <GlassPanel className="privacy-view__pannello" id="pubblicita">
         <h2>Pubblicità, cookie e consenso</h2>
         <p>
@@ -148,6 +169,7 @@ export default function PrivacyView() {
         </p>
         <ul>
           <Fornitore nome="Google AdSense">pubblicità (vedi sopra).</Fornitore>
+          <Fornitore nome="Google Analytics">statistiche di visita, solo con il tuo consenso (vedi sopra).</Fornitore>
           <Fornitore nome="Google Fonts">caratteri grafici del sito.</Fornitore>
           <Fornitore nome="Wikimedia Commons">immagini di piloti e circuiti.</Fornitore>
           <Fornitore nome="OpenF1">programma dei weekend di gara.</Fornitore>

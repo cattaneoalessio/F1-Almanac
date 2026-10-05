@@ -28,6 +28,7 @@ import AdminGpView from './views/AdminGpView.jsx';
 const AdminContenutiView = lazy(() => import('./views/admin/AdminContenutiView.jsx'));
 import SiteFooter from './components/SiteFooter.jsx';
 import { ConsensoProvider, useConsenso } from './consenso/ConsensoContext.jsx';
+import { avviaAnalytics, paginaVista } from './utils/analytics.js';
 import BannerConsenso from './consenso/BannerConsenso.jsx';
 import { LayoutConAdv, LayoutSenzaAdv } from './components/LayoutPagina.jsx';
 import PrivacyView from './views/PrivacyView.jsx';
@@ -170,7 +171,14 @@ function PaginaNonTrovata() {
 }
 
 function ContenutoApp() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  // Google Analytics (Consent Mode base: parte solo dopo il consenso, vedi utils/analytics.js)
+  useEffect(() => {
+    avviaAnalytics();
+  }, []);
+  useEffect(() => {
+    paginaVista(pathname + search);
+  }, [pathname, search]);
   const { bloccante } = useConsenso();
   // Meta tag di base della pagina (titolo, descrizione, canonical, Open Graph, robots).
   // useLayoutEffect: scatta PRIMA degli effetti delle pagine, che poi li affinano
