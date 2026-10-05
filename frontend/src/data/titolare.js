@@ -16,4 +16,4 @@ export const TITOLARE = {
 };
 
 /** Data dell'ultima revisione del testo: aggiornala quando modifichi la privacy. */
-export const PRIVACY_AGGIORNATA_IL = '28 settembre 2026';
+export const PRIVACY_AGGIORNATA_IL = '5 ottobre 2026';
