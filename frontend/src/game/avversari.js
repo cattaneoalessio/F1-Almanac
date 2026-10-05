@@ -125,6 +125,11 @@ const T_PARTENZA = (() => {
   return t;
 })();
 
+/** Secondi dal via per percorrere da fermi `metri` (rincorsa dalla piazzola alla linea). */
+export function tempoRincorsa(metri) {
+  return metri > 0 ? interpolaTabella(T_PARTENZA, metri) : 0;
+}
+
 function interpolaTabella(tabella, x) {
   const i = Math.max(0, Math.min(N - 1, Math.floor(x / LUNGHEZZA_SEGMENTO)));
   const f = x / LUNGHEZZA_SEGMENTO - i;
@@ -214,11 +219,12 @@ function creaBot(id, rnd, distanza, x, livrea) {
   };
 }
 
-/** 10 bot sparsi sul circuito, almeno 60 m lontani dal giocatore e tra loro. */
+/** 10 bot sparsi sul circuito, almeno 60 m lontani dal giocatore e tra loro.
+ * Il giocatore parte 250 m prima della linea (giro di lancio). */
 export function creaBotQualifica(numero = 10, seme = Date.now()) {
   const rnd = casuale(seme);
   const bots = [];
-  const occupate = [0];
+  const occupate = [0, L - 250, L - 125];
   for (let i = 0; i < numero; i++) {
     let d = 0;
     for (let tentativo = 0; tentativo < 50; tentativo++) {
@@ -298,7 +304,13 @@ export function creaGriglia(registrati, posizioneGiocatore, seme = Date.now()) {
     if (!auto) return;
     auto.distanza = distanzaPiazzola(i + 1);
     auto.partenza = auto.distanza;
-    if (auto.punti) auto.punti[0].d = auto.partenza; // la gara registrata riparte da questa piazzola
+    auto.rincorsa = tempoRincorsa(-auto.partenza);
+    if (auto.punti) {
+      // Il cronometro di ogni gara parte sulla linea: i tempi registrati
+      // contano da lì. Davanti si aggiunge la rincorsa dalla piazzola
+      // (da fermo), così l'avversario parte al via insieme a tutti.
+      auto.punti = [{ d: auto.partenza, t: 0 }, ...auto.punti.map((q) => ({ d: q.d, t: q.t + auto.rincorsa }))];
+    }
     auto.x = latoPiazzola(i + 1) * X_GRIGLIA;
     auto.xPreferita = latoPiazzola(i + 1) * X_GRIGLIA * 0.5;
   });
@@ -308,6 +320,60 @@ export function creaGriglia(registrati, posizioneGiocatore, seme = Date.now()) {
     distanzaGiocatore: distanzaPiazzola(posto),
     posto,
   };
+}
+
+/**
+ * Griglia di una gara tra utenti. `griglia` arriva dal server:
+ * [{id, nome, livrea (id livrea), posto}], `mioId` è il proprio id.
+ * Gli altri utenti diventano auto 'umano' (posizione dalla rete), i posti
+ * liberi sono bot simulati in locale (stesso seme per tutti).
+ */
+export function creaGrigliaMultigiocatore(griglia, mioId, seme, livreaUtente) {
+  const rnd = casuale(seme);
+  const occupati = new Map(griglia.map((g) => [g.posto, g]));
+  const io = griglia.find((g) => g.id === mioId);
+  const posto = io ? io.posto : 20;
+  const avversari = [];
+  let k = 0;
+  for (let p = 1; p <= 20; p++) {
+    if (p === posto) continue;
+    const g = occupati.get(p);
+    const auto = g
+      ? { id: g.id, tipo: 'umano', nome: g.nome, livrea: livreaUtente(g.livrea), velocita: 0, ultimo: null }
+      : creaBot(k++, rnd, 0, 0, LIVREE_AVVERSARI[k % LIVREE_AVVERSARI.length]);
+    auto.distanza = distanzaPiazzola(p);
+    auto.partenza = auto.distanza;
+    auto.rincorsa = tempoRincorsa(-auto.partenza);
+    auto.x = latoPiazzola(p) * X_GRIGLIA;
+    auto.xPreferita = latoPiazzola(p) * X_GRIGLIA * 0.5;
+    avversari.push(auto);
+  }
+  return { avversari, xGiocatore: latoPiazzola(posto) * X_GRIGLIA, distanzaGiocatore: distanzaPiazzola(posto), posto };
+}
+
+/**
+ * Aggiorna le auto degli altri utenti con l'ultimo "stato" ricevuto dalla
+ * rete ({id, d, x, v}). Tra un messaggio e l'altro (100 ms + ritardo di
+ * rete) la posizione viene prevista con la velocità e avvicinata
+ * dolcemente, per non vedere scatti.
+ */
+export function riceviStatoUmani(avversari, stati, adessoS) {
+  const perId = new Map(stati.map((q) => [q.id, q]));
+  for (const a of avversari) {
+    if (a.tipo !== 'umano') continue;
+    const q = perId.get(a.id);
+    if (q) a.ultimo = { d: q.d, x: q.x, v: q.v, t: adessoS };
+  }
+}
+export function muoviUmani(avversari, adessoS, dt) {
+  for (const a of avversari) {
+    if (a.tipo !== 'umano' || !a.ultimo) continue;
+    const previsto = a.ultimo.d + a.ultimo.v * Math.min(0.5, adessoS - a.ultimo.t);
+    const scarto = previsto - a.distanza;
+    a.distanza += Math.abs(scarto) > 60 ? scarto : scarto * Math.min(1, dt * 8);
+    a.x += (a.ultimo.x - a.x) * Math.min(1, dt * 8);
+    a.velocita = a.ultimo.v;
+  }
 }
 
 /** Distanza di un avversario "fantasma" all'istante t (s dal via), senza ritardi. */
@@ -345,9 +411,12 @@ function distanzaFantasma(f, t) {
  */
 export function aggiornaAvversari(avversari, giocatore, dt, { tempoGara = 0, circolare = false, via = true } = {}) {
   if (!via) return;
-  const tutti = [...avversari, { ...giocatore, giocatore: true }];
+  // le auto degli altri UTENTI (gare in tempo reale) sono attraversabili:
+  // non si simulano qui (arrivano dalla rete) e non contano nel traffico
+  const simulati = avversari.filter((a) => a.tipo !== 'umano');
+  const tutti = [...simulati, { ...giocatore, giocatore: true }];
 
-  for (const a of avversari) {
+  for (const a of simulati) {
     // auto più vicina davanti nella stessa "corsia"
     let davanti = null;
     let gapDavanti = Infinity;
@@ -420,6 +489,7 @@ export function interazioniGiocatore(giocatore, avversari, { circolare = false, 
   let scia = 0;
   let tamponamento = false;
   for (const a of avversari) {
+    if (a.tipo === 'umano') continue; // attraversabili: niente contatti né scia
     const d = delta(giocatore.distanza, a.distanza, circolare); // >0: l'avversario è davanti
     const dx = a.x - giocatore.x;
     const sovrapposti = Math.abs(dx) < LARGHEZZA_AUTO;
@@ -471,6 +541,7 @@ export function separaAvversari(avversari, circolare = false) {
         if (i === j) continue;
         const a = avversari[i]; // dietro
         const b = avversari[j]; // davanti
+        if (a.tipo === 'umano' || b.tipo === 'umano') continue;
         const d = delta(a.distanza, b.distanza, circolare);
         if (d >= 0 && d < LUNGHEZZA_AUTO && Math.abs(b.x - a.x) < LARGHEZZA_AUTO) {
           a.distanza -= LUNGHEZZA_AUTO - d;
@@ -494,9 +565,11 @@ export function posizioneInGara(distanzaGiocatore, avversari) {
 /** Tempo finale stimato di ogni avversario (s), per la classifica di fine gara. */
 export function tempoFinaleStimato(a, tempoGara, distanzaGara) {
   if (a.tipo === 'fantasma') return a.tempoTotale + a.ritardo;
+  // tempo "dalla linea", come quello del giocatore: si toglie la rincorsa dalla piazzola
+  const rincorsa = a.rincorsa || 0;
   const mancante = distanzaGara - a.distanza;
-  if (mancante <= 0) return tempoGara;
-  return tempoGara + mancante / Math.max(20, velocitaIdeale(a.distanza) * a.bravura * 0.85);
+  if (mancante <= 0) return tempoGara - rincorsa;
+  return tempoGara - rincorsa + mancante / Math.max(20, velocitaIdeale(a.distanza) * a.bravura * 0.85);
 }
 
 export const _test = { tempoIdeale, distanzaIdeale, distanzaFantasma, puntiDaCheckpoint };

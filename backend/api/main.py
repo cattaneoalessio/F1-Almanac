@@ -45,6 +45,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from auth import utente_da_token
 from contenuti import router as router_contenuti
+from multigiocatore import router as router_multigiocatore
 from chronoquiz import genera_quiz
 from db import get_connection
 from driverle import (
@@ -135,6 +136,8 @@ GAME_ADMIN_KEY = os.environ.get("GAME_ADMIN_KEY", "")
 
 # Articoli "In Primo Piano" e News + pannello di gestione (vedi contenuti.py).
 app.include_router(router_contenuti)
+# Gare tra utenti in tempo reale (WebSocket /game/ws/gara, vedi multigiocatore.py).
+app.include_router(router_multigiocatore)
 
 
 @app.get("/")

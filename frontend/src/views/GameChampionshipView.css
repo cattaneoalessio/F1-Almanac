@@ -740,3 +740,17 @@ body.gioco-fullscreen-pagina-intera {
   font-family: var(--font-mono);
   font-size: 0.8rem;
 }
+
+/* --- Gara tra utenti: scelta, attesa, arrivi --- */
+.game-championship-view__opzione { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; font-size: 0.9rem; color: var(--text-primary); cursor: pointer; }
+.game-championship-view__nota-modo { margin: 0.6rem 0 0; font-size: 0.82rem; line-height: 1.45; color: var(--text-gray); }
+.game-championship-view__attesa { display: flex; flex-direction: column; align-items: center; gap: 0.8rem; text-align: center; padding: 2rem 1.2rem; }
+.game-championship-view__attesa p { margin: 0; max-width: 44ch; line-height: 1.5; }
+.game-championship-view__attesa-numero { font-family: var(--font-display); font-size: 4rem; line-height: 1; color: var(--accent-cyan); }
+.game-championship-view__attesa-numero small { font-size: 1.6rem; color: var(--text-gray); }
+.game-championship-view__arrivi { width: 100%; max-width: 420px; margin: 0.8rem auto; text-align: left; }
+.game-championship-view__arrivi ol { margin: 0.4rem 0; padding-left: 1.4rem; }
+.game-championship-view__arrivi li span { display: inline-block; }
+.game-championship-view__arrivi li span:first-child { min-width: 60%; }
+.game-championship-view__arrivo--io { color: var(--accent-gold); font-weight: 600; }
+.game-championship-view__arrivi small { color: var(--text-gray); font-size: 0.78rem; }

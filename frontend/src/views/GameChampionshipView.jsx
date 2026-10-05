@@ -26,7 +26,10 @@ import {
   aggiornaAvversari,
   creaBotQualifica,
   creaGriglia,
+  creaGrigliaMultigiocatore,
   interazioniGiocatore,
+  muoviUmani,
+  riceviStatoUmani,
   posizioneInGara,
   separaAvversari,
   tempoFinaleStimato,
@@ -102,6 +105,18 @@ export default function GameChampionshipView() {
 
   const [fase, setFase] = useState('selezione'); // selezione | in-pista | riepilogo
   const [tipoSessione, setTipoSessione] = useState('qualifica');
+  // Gara: contro chi. 'bot' = gare registrate + bot (da soli); '1v1' e
+  // 'multi' = utenti collegati in quel momento (multigiocatore.py).
+  const [modoGara, setModoGara] = useState('bot');
+  const [attendiGrigliaCompleta, setAttendiGrigliaCompleta] = useState(false);
+  const [attesa, setAttesa] = useState(null); // { stato: 'sveglia'|'attesa'|'errore', in_attesa, posti, secondi_rimasti }
+  const [arrivi, setArrivi] = useState([]); // [{id, nome, tempo}] arrivi degli utenti nella gara in rete
+  const wsRef = useRef(null);
+  const mioIdRef = useRef(null);
+  const grigliaMultiRef = useRef(null); // griglia ricevuta dal server, usata da iniziaSessione
+  const semeSemaforoRef = useRef(null); // stesso semaforo per tutti gli utenti della stessa gara
+  const ultimoInvioPosRef = useRef(0);
+  const cronometroRef = useRef(null); // istante del primo passaggio sulla linea: da lì parte il cronometro
 
   const [risultatoFinale, setRisultatoFinale] = useState(null);
   const [statoInvio, setStatoInvio] = useState('inattivo');
@@ -204,6 +219,14 @@ export default function GameChampionshipView() {
   // fotogramma (vedi il punto in cui telemetriaRef viene aggiornato).
   const tempiIntermediGiroRef = useRef([null, null, null]);
   const [tempiIntermedi, setTempiIntermedi] = useState([null, null, null]);
+
+  // Uscendo dalla pagina del gioco si chiude anche la connessione di gara.
+  useEffect(
+    () => () => {
+      if (wsRef.current) wsRef.current.close();
+    },
+    []
+  );
 
   // Il banner del traguardo resta 3 secondi.
   useEffect(() => {
@@ -384,7 +407,8 @@ export default function GameChampionshipView() {
     for (let i = 1; i <= NUMERO_LUCI; i++) {
       idTimeout.push(setTimeout(() => setNumeroLuciAccese(i), i * INTERVALLO_LUCE_MS));
     }
-    const attesaExtra = ATTESA_EXTRA_MIN_MS + Math.random() * (ATTESA_EXTRA_MAX_MS - ATTESA_EXTRA_MIN_MS);
+    const casuale = semeSemaforoRef.current !== null ? ((semeSemaforoRef.current * 9301 + 49297) % 233280) / 233280 : Math.random();
+    const attesaExtra = ATTESA_EXTRA_MIN_MS + casuale * (ATTESA_EXTRA_MAX_MS - ATTESA_EXTRA_MIN_MS);
     const ritardoTotaleMs = NUMERO_LUCI * INTERVALLO_LUCE_MS + attesaExtra;
     idTimeout.push(
       setTimeout(() => {
@@ -693,6 +717,15 @@ export default function GameChampionshipView() {
         SEMI_LARGHEZZA_PISTA
       );
 
+      // Utenti collegati: posizione prevista tra un messaggio di rete e l'altro.
+      muoviUmani(avversariRef.current, performance.now() / 1000, dt);
+      const ws = wsRef.current;
+      if (ws && ws.readyState === 1 && performance.now() - ultimoInvioPosRef.current > 100) {
+        ultimoInvioPosRef.current = performance.now();
+        const st = statoAutoRef.current;
+        ws.send(JSON.stringify({ tipo: 'pos', d: st.distanza, x: st.x, v: st.velocita }));
+      }
+
       // Avversari: si muovono, poi contatti e scia col giocatore.
       if (avversariRef.current.length > 0) {
         const circolare = tipoSessione === 'qualifica';
@@ -718,10 +751,20 @@ export default function GameChampionshipView() {
       angoloVolanteRef.current += (angoloTarget * 0.6 - angoloVolanteRef.current) * Math.min(1, dt * 8);
 
       const adesso = performance.now();
+      // Il cronometro parte al primo passaggio sulla linea del traguardo
+      // (in tutte le sessioni): la rincorsa dalla griglia o dal giro di
+      // lancio non conta. Fino ad allora niente intermedi né giri.
+      if (cronometroRef.current === null && statoAutoRef.current.distanza >= 0) {
+        cronometroRef.current = adesso;
+        inizioGiroRef.current = adesso;
+      }
       const segmentoAssolutoAttuale = Math.floor(statoAutoRef.current.distanza / LUNGHEZZA_SEGMENTO);
-      const nuovoAtteso = controllaCatturaCheckpointSegmento(segmentoAssolutoAttuale, giroCorrenteRef.current, checkpointAttesoRef.current);
+      const nuovoAtteso =
+        cronometroRef.current === null
+          ? checkpointAttesoRef.current
+          : controllaCatturaCheckpointSegmento(segmentoAssolutoAttuale, giroCorrenteRef.current, checkpointAttesoRef.current);
       if (nuovoAtteso !== checkpointAttesoRef.current) {
-        const tSessione = adesso - tempoInizioRef.current;
+        const tSessione = adesso - cronometroRef.current;
         telemetriaRef.current.push({ giro: giroCorrenteRef.current, indice: checkpointAttesoRef.current, t: tSessione });
 
         if (tipoSessione === 'gara' && avversariRef.current.length > 0) {
@@ -733,7 +776,7 @@ export default function GameChampionshipView() {
           // S1/S2/S3 di QUESTO giro (indice 3 è il traguardo, gestito
           // sotto come fine giro, non come intermedio): tempo dal via
           // di questo giro, per il riquadro accanto alla minimappa.
-          const inizioGiroRelativoASessione = inizioGiroRef.current - tempoInizioRef.current;
+          const inizioGiroRelativoASessione = inizioGiroRef.current - cronometroRef.current;
           tempiIntermediGiroRef.current = [...tempiIntermediGiroRef.current];
           tempiIntermediGiroRef.current[checkpointAttesoRef.current] = (tSessione - inizioGiroRelativoASessione) / 1000;
           setTempiIntermedi(tempiIntermediGiroRef.current);
@@ -742,7 +785,7 @@ export default function GameChampionshipView() {
         if (checkpointAttesoRef.current === 3) {
           const numeroGiroCompletato = giroCorrenteRef.current;
           const tempoGiroSecondi = (adesso - inizioGiroRef.current) / 1000;
-          const inizioGiroRelativoASessione = inizioGiroRef.current - tempoInizioRef.current;
+          const inizioGiroRelativoASessione = inizioGiroRef.current - cronometroRef.current;
           const checkpointDiQuestoGiro = estraiCheckpointDelGiro(telemetriaRef.current, numeroGiroCompletato, inizioGiroRelativoASessione);
 
           setBannerTraguardo({
@@ -797,6 +840,7 @@ export default function GameChampionshipView() {
         ultimoAggiornamentoHudRef.current = timestamp;
         setHud({
           tempoTrascorso: (performance.now() - tempoInizioRef.current) / 1000,
+          cronometro: cronometroRef.current === null ? 0 : (performance.now() - cronometroRef.current) / 1000,
           giro: giroCorrenteRef.current,
           velocitaKmh: Math.round(statoAutoRef.current.velocita * 3.6),
           zona: statoAutoRef.current.zona,
@@ -845,6 +889,10 @@ export default function GameChampionshipView() {
       .catch((errore) => console.error('Errore nel caricare il mio record personale:', errore));
 
     avversariRef.current = [];
+    cronometroRef.current = null;
+    // Prove Libere e Qualifica: si parte 250 m prima della linea, così il
+    // primo giro cronometrato è già lanciato (la Gara parte dalle piazzole).
+    if (tipo !== 'gara') statoAutoRef.current = { ...statoAutoRef.current, distanza: -250 };
     sciaRef.current = 0;
     ultimoTamponamentoRef.current = -Infinity;
     setPosizioneGara(null);
@@ -859,6 +907,15 @@ export default function GameChampionshipView() {
         setPosizioneGara(griglia.posto);
         setGrigliaInfo({ posizione: griglia.posto, piloti_totali: 20 });
       };
+      if (grigliaMultiRef.current) {
+        // gara tra utenti: griglia decisa dal server, posti liberi ai bot
+        const { griglia, seme } = grigliaMultiRef.current;
+        applica(creaGrigliaMultigiocatore(griglia, mioIdRef.current, seme, livreaDaId));
+        setStatoGriglia('pronto');
+        setFase('in-pista');
+        return;
+      }
+      semeSemaforoRef.current = null;
       applica(creaGriglia([], null));
       setStatoGriglia('caricamento');
       ottieniToken()
@@ -879,10 +936,100 @@ export default function GameChampionshipView() {
     setFase('in-pista');
   }
 
+  function chiudiConnessione() {
+    if (wsRef.current) {
+      try {
+        wsRef.current.close();
+      } catch {
+        /* già chiusa */
+      }
+    }
+    wsRef.current = null;
+    grigliaMultiRef.current = null;
+    semeSemaforoRef.current = null;
+  }
+
   function abbandonaSessione() {
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
+    chiudiConnessione();
+    setFase('selezione');
+  }
+
+  /**
+   * Gara tra utenti: sveglia il server (su Render gratuito dorme dopo 15
+   * minuti: fino a ~1 minuto), poi si collega alla sala d'attesa.
+   */
+  async function avviaGaraInRete() {
+    chiudiConnessione();
+    setArrivi([]);
+    setAttesa({ stato: 'sveglia' });
+    setFase('attesa');
+    const base = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+    let sveglio = false;
+    for (let i = 0; i < 18 && !sveglio; i++) {
+      try {
+        const r = await fetch(new URL('/', base), { signal: AbortSignal.timeout(10000) });
+        sveglio = r.ok;
+      } catch {
+        await new Promise((ok) => setTimeout(ok, 3000));
+      }
+    }
+    if (!sveglio) {
+      setAttesa({ stato: 'errore' });
+      return;
+    }
+    let token = null;
+    let posto = null;
+    try {
+      token = await ottieniToken();
+      posto = (await getGrigliaPartenza(CIRCUITO_SLUG, token))?.posizione || null;
+    } catch {
+      /* senza login o senza qualifica: si parte in fondo */
+    }
+    const url = new URL('/game/ws/gara', base);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+    ws.onopen = () => {
+      ws.send(
+        JSON.stringify({
+          tipo: 'entra',
+          modalita: modoGara === '1v1' ? '1v1' : attendiGrigliaCompleta ? 'multi_completa' : 'multi',
+          token,
+          livrea: livreaRef.current,
+          posto_qualifica: posto,
+        })
+      );
+    };
+    ws.onmessage = (evento) => {
+      let m;
+      try {
+        m = JSON.parse(evento.data);
+      } catch {
+        return;
+      }
+      if (m.tipo === 'benvenuto') mioIdRef.current = m.id;
+      else if (m.tipo === 'attesa') setAttesa({ stato: 'attesa', ...m });
+      else if (m.tipo === 'partenza') {
+        mioIdRef.current = m.tuo_id;
+        grigliaMultiRef.current = { griglia: m.griglia, seme: m.seme };
+        semeSemaforoRef.current = m.seme;
+        setTipoSessione('gara');
+        iniziaSessione('gara');
+      } else if (m.tipo === 'stato') riceviStatoUmani(avversariRef.current, m.auto, performance.now() / 1000);
+      else if (m.tipo === 'arrivo') setArrivi((a) => [...a.filter((x) => x.id !== m.id), { id: m.id, nome: m.nome, tempo: m.tempo, io: m.id === mioIdRef.current }]);
+      else if (m.tipo === 'uscito') avversariRef.current = avversariRef.current.filter((a) => a.id !== m.id);
+    };
+    ws.onerror = () => {
+      if (!grigliaMultiRef.current) setAttesa({ stato: 'errore' });
+    };
+  }
+
+  function annullaAttesa() {
+    chiudiConnessione();
+    setAttesa(null);
     setFase('selezione');
   }
 
@@ -969,6 +1116,9 @@ export default function GameChampionshipView() {
 
   function concludiGara(tempoTotaleSecondi) {
     const telemetria = [...telemetriaRef.current];
+    if (wsRef.current && wsRef.current.readyState === 1) {
+      wsRef.current.send(JSON.stringify({ tipo: 'fine', tempo: tempoTotaleSecondi }));
+    }
     const distanzaGara = GIRI_GARA * LUNGHEZZA_CIRCUITO;
     const posizioneFinale =
       1 + avversariRef.current.filter((a) => tempoFinaleStimato(a, tempoTotaleSecondi, distanzaGara) < tempoTotaleSecondi).length;
@@ -1060,7 +1210,7 @@ export default function GameChampionshipView() {
               {tipoSessione === 'qualifica' ? (
                 <span className="tab-num">Tempo rimasto: {formattaTempo(tempoRimastoQualifica)}</span>
               ) : (
-                <span className="tab-num">{formattaTempo(hud.tempoTrascorso)}</span>
+                <span className="tab-num">{formattaTempo(hud.cronometro || 0)}</span>
               )}
               <span className="tab-num">{tipoSessione === 'gara' ? `Giro ${hud.giro}/${GIRI_GARA}` : `Giro ${hud.giro}`}</span>
               <span className="tab-num">{hud.velocitaKmh} km/h</span>
@@ -1220,6 +1370,23 @@ export default function GameChampionshipView() {
               </span>
             )}
 
+            {arrivi.length > 0 && (
+              <div className="game-championship-view__arrivi">
+                <span className="game-championship-view__riepilogo-etichetta">Ordine d&rsquo;arrivo tra gli utenti</span>
+                <ol>
+                  {[...arrivi]
+                    .sort((a, b) => a.tempo - b.tempo)
+                    .map((a) => (
+                      <li key={a.id} className={a.io ? 'game-championship-view__arrivo--io' : ''}>
+                        <span>{a.nome}</span>
+                        <span className="tab-num">{formattaTempo(a.tempo)}</span>
+                      </li>
+                    ))}
+                </ol>
+                <small>Chi è ancora in pista comparirà qui appena taglia il traguardo.</small>
+              </div>
+            )}
+
             {statoInvio === 'nessun-tempo' && (
               <p className="game-championship-view__esito">Nessun giro completato entro il tempo limite &mdash; riprova.</p>
             )}
@@ -1242,10 +1409,28 @@ export default function GameChampionshipView() {
             )}
 
             <div className="game-championship-view__riepilogo-azioni">
-              <button type="button" className="game-championship-view__bottone-primario" onClick={() => iniziaSessione(tipoSessione)}>
+              <button
+                type="button"
+                className="game-championship-view__bottone-primario"
+                onClick={() => {
+                  if (tipoSessione === 'gara' && modoGara !== 'bot') {
+                    avviaGaraInRete();
+                  } else {
+                    chiudiConnessione();
+                    iniziaSessione(tipoSessione);
+                  }
+                }}
+              >
                 Rigioca
               </button>
-              <button type="button" className="game-championship-view__torna-selezione" onClick={() => setFase('selezione')}>
+              <button
+                type="button"
+                className="game-championship-view__torna-selezione"
+                onClick={() => {
+                  chiudiConnessione();
+                  setFase('selezione');
+                }}
+              >
                 &larr; Cambia sessione
               </button>
             </div>
@@ -1272,6 +1457,39 @@ export default function GameChampionshipView() {
             )}
           </GlassPanel>
         </>
+      );
+    }
+
+    if (fase === 'attesa') {
+      const minuti = Math.floor((attesa?.secondi_rimasti ?? 180) / 60);
+      const secondi = String((attesa?.secondi_rimasti ?? 180) % 60).padStart(2, '0');
+      return (
+        <GlassPanel className="game-championship-view__panel game-championship-view__attesa">
+          <span className="game-championship-view__riepilogo-etichetta">
+            Gara {modoGara === '1v1' ? '1 contro 1' : attendiGrigliaCompleta ? 'a griglia completa' : 'tra più piloti'} &mdash; {CIRCUITO_NOME}
+          </span>
+          {attesa?.stato === 'sveglia' && <p>Sto svegliando il server di gioco: può volerci fino a un minuto&hellip;</p>}
+          {attesa?.stato === 'errore' && <p>Il server di gioco non risponde. Riprova tra poco, o corri contro i bot.</p>}
+          {attesa?.stato === 'attesa' && (
+            <>
+              <span className="game-championship-view__attesa-numero tab-num">
+                {attesa.in_attesa}
+                <small>/{attesa.posti}</small>
+              </span>
+              <p>
+                {attesa.in_attesa === 1
+                  ? 'Sei l’unico pilota in attesa, per ora.'
+                  : `${attesa.in_attesa} piloti in attesa come te.`}{' '}
+                Partenza al più tardi tra <strong className="tab-num">{minuti}:{secondi}</strong>: i posti vuoti saranno dei bot.
+              </p>
+            </>
+          )}
+          <div className="game-championship-view__riepilogo-azioni">
+            <button type="button" className="game-championship-view__torna-selezione" onClick={annullaAttesa}>
+              &larr; Annulla
+            </button>
+          </div>
+        </GlassPanel>
       );
     }
 
@@ -1309,6 +1527,45 @@ export default function GameChampionshipView() {
               ))}
             </div>
           </div>
+
+          {tipoSessione === 'gara' && (
+            <div className="game-championship-view__campo">
+              <span>Avversari</span>
+              <div className="game-championship-view__sessioni">
+                {[
+                  ['bot', 'Bot e gare registrate'],
+                  ['1v1', '1 contro 1'],
+                  ['multi', 'Più piloti'],
+                ].map(([valore, etichetta]) => (
+                  <button
+                    key={valore}
+                    type="button"
+                    className={`game-championship-view__sessione-bottone ${modoGara === valore ? 'game-championship-view__sessione-bottone--attiva' : ''}`}
+                    onClick={() => setModoGara(valore)}
+                  >
+                    {etichetta}
+                  </button>
+                ))}
+              </div>
+              {modoGara === 'multi' && (
+                <label className="game-championship-view__opzione">
+                  <input type="checkbox" checked={attendiGrigliaCompleta} onChange={(e) => setAttendiGrigliaCompleta(e.target.checked)} />
+                  Aspetta la griglia completa (20 piloti)
+                </label>
+              )}
+              {modoGara !== 'bot' && (
+                <p className="game-championship-view__nota-modo">
+                  {modoGara === '1v1'
+                    ? 'Si parte appena arriva un altro pilota.'
+                    : attendiGrigliaCompleta
+                      ? 'Si parte quando la griglia è piena.'
+                      : 'Si parte con almeno 2 piloti, 20 secondi dopo l’arrivo del secondo.'}{' '}
+                  Al massimo 3 minuti di attesa, poi si parte comunque e i posti vuoti vanno ai bot. Le auto degli altri
+                  utenti sono attraversabili: niente contatti tra utenti.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="game-championship-view__campo">
             <span>Livrea</span>
@@ -1442,9 +1699,9 @@ export default function GameChampionshipView() {
           <button
             type="button"
             className="game-championship-view__bottone-primario"
-            onClick={() => iniziaSessione(tipoSessione)}
+            onClick={() => (tipoSessione === 'gara' && modoGara !== 'bot' ? avviaGaraInRete() : iniziaSessione(tipoSessione))}
           >
-            Vai in pista
+            {tipoSessione === 'gara' && modoGara !== 'bot' ? 'Cerca avversari' : 'Vai in pista'}
           </button>
         </GlassPanel>
 
