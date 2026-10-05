@@ -39,8 +39,15 @@ export function ConsensoProvider({ children }) {
   const [riaperto, setRiaperto] = useState(false);
 
   useEffect(() => {
-    // Con un sistema di consenso esterno (CONSENSO.PROPRIO=false) le richieste le gestisce lui.
-    if (CONSENSO.PROPRIO) applicaAdSense(window, record);
+    if (CONSENSO.PROPRIO) {
+      applicaAdSense(window, record);
+    } else {
+      // Consenso affidato al sistema certificato di Google (TCF): è lui a
+      // decidere cosa può fare ogni annuncio. La pausa messa in index.html
+      // (pensata per il banner fatto in casa) qui va tolta, altrimenti nessun
+      // annuncio verrebbe MAI richiesto.
+      (window.adsbygoogle = window.adsbygoogle || []).pauseAdRequests = 0;
+    }
   }, [record]);
 
   const scegli = useCallback(

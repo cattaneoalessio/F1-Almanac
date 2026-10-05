@@ -25,9 +25,9 @@ export const MODALITA = MODALITA_AMMESSE.includes(richiesta) ? richiesta : impor
  * in data-ad-slot nel codice che AdSense mostra per ciascuna unità.
  */
 export const UNITA = {
-  orizzontale: '', // banner orizzontali: tra i blocchi e in fondo alla pagina
-  rettangolo: '', // rettangoli tra i blocchi
-  verticale: '', // colonne laterali
+  orizzontale: '2796697413', // "Orizzontale": banner tra i blocchi e in fondo alla pagina
+  rettangolo: '8049024091', // "Quadrato": rettangoli tra i blocchi
+  verticale: '5965696944', // "Verticale": colonne laterali
 };
 
 // Ogni formato degli spazi (vedi components/AdSlot.jsx) usa una delle tre unità.
