@@ -759,6 +759,102 @@ function disegnaAutoNelTratto(ctx, lista, P, f, cx, oy, sprite, larghezzaMondo, 
 }
 
 // ---------------------------------------------------------------------------
+// Traguardo: linea a scacchi, piazzole della griglia e portale
+// ---------------------------------------------------------------------------
+const POSTI_GRIGLIA = 20;
+const PASSO_GRIGLIA = 8; // metri tra una piazzola e l'altra (come avversari.js)
+
+/** Posizione della strada alla profondità z (P ordinato per z crescente). */
+function stradaA(P, z) {
+  let j = 1;
+  while (j < P.length && P[j].s.z < z) j++;
+  if (j >= P.length || z < P[0].s.z) return null;
+  const a = P[j - 1];
+  const b = P[j];
+  const t = (z - a.s.z) / (b.s.z - a.s.z || 1);
+  return { x: a.s.x + (b.s.x - a.s.x) * t, y: a.s.y + (b.s.y - a.s.y) * t };
+}
+
+/** Quadrilatero sull'asfalto tra le profondità z0..z1 e le x (dal centro pista) x0..x1. */
+function quadAsfalto(ctx, P, f, cx, oy, z0, z1, x0, x1, colore, sollevato = 0) {
+  if (z0 < 0.6) z0 = 0.6;
+  if (z1 <= z0) return;
+  const r0 = stradaA(P, z0);
+  const r1 = stradaA(P, z1);
+  if (!r0 || !r1) return;
+  const k0 = f / z0;
+  const k1 = f / z1;
+  ctx.fillStyle = colore;
+  ctx.beginPath();
+  ctx.moveTo(cx + (r0.x + x0) * k0, oy - (r0.y + sollevato) * k0);
+  ctx.lineTo(cx + (r0.x + x1) * k0, oy - (r0.y + sollevato) * k0);
+  ctx.lineTo(cx + (r1.x + x1) * k1, oy - (r1.y + sollevato) * k1);
+  ctx.lineTo(cx + (r1.x + x0) * k1, oy - (r1.y + sollevato) * k1);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** Decorazioni del traguardo che cadono nel tratto di profondità [zMin, zMax). */
+function disegnaTraguardo(ctx, P, f, cx, oy, zLinea, zMin, zMax) {
+  // piazzole della griglia, dietro la linea (bianche, a "U" aperta verso la linea)
+  for (let k = 0; k < POSTI_GRIGLIA; k++) {
+    const zFronte = zLinea - 4 - k * PASSO_GRIGLIA;
+    if (zFronte < zMin || zFronte >= zMax) continue;
+    const xc = (k % 2 === 0 ? -1 : 1) * 2.4;
+    quadAsfalto(ctx, P, f, cx, oy, zFronte - 0.25, zFronte, xc - 1.2, xc + 1.2, '#f5f5f5');
+    quadAsfalto(ctx, P, f, cx, oy, zFronte - 2.6, zFronte, xc - 1.2, xc - 1.0, '#f5f5f5');
+    quadAsfalto(ctx, P, f, cx, oy, zFronte - 2.6, zFronte, xc + 1.0, xc + 1.2, '#f5f5f5');
+  }
+  if (zLinea < zMin || zLinea >= zMax) return;
+  // linea a scacchi: 2 file da 1 m, 16 caselle in larghezza
+  const caselle = 16;
+  const largh = LARGHEZZA_PISTA / caselle;
+  for (let fila = 0; fila < 2; fila++) {
+    for (let i = 0; i < caselle; i++) {
+      const nero = (i + fila) % 2 === 0;
+      const x0 = -SEMI_PISTA + i * largh;
+      quadAsfalto(ctx, P, f, cx, oy, zLinea + fila * 1.0, zLinea + (fila + 1) * 1.0, x0, x0 + largh, nero ? '#111111' : '#ffffff');
+    }
+  }
+  // portale sopra il traguardo: due piloni e una trave a scacchi con la scritta
+  const r = stradaA(P, Math.max(0.6, zLinea));
+  if (!r || zLinea < 2) return;
+  const k = f / zLinea;
+  const xs = SEMI_PISTA + LARGHEZZA_CORDOLO + 1.2;
+  const hTrave = 7;
+  ctx.fillStyle = '#37474f';
+  for (const lato of [-1, 1]) {
+    const x = cx + (r.x + lato * xs) * k;
+    ctx.fillRect(x - 0.35 * k, oy - (r.y + hTrave + 1.2) * k, 0.7 * k, (hTrave + 1.2) * k);
+  }
+  const xa = cx + (r.x - xs) * k;
+  const xb = cx + (r.x + xs) * k;
+  const yTop = oy - (r.y + hTrave + 1.4) * k;
+  const hBanda = 1.6 * k;
+  ctx.fillStyle = '#0b0c10';
+  ctx.fillRect(xa, yTop, xb - xa, hBanda);
+  const lato = Math.max(1, hBanda / 3);
+  for (let x = xa; x < xb; x += lato) {
+    for (let riga = 0; riga < 3; riga++) {
+      if ((Math.floor((x - xa) / lato) + riga) % 2 === 0) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, yTop + riga * lato, Math.min(lato, xb - x), lato);
+      }
+    }
+  }
+  if (hBanda > 10) {
+    const w = (xb - xa) * 0.42;
+    ctx.fillStyle = '#e10600';
+    ctx.fillRect(cx + r.x * k - w / 2, yTop + hBanda * 0.12, w, hBanda * 0.76);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `800 ${Math.round(hBanda * 0.62)}px "Big Shoulders Display", "Arial Narrow", sans-serif`;
+    ctx.fillText('MONOPOSTO.IO', cx + r.x * k, yTop + hBanda * 0.52);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Renderer
 // ---------------------------------------------------------------------------
 /**
@@ -935,6 +1031,14 @@ export function creaRendererPov(creaCanvas) {
       .filter((a) => a.dz > 1 && a.dz < 1500)
       .map((a) => ({ ...a, z: a.dz }))
       .sort((p1, p2) => p2.z - p1.z);
+    // profondità della linea del traguardo più vicina davanti (o appena dietro)
+    let zLinea = null;
+    if (typeof scena.distanzaCamera === 'number') {
+      const restoGiro = ((scena.distanzaCamera % LUNGHEZZA_CIRCUITO) + LUNGHEZZA_CIRCUITO) % LUNGHEZZA_CIRCUITO;
+      zLinea = LUNGHEZZA_CIRCUITO - restoGiro;
+      if (zLinea > LUNGHEZZA_CIRCUITO - 200) zLinea -= LUNGHEZZA_CIRCUITO; // appena passata: le piazzole sono davanti
+      // le piazzole stanno fino a 160 m prima della linea: se la linea è dietro, restano da disegnare
+    }
     let prossimaAuto = 0;
     const disegnaAutoFinoA = (zLimite) => {
       const gruppo = [];
@@ -1002,6 +1106,9 @@ export function creaRendererPov(creaCanvas) {
       }
 
       // scenario (dal più lontano al più vicino, insieme alla pista)
+      if (zLinea !== null && zLinea > -10 - POSTI_GRIGLIA * PASSO_GRIGLIA && b.s.z < 700) {
+        disegnaTraguardo(ctx, P, f, cx, oy, zLinea, b.s.z, a.s.z);
+      }
       if (b.s.z < 900) disegnaScenario(ctx, c, a, b, idx, scena.tratti.get(idx), Math.abs(b.s.curva));
       disegnaAutoFinoA(b.s.z);
     }

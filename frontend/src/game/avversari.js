@@ -251,13 +251,20 @@ function puntiDaCheckpoint(checkpoint) {
 }
 
 /**
- * Griglia della gara (20 posti). `registrati`: gare di altri utenti
- * [{username, tempo_totale, tempo_qualifica, checkpoint}]; `posizioneGiocatore`:
- * posto in griglia dalla qualifica (1-20), o null = in fondo.
- * Il giocatore parte SEMPRE a distanza 0 (la sua gara misura sempre gli
- * stessi metri, a garanzia della classifica): gli altri sono messi davanti
- * o dietro di lui di conseguenza.
+ * Griglia della gara (20 posti), come in F1: piazzole DIETRO la linea del
+ * traguardo, una ogni 8 m alternando i lati; la pole ha il muso a 4 m dalla
+ * linea. `registrati`: gare di altri utenti [{username, tempo_totale,
+ * tempo_qualifica, checkpoint}]; `posizioneGiocatore`: posto dalla
+ * qualifica (1-20) o null = in fondo. Il giro 1 di chi parte dietro è più
+ * lungo di qualche decina di metri: è la penalità reale di partire dietro.
  */
+export function distanzaPiazzola(posto) {
+  return -(4 + (posto - 1) * DISTANZA_GRIGLIA);
+}
+export function latoPiazzola(posto) {
+  return posto % 2 === 1 ? -1 : 1;
+}
+
 export function creaGriglia(registrati, posizioneGiocatore, seme = Date.now()) {
   const rnd = casuale(seme);
   const altri = [];
@@ -287,31 +294,35 @@ export function creaGriglia(registrati, posizioneGiocatore, seme = Date.now()) {
   altri.sort((a, b) => a.ritmo - b.ritmo); // i più veloci davanti
   const posto = Math.max(1, Math.min(20, posizioneGiocatore || 20));
   const ordine = [...altri.slice(0, posto - 1), null, ...altri.slice(posto - 1)];
-  const latoGiocatore = posto % 2 === 1 ? -1 : 1;
   ordine.forEach((auto, i) => {
     if (!auto) return;
-    const offset = (posto - 1 - i) * DISTANZA_GRIGLIA; // davanti = positivo
-    const lato = (i + 1) % 2 === 1 ? -1 : 1;
-    auto.offsetGriglia = offset;
-    auto.distanza = offset;
-    auto.x = lato * X_GRIGLIA;
-    auto.xPreferita = lato * X_GRIGLIA * 0.5;
+    auto.distanza = distanzaPiazzola(i + 1);
+    auto.partenza = auto.distanza;
+    if (auto.punti) auto.punti[0].d = auto.partenza; // la gara registrata riparte da questa piazzola
+    auto.x = latoPiazzola(i + 1) * X_GRIGLIA;
+    auto.xPreferita = latoPiazzola(i + 1) * X_GRIGLIA * 0.5;
   });
-  return { avversari: altri, xGiocatore: latoGiocatore * X_GRIGLIA, posto };
+  return {
+    avversari: altri,
+    xGiocatore: latoPiazzola(posto) * X_GRIGLIA,
+    distanzaGiocatore: distanzaPiazzola(posto),
+    posto,
+  };
 }
 
 /** Distanza di un avversario "fantasma" all'istante t (s dal via), senza ritardi. */
 function distanzaFantasma(f, t) {
   const p = f.punti;
-  if (t <= 0) return 0;
+  if (t <= 0) return p[0].d;
   for (let i = 1; i < p.length; i++) {
     if (t <= p[i].t) {
       const a = p[i - 1];
       const b = p[i];
-      if (a.d === 0 && b.d <= L) {
-        // primo intermedio: partenza da fermo
-        const tb = interpolaTabella(T_PARTENZA, b.d);
-        return inversaTabella(T_PARTENZA, ((t - a.t) / (b.t - a.t)) * tb);
+      if (i === 1) {
+        // primo intermedio: partenza da fermo dalla piazzola
+        const tratto = Math.min(L, b.d - a.d);
+        const tb = interpolaTabella(T_PARTENZA, tratto);
+        return a.d + inversaTabella(T_PARTENZA, ((t - a.t) / (b.t - a.t)) * tb);
       }
       const ta = tempoIdeale(a.d);
       const tb = tempoIdeale(b.d);
@@ -379,7 +390,7 @@ export function aggiornaAvversari(avversari, giocatore, dt, { tempoGara = 0, cir
       const chiuso = davanti && gapDavanti < LUNGHEZZA_AUTO + 3 && Math.abs(davanti.x - a.x) < LARGHEZZA_AUTO;
       if (chiuso) a.ritardo += dt * 0.6;
       const prima = a.distanza;
-      a.distanza = distanzaFantasma(a, tempoGara - a.ritardo) + a.offsetGriglia;
+      a.distanza = distanzaFantasma(a, tempoGara - a.ritardo);
       if (chiuso && davanti) a.distanza = Math.min(a.distanza, davanti.distanza - LUNGHEZZA_AUTO - 1);
       a.velocita = Math.max(0, (a.distanza - prima) / Math.max(dt, 1e-3));
     } else {

@@ -167,6 +167,7 @@ export default function GameChampionshipView() {
   const sciaRef = useRef(0);
   const ultimoTamponamentoRef = useRef(-Infinity);
   const [posizioneGara, setPosizioneGara] = useState(null);
+  const [bannerTraguardo, setBannerTraguardo] = useState(null); // { titolo, dettaglio } per ~3 s al passaggio sul traguardo
   const ultimoDtRef = useRef(0); // per le particelle di fumo, che vivono nel renderer
   const rendererRef = useRef(null);
   if (rendererRef.current === null && typeof document !== 'undefined') {
@@ -203,6 +204,25 @@ export default function GameChampionshipView() {
   // fotogramma (vedi il punto in cui telemetriaRef viene aggiornato).
   const tempiIntermediGiroRef = useRef([null, null, null]);
   const [tempiIntermedi, setTempiIntermedi] = useState([null, null, null]);
+
+  // Il banner del traguardo resta 3 secondi.
+  useEffect(() => {
+    if (!bannerTraguardo) return undefined;
+    const id = setTimeout(() => setBannerTraguardo(null), 3000);
+    return () => clearTimeout(id);
+  }, [bannerTraguardo]);
+
+  // BUG (segnalato il 4/10): finita la sessione si passava al riepilogo
+  // lasciando attivo lo schermo intero "via CSS" (su iPhone l'unico
+  // possibile), che nasconde menu e footer e blocca lo scorrimento della
+  // pagina: sito bloccato. Fuori dalla pista lo schermo intero si chiude sempre.
+  useEffect(() => {
+    if (fase === 'in-pista') return;
+    if (document.body.classList.contains('gioco-fullscreen-pagina-intera') || modoFullscreenPaginaInteraRef.current) {
+      disattivaSchermoIntero();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase]);
 
   // Sicurezza: se si naviga via mentre si è nel fallback fullscreen su
   // tutta la pagina, la classe sul body non deve restare appiccicata.
@@ -392,12 +412,12 @@ export default function GameChampionshipView() {
      * massima — il momento ideale di cambiata. `frazioneVelocita` è
      * velocità attuale / velocità massima (0-1).
      */
-    function disegnaLedCambio(ctx, larghezza, frazioneVelocita, adesso) {
+    function disegnaLedCambio(ctx, larghezza, altezza, frazioneVelocita, adesso) {
       const numeroLed = 7;
-      const raggio = Math.max(3, larghezza * 0.007);
-      const spaziatura = raggio * 2.8;
+      const raggio = Math.max(2.5, larghezza * 0.0055);
+      const spaziatura = raggio * 2.7;
       const centroX = larghezza / 2;
-      const y = raggio * 2.4;
+      const y = altezza * 0.705; // sulla cornice superiore del display, nell'abitacolo
       const ledAccesi = Math.floor(frazioneVelocita * numeroLed);
       const lampeggia = Math.floor(adesso / 150) % 2 === 0;
 
@@ -417,17 +437,17 @@ export default function GameChampionshipView() {
       }
     }
 
-    /** Display digitale in cima al cielo: marcia (ciano) e velocità (oro)
-     * in Big Shoulders Display, su un riquadro scuro arrotondato. */
-    function disegnaDisplay(ctx, larghezza, velocitaKmh, frazioneVelocita) {
-      const larghezzaBox = Math.max(120, larghezza * 0.17);
-      const altezzaBox = larghezzaBox * 0.36;
+    /** Display del volante, nell'abitacolo appena sopra il casco: marcia
+     * (ciano) e velocità (oro) in Big Shoulders Display. */
+    function disegnaDisplay(ctx, larghezza, altezza, velocitaKmh, frazioneVelocita) {
+      const larghezzaBox = Math.max(110, larghezza * 0.14);
+      const altezzaBox = larghezzaBox * 0.34;
       const x = larghezza / 2 - larghezzaBox / 2;
-      const y = larghezzaBox * 0.2;
+      const y = altezza * 0.72;
 
-      ctx.fillStyle = 'rgba(11,12,16,0.78)';
+      ctx.fillStyle = 'rgba(8,9,12,0.92)';
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(x, y, larghezzaBox, altezzaBox, altezzaBox * 0.22);
+      if (ctx.roundRect) ctx.roundRect(x, y, larghezzaBox, altezzaBox, altezzaBox * 0.2);
       else ctx.rect(x, y, larghezzaBox, altezzaBox);
       ctx.fill();
       ctx.strokeStyle = 'rgba(63,208,255,0.45)';
@@ -504,12 +524,28 @@ export default function GameChampionshipView() {
       ctx.arc(sPartenza.x, sPartenza.y, Math.max(2.5, larghezza * 0.034), 0, Math.PI * 2);
       ctx.fill();
 
-      const i0 = Math.floor(segmentoAutoFrazionale) % NUMERO_SEGMENTI_TOTALE;
-      const i1 = (i0 + 1) % NUMERO_SEGMENTI_TOTALE;
-      const frazione = segmentoAutoFrazionale - Math.floor(segmentoAutoFrazionale);
-      const p0 = FORMA_MINIMAPPA[i0];
-      const p1 = FORMA_MINIMAPPA[i1];
-      const sAuto = puntoSchermo({ x: p0.x + (p1.x - p0.x) * frazione, y: p0.y + (p1.y - p0.y) * frazione });
+      // Pallini sulla pista: prima gli avversari (colore della loro livrea), poi il giocatore sopra.
+      const puntoSulGiro = (segmentoFrazionale) => {
+        const n = NUMERO_SEGMENTI_TOTALE;
+        const assoluto = ((segmentoFrazionale % n) + n) % n; // anche prima del via, quando si è in griglia (distanza negativa)
+        const i0 = Math.floor(assoluto);
+        const i1 = (i0 + 1) % n;
+        const fr = assoluto - i0;
+        const p0 = FORMA_MINIMAPPA[i0];
+        const p1 = FORMA_MINIMAPPA[i1];
+        return puntoSchermo({ x: p0.x + (p1.x - p0.x) * fr, y: p0.y + (p1.y - p0.y) * fr });
+      };
+      for (const a of avversariRef.current) {
+        const q = puntoSulGiro(a.distanza / LUNGHEZZA_SEGMENTO);
+        ctx.fillStyle = a.livrea?.base || '#cccccc';
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+        ctx.lineWidth = Math.max(1, larghezza * 0.008);
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, Math.max(2, larghezza * 0.028), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      const sAuto = puntoSulGiro(segmentoAutoFrazionale);
       ctx.fillStyle = '#ff3b30';
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = Math.max(1, larghezza * 0.012);
@@ -611,6 +647,7 @@ export default function GameChampionshipView() {
         velocita: auto.velocita,
         dt: ultimoDtRef.current,
         // specchietti con vista posteriore solo in Qualifica e Gara (decisione del 4/10)
+        distanzaCamera: camera.distanza,
         dietro: tipoSessione === 'prove_libere' ? null : segmentiDietro(camera),
         auto: avversariRef.current.map((a) => {
           let dz = a.distanza - auto.distanza;
@@ -622,8 +659,9 @@ export default function GameChampionshipView() {
       });
 
       disegnaLineeVento(ctx, W, H, velocitaKmhHud, performance.now());
-      disegnaLedCambio(ctx, W, frazioneVelocitaHud, performance.now());
-      if (viaRef.current) disegnaDisplay(ctx, W, velocitaKmhHud, frazioneVelocitaHud); // durante il semaforo quel posto è delle luci
+      // cruscotto nell'abitacolo, sopra il casco: LED del cambio + marcia/velocità
+      disegnaDisplay(ctx, W, H, velocitaKmhHud, frazioneVelocitaHud);
+      disegnaLedCambio(ctx, W, H, frazioneVelocitaHud, performance.now());
 
       const minimappa = minimappaRef.current;
       if (minimappa && minimappa.width > 0 && minimappa.height > 0) {
@@ -707,6 +745,14 @@ export default function GameChampionshipView() {
           const inizioGiroRelativoASessione = inizioGiroRef.current - tempoInizioRef.current;
           const checkpointDiQuestoGiro = estraiCheckpointDelGiro(telemetriaRef.current, numeroGiroCompletato, inizioGiroRelativoASessione);
 
+          setBannerTraguardo({
+            titolo: tipoSessione === 'gara' && numeroGiroCompletato >= GIRI_GARA ? 'BANDIERA A SCACCHI' : 'TRAGUARDO',
+            dettaglio:
+              tipoSessione === 'gara'
+                ? `Giro ${numeroGiroCompletato}/${GIRI_GARA} · ${formattaTempo(tempoGiroSecondi)}`
+                : `Giro ${numeroGiroCompletato} · ${formattaTempo(tempoGiroSecondi)}`,
+            id: adesso,
+          });
           giriCompletatiRef.current = [
             ...giriCompletatiRef.current,
             { numero: numeroGiroCompletato, tempo: tempoGiroSecondi, valido: true, checkpoint: checkpointDiQuestoGiro },
@@ -809,7 +855,7 @@ export default function GameChampionshipView() {
       // arrivano griglia e gare registrate, se arrivano prima del via
       const applica = (griglia) => {
         avversariRef.current = griglia.avversari;
-        statoAutoRef.current = { ...statoAutoRef.current, x: griglia.xGiocatore };
+        statoAutoRef.current = { ...statoAutoRef.current, x: griglia.xGiocatore, distanza: griglia.distanzaGiocatore };
         setPosizioneGara(griglia.posto);
         setGrigliaInfo({ posizione: griglia.posto, piloti_totali: 20 });
       };
@@ -1058,6 +1104,12 @@ export default function GameChampionshipView() {
             </div>
           )}
           {mostraVia && <div className="game-championship-view__via-flash-pov">VIA!</div>}
+          {bannerTraguardo && (
+            <div key={bannerTraguardo.id} className="game-championship-view__banner-traguardo" role="status">
+              <span className="game-championship-view__banner-traguardo-titolo">{bannerTraguardo.titolo}</span>
+              <span className="game-championship-view__banner-traguardo-dettaglio tab-num">{bannerTraguardo.dettaglio}</span>
+            </div>
+          )}
 
           {!desktopFullscreenImmersivo && giriCompletati.length > 0 && (
             <div className="game-championship-view__giri-lista-pov-contenitore">
@@ -1304,17 +1356,88 @@ export default function GameChampionshipView() {
             </div>
           </div>
 
-          <ul className="game-championship-view__regole-lista">
-            <li>Il cordolo riduce la velocità del 20% al secondo, l&rsquo;erba del 40% al secondo.</li>
-            <li>Muri di contenimento oltre l&rsquo;erba: l&rsquo;auto non può uscirne. Niente retromarcia.</li>
-            {tipoSessione === 'qualifica' && (
-              <li>
-                Qualifica: hai <strong>{formattaTempo(LIMITE_TEMPO_QUALIFICA_SECONDI)}</strong> dal semaforo verde per
-                il tuo giro migliore.
-              </li>
+          <div className="game-championship-view__regole">
+            <section className="game-championship-view__regola game-championship-view__regola--sessione">
+              <h4>{ETICHETTA_SESSIONE[tipoSessione]}</h4>
+              <ul>
+                {tipoSessione === 'prove_libere' && (
+                  <>
+                    <li>Pista libera, nessun limite di tempo: impara traiettorie e punti di frenata.</li>
+                    <li>Ogni giro completato può diventare il tuo record (se hai fatto l&rsquo;accesso).</li>
+                  </>
+                )}
+                {tipoSessione === 'qualifica' && (
+                  <>
+                    <li>
+                      Hai <strong>{formattaTempo(LIMITE_TEMPO_QUALIFICA_SECONDI)}</strong> dal semaforo verde: conta il tuo giro
+                      più veloce.
+                    </li>
+                    <li>In pista girano <strong>10 bot</strong>: superali o sfrutta la loro scia.</li>
+                    <li>Il tempo decide il tuo posto in griglia per la Gara.</li>
+                  </>
+                )}
+                {tipoSessione === 'gara' && (
+                  <>
+                    <li>
+                      <strong>{GIRI_GARA} giri</strong>, partenza da fermo dalla griglia: il tuo posto dipende dal tempo di
+                      Qualifica (senza tempo parti ultimo).
+                    </li>
+                    <li>20 auto: le migliori gare registrate dagli altri piloti, completate da bot.</li>
+                    <li>La posizione si aggiorna a ogni intermedio; al traguardo vedi l&rsquo;ordine d&rsquo;arrivo.</li>
+                  </>
+                )}
+              </ul>
+            </section>
+
+            <section className="game-championship-view__regola">
+              <h4>Comandi</h4>
+              <ul>
+                <li>
+                  Tastiera: <kbd>↑</kbd>/<kbd>W</kbd> gas, <kbd>↓</kbd>/<kbd>S</kbd> freno, <kbd>←</kbd> <kbd>→</kbd> o{' '}
+                  <kbd>A</kbd> <kbd>D</kbd> sterzo.
+                </li>
+                <li>Telefono: i pulsanti a schermo, sterzo a sinistra e pedali a destra. Meglio in orizzontale.</li>
+              </ul>
+            </section>
+
+            <section className="game-championship-view__regola">
+              <h4>Guida</h4>
+              <ul>
+                <li>La spinta cala salendo di velocità: i <strong>350 km/h</strong> si toccano solo in fondo ai rettilinei lunghi.</li>
+                <li>Se lasci il gas la macchina rallenta da sola; il freno morde di più ad alta velocità.</li>
+                <li>
+                  I cartelli prima delle curve indicano la velocità consigliata: entrando più forte l&rsquo;auto allarga
+                  (<strong>sottosterzo</strong>) e perde velocità.
+                </li>
+              </ul>
+            </section>
+
+            <section className="game-championship-view__regola">
+              <h4>Fuori pista</h4>
+              <ul>
+                <li>
+                  Cordolo: <strong>−20%</strong> di velocità ogni secondo. Erba: <strong>−50%</strong> ogni secondo.
+                </li>
+                <li>Oltre l&rsquo;erba ci sono i muri: l&rsquo;auto non può uscire. Niente retromarcia.</li>
+              </ul>
+            </section>
+
+            {tipoSessione !== 'prove_libere' && (
+              <section className="game-championship-view__regola">
+                <h4>Traffico</h4>
+                <ul>
+                  <li>
+                    <strong>Scia</strong>: entro 50 m dietro un&rsquo;auto guadagni fino a 10 km/h.
+                  </li>
+                  <li>
+                    <strong>Tamponamento</strong>: se colpisci un&rsquo;auto da dietro perdi velocità in proporzione alla botta
+                    (nulla sotto i 10 km/h di differenza, al massimo il 60%).
+                  </li>
+                  <li>Le altre auto non ti tamponano mai: ti girano attorno o rallentano. Negli specchietti vedi chi arriva.</li>
+                </ul>
+              </section>
             )}
-            {tipoSessione === 'gara' && <li>Gara: {GIRI_GARA} giri, si parte in griglia secondo il tempo di Qualifica.</li>}
-          </ul>
+          </div>
 
           <button
             type="button"
