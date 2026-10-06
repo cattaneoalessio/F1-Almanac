@@ -17,6 +17,7 @@ const FISSE = {
   '/piloti': pagina('Piloti di Formula 1', 'Tutti i piloti della storia della Formula 1: carriera, vittorie, punti e risultati gara per gara, dal 1950 a oggi.'),
   '/scuderie': pagina('Scuderie di Formula 1', 'Le scuderie e i costruttori della Formula 1: piloti, gare disputate, vittorie e punti nella storia del campionato.'),
   '/circuiti': pagina('Circuiti di Formula 1', "I circuiti della Formula 1: tracciato, storia, curve, gare disputate e albo d'oro dei vincitori."),
+  '/academy': pagina('Academy: impara la Formula 1', 'Vocabolario dei termini della F1 e lezioni su come è fatta una monoposto.'),
   '/news': pagina('News Formula 1', 'Articoli, approfondimenti e notizie sulla Formula 1 dalla redazione di Monoposto.io.'),
   '/analisi': pagina('Analisi GP: telemetria e strategie', 'Telemetria comparativa tra piloti, strategie gomme e ritmo gara di ogni Gran Premio, dal 2023 a oggi.'),
   '/arcade': pagina('Arcade: giochi sulla Formula 1', 'Quiz e sfide a tempo sulla storia della Formula 1: metti alla prova le tue conoscenze e scala le classifiche.'),

@@ -1,0 +1,53 @@
+.academy { max-width: 980px; margin-inline: auto; }
+.academy h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.1; margin: 0 0 0.6rem; }
+.academy__occhiello { margin: 0 0 0.3rem; font-family: var(--font-display); font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-gold); }
+.academy__intro { margin: 0 0 1.6rem; max-width: 62ch; font-size: 1.05rem; line-height: 1.55; color: var(--text-gray); }
+.academy__briciole { margin: 0 0 0.8rem; font-size: 0.85rem; color: var(--text-gray); }
+.academy__briciole a { color: var(--text-gray); }
+.academy__griglia { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-bottom: 1.6rem; }
+.academy__scheda { display: flex; flex-direction: column; gap: 0.6rem; color: inherit; text-decoration: none; border-top: 3px solid var(--accent-red); transition: transform 0.15s; }
+.academy__scheda:hover { transform: translateY(-2px); }
+.academy__scheda h2 { margin: 0; font-size: 1.5rem; }
+.academy__scheda p { margin: 0; line-height: 1.5; color: var(--text-gray); flex-grow: 1; }
+.academy__scheda--presto { border-top-color: var(--text-gray); opacity: 0.75; }
+.academy__azione { font-family: var(--font-display); font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--accent-gold); }
+.academy__presto p { line-height: 1.6; }
+
+.vocabolario__filtri { position: sticky; top: 0; z-index: 3; padding: 0.8rem 0; background: var(--bg-main, #0b0c10); display: flex; flex-direction: column; gap: 0.7rem; }
+.vocabolario__filtri input { width: 100%; padding: 0.7rem 0.9rem; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; background: rgba(0,0,0,0.3); color: var(--text-primary); font: inherit; }
+.vocabolario__categorie { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.2rem; }
+.vocabolario__categorie button { flex-shrink: 0; padding: 0.35rem 0.75rem; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--text-gray); font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
+.vocabolario__categorie button.attiva { border-color: var(--accent-gold); color: var(--text-primary); }
+.vocabolario__lettere { display: flex; flex-wrap: wrap; gap: 0.15rem; }
+.vocabolario__lettere a { min-width: 1.6rem; padding: 0.15rem 0.3rem; text-align: center; font-family: var(--font-display); color: var(--accent-cyan); text-decoration: none; }
+.vocabolario__lista { margin: 0; }
+.vocabolario__voce { padding: 1rem 0; border-bottom: 1px solid var(--line); scroll-margin-top: 11rem; }
+.vocabolario__voce--evidenziata { background: rgba(217,164,65,0.08); }
+.vocabolario__lettera { display: block; margin: 0.6rem 0 0.8rem; font-family: var(--font-display); font-size: 2rem; color: var(--accent-red); scroll-margin-top: 11rem; }
+.vocabolario__voce dt { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; font-size: 1.15rem; font-weight: 700; }
+.vocabolario__inglese { font-weight: 400; font-style: italic; font-size: 0.95rem; color: var(--accent-cyan); }
+.vocabolario__categoria { margin-left: auto; font-weight: 400; font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-gray); }
+.vocabolario__voce dd { margin: 0.4rem 0 0; }
+.vocabolario__voce dd p { margin: 0 0 0.35rem; line-height: 1.55; }
+.vocabolario__esempio { color: var(--text-gray); font-style: italic; }
+
+.impara__indice { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.6rem; }
+.impara__scheda { display: flex; align-items: center; gap: 1rem; color: inherit; text-decoration: none; }
+.impara__scheda strong { display: block; font-size: 1.1rem; }
+.impara__numero { font-family: var(--font-display); font-size: 1.8rem; color: var(--accent-red); min-width: 2.6rem; }
+.impara__sommario { display: block; margin-top: 0.2rem; color: var(--text-gray); font-size: 0.92rem; line-height: 1.45; }
+
+.lezione__sezione { margin: 1.8rem 0; }
+.lezione__sezione h2 { font-size: 1.45rem; margin: 0 0 0.7rem; }
+.lezione__sezione p { font-size: 1.05rem; line-height: 1.7; margin: 0 0 0.9rem; }
+.lezione__tabella-wrap { overflow-x: auto; }
+.lezione__confronto { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.lezione__confronto th, .lezione__confronto td { padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.lezione__confronto thead th { font-family: var(--font-display); letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.8rem; color: var(--accent-gold); }
+.lezione__confronto tbody th { color: var(--text-gray); font-weight: 600; width: 30%; }
+.lezione__confronto td:nth-child(2) { color: var(--text-primary); font-weight: 600; }
+.lezione__nota { font-size: 0.8rem !important; color: var(--text-gray); }
+.lezione__fonti ul { padding-left: 1.2rem; line-height: 1.7; }
+.lezione__fonti a { color: var(--accent-cyan); }
+.lezione__navigazione { display: flex; justify-content: space-between; gap: 1rem; margin: 2rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.lezione__navigazione a { color: var(--accent-gold); text-decoration: none; font-family: var(--font-display); }

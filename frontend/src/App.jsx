@@ -39,6 +39,10 @@ import { useMetaPagina } from './hooks/useMetaPagina.js';
 import { AuthProvider } from './auth/AuthContext.jsx';
 import MenuUtente from './components/MenuUtente.jsx';
 import ArticoloView from './views/ArticoloView.jsx';
+import AcademyView from './views/academy/AcademyView.jsx';
+import VocabolarioView from './views/academy/VocabolarioView.jsx';
+import ForumView from './views/academy/ForumView.jsx';
+import { ImparaIndice, LezioneView } from './views/academy/ImparaView.jsx';
 import monopostoIcona from './assets/monoposto-nav-icon.png';
 
 // Ordine deciso con il gestore (1/10/2026). Niente voce "Home": è già il logo.
@@ -49,6 +53,7 @@ const TABS = [
   { pattern: '/circuiti', to: '/circuiti', label: 'Circuiti' },
   { pattern: '/scuderie', to: '/scuderie', label: 'Scuderie' },
   { pattern: '/arcade', to: '/arcade', label: 'Arcade' },
+  { pattern: '/academy', to: '/academy', label: 'Academy' },
   { pattern: '/news', to: '/news', label: 'News' },
   { pattern: '/archivio', to: `/archivio/${ANNO_DI_DEFAULT}`, label: 'Archivio' },
 ];
@@ -213,6 +218,11 @@ function ContenutoApp() {
             <Route path="/scuderie/:slug" element={<ScuderiaView />} />
             <Route path="/news" element={<NewsView />} />
             <Route path="/news/:slug" element={<ArticoloView />} />
+            <Route path="/academy" element={<AcademyView />} />
+            <Route path="/academy/vocabolario" element={<VocabolarioView />} />
+            <Route path="/academy/impara" element={<ImparaIndice />} />
+            <Route path="/academy/impara/:id" element={<LezioneView />} />
+            <Route path="/academy/forum" element={<ForumView />} />
             <Route path="/analisi" element={<AnalisiView />} />
             <Route path="/arcade" element={<ArcadeView />} />
             <Route path="/arcade/chronoquiz" element={<ChronoQuizView />} />

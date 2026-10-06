@@ -6,6 +6,7 @@
  * interruttore, `pubblico` (variabile d'ambiente SITO_PUBBLICO su Netlify).
  */
 import { SITO, ROBOTS_NON_PUBBLICO } from '../src/config/sito.js';
+import { LEZIONI } from '../src/data/academy/lezioni.js';
 
 /** Pagine con indirizzo fisso, da mettere in sitemap. Se aggiungi una pagina
  * in App.jsx con un percorso fisso, aggiungila anche qui (o in ROTTE_ESCLUSE):
@@ -13,9 +14,12 @@ import { SITO, ROBOTS_NON_PUBBLICO } from '../src/config/sito.js';
 export const ROTTE_SITEMAP = [
   '/', '/piloti', '/scuderie', '/circuiti', '/news', '/analisi', '/arcade', '/arcade/chronoquiz',
   '/arcade/time-attack', '/arcade/driverle', '/idols', '/idols/senna', '/idols/schumacher', '/idols/hamilton', '/privacy',
+  '/academy', '/academy/vocabolario', '/academy/impara',
 ];
+/** Lezioni di Impara: pagine con parametro, ma note a priori (data/academy/lezioni.js). */
+export const PAGINE_LEZIONI = LEZIONI.map((l) => `/academy/impara/${l.id}`);
 /** Percorsi fissi di App.jsx volutamente FUORI dalla sitemap (amministrazione, ecc.). */
-export const ROTTE_ESCLUSE = ['/admin/chiudi-gp', '/admin/contenuti/*'];
+export const ROTTE_ESCLUSE = ['/admin/chiudi-gp', '/admin/contenuti/*', '/academy/forum'];
 
 /** Le stagioni dell'archivio: /archivio/1950 … /archivio/<anno in corso>. */
 export function pagineArchivio(annoCorrente = new Date().getFullYear()) {
@@ -34,6 +38,9 @@ const SEZIONI_LLMS = [
   ['News', '/news', 'Articoli, approfondimenti e notizie sulla Formula 1, scritti dalla redazione del sito.'],
   ['Idols', '/idols', 'Approfondimenti sui piloti leggendari.'],
   ['Arcade', '/arcade', 'Giochi e quiz sulla storia della Formula 1.'],
+  ['Academy', '/academy', 'Impara la Formula 1: vocabolario dei termini e lezioni su come è fatta una monoposto.'],
+  ['Vocabolario della F1', '/academy/vocabolario', 'Oltre 200 termini della Formula 1, italiani e inglesi, spiegati con esempi.'],
+  ['Impara', '/academy/impara', "Lezioni su com'è fatta una F1: power unit, aerodinamica, freni, cambio, volante, gomme, sicurezza."],
 ];
 
 /** Meta tag "robots" per l'HTML. */
@@ -103,7 +110,7 @@ export function contenutoSitemap({ pubblico, percorsiDinamici = [], annoCorrente
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>
 `;
   }
-  const tutti = [...new Set([...ROTTE_SITEMAP, ...pagineArchivio(annoCorrente), ...percorsiDinamici])];
+  const tutti = [...new Set([...ROTTE_SITEMAP, ...PAGINE_LEZIONI, ...pagineArchivio(annoCorrente), ...percorsiDinamici])];
   const righe = tutti.map((percorso) => `  <url><loc>${esc(SITO.url + (percorso === '/' ? '/' : percorso))}</loc></url>`);
   return `${intestazione}<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${righe.join('\n')}\n</urlset>\n`;
 }
